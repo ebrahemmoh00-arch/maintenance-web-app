@@ -1,0 +1,99 @@
+import { useState } from "react";
+
+export default function FormModal({ title, fields, value, setValue, onSubmit, onClose, options = {}, onAddOption, labels = {} }) {
+  const [optionDrafts, setOptionDrafts] = useState({});
+  const update = (key, next) => setValue({ ...value, [key]: next });
+  const optionValue = (field, raw) => {
+    if (!field.number) return raw;
+    return raw === "" ? null : Number(raw);
+  };
+  const updateOptionDraft = (key, next) => setOptionDrafts((current) => ({ ...current, [key]: next }));
+  const addOption = async (field) => {
+    const draft = String(optionDrafts[field.key] || "").trim();
+    if (!draft || !onAddOption) return;
+    const saved = await onAddOption(field, draft);
+    if (saved) {
+      update(field.key, draft);
+      updateOptionDraft(field.key, "");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm">
+      <form onSubmit={onSubmit} className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">{labels.record || "Maintenance Record"}</p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">{title}</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-950">
+            {labels.close || "Close"}
+          </button>
+        </div>
+        <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-6 md:grid-cols-2">
+          {fields.map((field) => {
+            const common = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+            return (
+              <label key={field.key} className={field.type === "textarea" ? "md:col-span-2" : ""}>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{field.label}</span>
+                {field.type === "select" ? (
+                  <>
+                    <select className={common} value={value[field.key] ?? ""} onChange={(event) => update(field.key, optionValue(field, event.target.value))}>
+                      <option value="">{labels.select || "Select"}</option>
+                      {(options[field.options] || field.options || []).map((option) => (
+                        <option key={option.value ?? option} value={option.value ?? option}>
+                          {option.label ?? option}
+                        </option>
+                      ))}
+                    </select>
+                    {field.allowAddOption ? (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          className={common}
+                          type="text"
+                          value={optionDrafts[field.key] ?? ""}
+                          placeholder={field.addPlaceholder || "Add option"}
+                          onChange={(event) => updateOptionDraft(field.key, event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              addOption(field);
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addOption(field)}
+                          className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-blue-800"
+                        >
+                          {field.addLabel || labels.add || "Add"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : field.type === "textarea" ? (
+                  <textarea className={common} rows={4} value={value[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} />
+                ) : (
+                  <input
+                    className={common}
+                    type={field.type || "text"}
+                    value={value[field.key] ?? ""}
+                    onChange={(event) => update(field.key, field.type === "number" ? Number(event.target.value) : event.target.value)}
+                  />
+                )}
+              </label>
+            );
+          })}
+        </div>
+        <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-950">
+            {labels.cancel || "Cancel"}
+          </button>
+          <button type="submit" className="rounded-lg bg-blue-700 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-800">
+            {labels.save || "Save Changes"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
