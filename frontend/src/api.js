@@ -1,4 +1,4 @@
-const API_BASE = "https://cmms-system.onrender.com";
+const API_BASE = "https://cmms-system.onrender.com/api";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
