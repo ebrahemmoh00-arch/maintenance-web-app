@@ -1,4 +1,7 @@
-const API_BASE = "https://cmms-system.onrender.com/api";
+const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (isLocalHost ? "http://127.0.0.1:8000/api" : "https://cmms-system.onrender.com/api");
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {

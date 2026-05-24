@@ -1,140 +1,329 @@
 from __future__ import annotations
 
+import os
+import re
 import sqlite3
 from pathlib import Path
+from typing import Any
+
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except ImportError:  # pragma: no cover - SQLite-only local installs can still run.
+    psycopg = None
+    dict_row = None
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "maintenance.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+DB_BACKEND = "postgres" if DATABASE_URL else "sqlite"
 
 
-def get_connection() -> sqlite3.Connection:
+SQLITE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    contact_person TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    address TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS engineers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_code TEXT DEFAULT '',
+    name TEXT NOT NULL,
+    email TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    specialty TEXT DEFAULT '',
+    job_title TEXT DEFAULT '',
+    department TEXT DEFAULT '',
+    work_location TEXT DEFAULT '',
+    supervisor TEXT DEFAULT '',
+    username TEXT DEFAULT '',
+    password TEXT DEFAULT '',
+    role TEXT DEFAULT 'viewer',
+    permissions TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS job_titles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS equipment (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    serial_number TEXT DEFAULT '',
+    model TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    parent_id INTEGER,
+    asset_type TEXT DEFAULT 'Equipment',
+    asset_level TEXT DEFAULT 'Equipment',
+    asset_code TEXT DEFAULT '',
+    criticality TEXT DEFAULT 'Medium',
+    maintenance_interval_hours INTEGER DEFAULT 1000,
+    maintenance_interval_days INTEGER DEFAULT 90,
+    current_hours INTEGER DEFAULT 0,
+    last_maintenance_date TEXT DEFAULT '',
+    status TEXT DEFAULT 'operational',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS work_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    customer_id INTEGER NOT NULL,
+    equipment_id INTEGER NOT NULL,
+    engineer_id INTEGER NOT NULL,
+    scheduled_date TEXT NOT NULL,
+    due_date TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',
+    priority TEXT DEFAULT 'medium',
+    service_hours INTEGER DEFAULT 0,
+    notes TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT,
+    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    part_number TEXT DEFAULT '',
+    name TEXT NOT NULL,
+    category TEXT DEFAULT '',
+    stock_quantity INTEGER DEFAULT 0,
+    minimum_quantity INTEGER DEFAULT 1,
+    unit TEXT DEFAULT 'pcs',
+    location TEXT DEFAULT '',
+    linked_work_order_id INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(linked_work_order_id) REFERENCES work_orders(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS preventive_maintenance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipment_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    interval_hours INTEGER DEFAULT 0,
+    interval_days INTEGER DEFAULT 30,
+    last_service_hours INTEGER DEFAULT 0,
+    last_service_date TEXT DEFAULT '',
+    next_due_date TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pm_task_id INTEGER NOT NULL,
+    equipment_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    service_hours INTEGER DEFAULT 0,
+    service_date TEXT DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE CASCADE,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+"""
+
+
+POSTGRES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS customers (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    contact_person TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    address TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text)
+);
+
+CREATE TABLE IF NOT EXISTS engineers (
+    id SERIAL PRIMARY KEY,
+    employee_code TEXT DEFAULT '',
+    name TEXT NOT NULL,
+    email TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    specialty TEXT DEFAULT '',
+    job_title TEXT DEFAULT '',
+    department TEXT DEFAULT '',
+    work_location TEXT DEFAULT '',
+    supervisor TEXT DEFAULT '',
+    username TEXT DEFAULT '',
+    password TEXT DEFAULT '',
+    role TEXT DEFAULT 'viewer',
+    permissions TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text)
+);
+
+CREATE TABLE IF NOT EXISTS job_titles (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text)
+);
+
+CREATE TABLE IF NOT EXISTS equipment (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    serial_number TEXT DEFAULT '',
+    model TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    parent_id INTEGER,
+    asset_type TEXT DEFAULT 'Equipment',
+    asset_level TEXT DEFAULT 'Equipment',
+    asset_code TEXT DEFAULT '',
+    criticality TEXT DEFAULT 'Medium',
+    maintenance_interval_hours INTEGER DEFAULT 1000,
+    maintenance_interval_days INTEGER DEFAULT 90,
+    current_hours INTEGER DEFAULT 0,
+    last_maintenance_date TEXT DEFAULT '',
+    status TEXT DEFAULT 'operational',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS work_orders (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    customer_id INTEGER NOT NULL,
+    equipment_id INTEGER NOT NULL,
+    engineer_id INTEGER NOT NULL,
+    scheduled_date TEXT NOT NULL,
+    due_date TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending',
+    priority TEXT DEFAULT 'medium',
+    service_hours INTEGER DEFAULT 0,
+    notes TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT,
+    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id SERIAL PRIMARY KEY,
+    part_number TEXT DEFAULT '',
+    name TEXT NOT NULL,
+    category TEXT DEFAULT '',
+    stock_quantity INTEGER DEFAULT 0,
+    minimum_quantity INTEGER DEFAULT 1,
+    unit TEXT DEFAULT 'pcs',
+    location TEXT DEFAULT '',
+    linked_work_order_id INTEGER,
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(linked_work_order_id) REFERENCES work_orders(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS preventive_maintenance (
+    id SERIAL PRIMARY KEY,
+    equipment_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    interval_hours INTEGER DEFAULT 0,
+    interval_days INTEGER DEFAULT 30,
+    last_service_hours INTEGER DEFAULT 0,
+    last_service_date TEXT DEFAULT '',
+    next_due_date TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
+    id SERIAL PRIMARY KEY,
+    pm_task_id INTEGER NOT NULL,
+    equipment_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    service_hours INTEGER DEFAULT 0,
+    service_date TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE CASCADE,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+"""
+
+
+class DatabaseConnection:
+    def __init__(self, raw: Any, backend: str):
+        self.raw = raw
+        self.backend = backend
+
+    def __enter__(self) -> "DatabaseConnection":
+        self.raw.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.raw.__exit__(exc_type, exc, tb)
+
+    def execute(self, query: str, params: tuple[Any, ...] | list[Any] | None = None):
+        return self.raw.execute(adapt_query(query, self.backend), params or ())
+
+    def executescript(self, script: str) -> None:
+        if self.backend == "sqlite":
+            self.raw.executescript(script)
+            return
+        for statement in split_sql_script(script):
+            self.execute(statement)
+
+    def commit(self) -> None:
+        self.raw.commit()
+
+
+def get_connection() -> DatabaseConnection:
+    if DB_BACKEND == "postgres":
+        if psycopg is None:
+            raise RuntimeError("DATABASE_URL is set, but psycopg is not installed.")
+        connection = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+        return DatabaseConnection(connection, "postgres")
+
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    return DatabaseConnection(connection, "sqlite")
+
+
+def adapt_query(query: str, backend: str) -> str:
+    if backend != "postgres":
+        return query
+    adapted = query.replace("?", "%s")
+    adapted = adapted.replace("COLLATE NOCASE", "")
+    adapted = re.sub(r"\bINSERT OR IGNORE INTO\b", "INSERT INTO", adapted, flags=re.IGNORECASE)
+    return adapted
+
+
+def split_sql_script(script: str) -> list[str]:
+    return [statement.strip() for statement in script.split(";") if statement.strip()]
+
+
+def insert_row(db: DatabaseConnection, table: str, data: dict[str, Any]) -> int:
+    columns = ", ".join(data)
+    placeholders = ", ".join(["?"] * len(data))
+    query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+    if db.backend == "postgres":
+        cursor = db.execute(f"{query} RETURNING id", tuple(data.values()))
+        row = cursor.fetchone()
+        return int(row["id"])
+    cursor = db.execute(query, tuple(data.values()))
+    return int(cursor.lastrowid)
 
 
 def init_db() -> None:
     with get_connection() as db:
-        db.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS customers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                contact_person TEXT DEFAULT '',
-                email TEXT DEFAULT '',
-                phone TEXT DEFAULT '',
-                address TEXT DEFAULT '',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS engineers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                employee_code TEXT DEFAULT '',
-                name TEXT NOT NULL,
-                email TEXT DEFAULT '',
-                phone TEXT DEFAULT '',
-                specialty TEXT DEFAULT '',
-                job_title TEXT DEFAULT '',
-                department TEXT DEFAULT '',
-                work_location TEXT DEFAULT '',
-                supervisor TEXT DEFAULT '',
-                username TEXT DEFAULT '',
-                password TEXT DEFAULT '',
-                role TEXT DEFAULT 'viewer',
-                permissions TEXT DEFAULT '',
-                status TEXT DEFAULT 'active',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS job_titles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS equipment (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                customer_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                serial_number TEXT DEFAULT '',
-                model TEXT DEFAULT '',
-                location TEXT DEFAULT '',
-                parent_id INTEGER,
-                asset_type TEXT DEFAULT 'Equipment',
-                asset_level TEXT DEFAULT 'Equipment',
-                asset_code TEXT DEFAULT '',
-                criticality TEXT DEFAULT 'Medium',
-                maintenance_interval_hours INTEGER DEFAULT 1000,
-                maintenance_interval_days INTEGER DEFAULT 90,
-                current_hours INTEGER DEFAULT 0,
-                last_maintenance_date TEXT DEFAULT '',
-                status TEXT DEFAULT 'operational',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS work_orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                customer_id INTEGER NOT NULL,
-                equipment_id INTEGER NOT NULL,
-                engineer_id INTEGER NOT NULL,
-                scheduled_date TEXT NOT NULL,
-                due_date TEXT DEFAULT '',
-                status TEXT DEFAULT 'pending',
-                priority TEXT DEFAULT 'medium',
-                service_hours INTEGER DEFAULT 0,
-                notes TEXT DEFAULT '',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
-                FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT,
-                FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT
-            );
-
-            CREATE TABLE IF NOT EXISTS inventory_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                part_number TEXT DEFAULT '',
-                name TEXT NOT NULL,
-                category TEXT DEFAULT '',
-                stock_quantity INTEGER DEFAULT 0,
-                minimum_quantity INTEGER DEFAULT 1,
-                unit TEXT DEFAULT 'pcs',
-                location TEXT DEFAULT '',
-                linked_work_order_id INTEGER,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(linked_work_order_id) REFERENCES work_orders(id) ON DELETE SET NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS preventive_maintenance (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                equipment_id INTEGER NOT NULL,
-                task_name TEXT NOT NULL,
-                interval_hours INTEGER DEFAULT 0,
-                interval_days INTEGER DEFAULT 30,
-                last_service_hours INTEGER DEFAULT 0,
-                last_service_date TEXT DEFAULT '',
-                next_due_date TEXT DEFAULT '',
-                status TEXT DEFAULT 'active',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pm_task_id INTEGER NOT NULL,
-                equipment_id INTEGER NOT NULL,
-                task_name TEXT NOT NULL,
-                service_hours INTEGER DEFAULT 0,
-                service_date TEXT DEFAULT CURRENT_TIMESTAMP,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE CASCADE,
-                FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
-            );
-            """
-        )
+        db.executescript(POSTGRES_SCHEMA if db.backend == "postgres" else SQLITE_SCHEMA)
         ensure_columns(
             db,
             "engineers",
@@ -164,14 +353,26 @@ def init_db() -> None:
         seed_data(db)
 
 
-def ensure_columns(db: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
-    existing = {row["name"] for row in db.execute(f"PRAGMA table_info({table})").fetchall()}
+def ensure_columns(db: DatabaseConnection, table: str, columns: dict[str, str]) -> None:
+    if db.backend == "postgres":
+        existing_rows = db.execute(
+            """
+            SELECT column_name AS name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+            """,
+            (table,),
+        ).fetchall()
+        existing = {row["name"] for row in existing_rows}
+    else:
+        existing = {row["name"] for row in db.execute(f"PRAGMA table_info({table})").fetchall()}
+
     for name, definition in columns.items():
         if name not in existing:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
 
-def seed_data(db: sqlite3.Connection) -> None:
+def seed_data(db: DatabaseConnection) -> None:
     seed_job_titles(db)
     customer_count = db.execute("SELECT COUNT(*) AS total FROM customers").fetchone()["total"]
     if customer_count:
@@ -237,7 +438,7 @@ def seed_data(db: sqlite3.Connection) -> None:
     )
 
 
-def seed_job_titles(db: sqlite3.Connection) -> None:
+def seed_job_titles(db: DatabaseConnection) -> None:
     titles = [
         "Shift Engineer",
         "Maintenance Engineer",
@@ -251,4 +452,7 @@ def seed_job_titles(db: sqlite3.Connection) -> None:
         "Viewer",
     ]
     for title in titles:
-        db.execute("INSERT OR IGNORE INTO job_titles (name) VALUES (?)", (title,))
+        if db.backend == "postgres":
+            db.execute("INSERT INTO job_titles (name) VALUES (?) ON CONFLICT (name) DO NOTHING", (title,))
+        else:
+            db.execute("INSERT OR IGNORE INTO job_titles (name) VALUES (?)", (title,))

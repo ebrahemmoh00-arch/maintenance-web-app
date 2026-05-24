@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .database import get_connection
+from .database import get_connection, insert_row
 
 MAINTENANCE_ALERT_WINDOW_DAYS = 7
 MAINTENANCE_ALERT_WINDOW_HOURS = 100
@@ -71,14 +71,8 @@ class Repository:
 
     def create(self, payload: dict[str, Any]) -> dict[str, Any]:
         data = {field: payload[field] for field in self.fields if field in payload}
-        columns = ", ".join(data)
-        placeholders = ", ".join(["?"] * len(data))
         with get_connection() as db:
-            cursor = db.execute(
-                f"INSERT INTO {self.table} ({columns}) VALUES ({placeholders})",
-                tuple(data.values()),
-            )
-            item_id = cursor.lastrowid
+            item_id = insert_row(db, self.table, data)
             db.commit()
         return self.get(item_id)
 
@@ -148,8 +142,7 @@ class JobTitleRepository(Repository):
             existing = db.execute("SELECT * FROM job_titles WHERE lower(name) = lower(?)", (name,)).fetchone()
             if existing:
                 return dict(existing)
-            cursor = db.execute("INSERT INTO job_titles (name) VALUES (?)", (name,))
-            item_id = cursor.lastrowid
+            item_id = insert_row(db, "job_titles", {"name": name})
             db.commit()
         return self.get(item_id)
 

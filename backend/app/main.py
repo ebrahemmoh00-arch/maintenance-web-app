@@ -1,6 +1,8 @@
+from datetime import datetime
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
 
 from .database import init_db
 from .routers import customers, dashboard, engineers, equipment, inventory, job_titles, maintenance_alerts, preventive_maintenance, schedule, work_orders
@@ -11,9 +13,20 @@ app = FastAPI(
     description="REST API for departments, assets, resources, work orders, inventory, preventive maintenance, schedule, and dashboard metrics.",
 )
 
+frontend_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://cmms-system-1.onrender.com",
+    "https://cmms-system.onrender.com",
+    "https://maintenance-frontend.onrender.com",
+]
+frontend_origin_env = os.getenv("FRONTEND_ORIGINS", "")
+if frontend_origin_env:
+    frontend_origins.extend(origin.strip() for origin in frontend_origin_env.split(",") if origin.strip())
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://cmms-system-1.onrender.com"],
+    allow_origins=frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
