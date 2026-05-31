@@ -1396,13 +1396,6 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language }) {
         <TechnicianPerformanceSection engineers={data.engineers} workOrders={data["work-orders"]} language={language} />
       </div>
 
-      <Panel
-        title={t("Priority Work Orders")}
-        subtitle={t("Structured maintenance workload with visible status, priority, and technician assignment.")}
-        actions={canManage ? <button onClick={() => openCreate("work-orders")} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">{t("Create Order")}</button> : null}
-      >
-        <DataTable columns={localizedConfig("work-orders", language).columns} rows={data["work-orders"].slice(0, 8)} emptyMessage={t("No active work orders.")} labels={tableLabels(language)} />
-      </Panel>
     </>
   );
 }
