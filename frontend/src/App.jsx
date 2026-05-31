@@ -2552,6 +2552,7 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
     if (!savedFilter.date) return savedRowsByEquipment;
     return savedRowsByEquipment.filter((row) => getWorkOrderSavedDate(row) === savedFilter.date);
   }, [savedRowsByEquipment, savedFilter.date]);
+  const selectedSavedOrder = rows.find((row) => Number(row.id) === Number(selectedSavedId));
 
   useEffect(() => {
     if (!form.equipment_id && !form.customer_id && !rows.length && !equipment.length) {
@@ -2776,6 +2777,22 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
     }
   }
 
+  function exportWorkOrderPdf() {
+    const savedMeta = selectedSavedOrder ? parseWorkOrderNotes(selectedSavedOrder.notes) : {};
+    const pdfTitle = sanitizePdfFileName(woReference || savedMeta.wo_reference || selectedSavedOrder?.title || "Work Order");
+    const previousTitle = document.title;
+
+    const restoreTitle = () => {
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    document.title = pdfTitle;
+    window.addEventListener("afterprint", restoreTitle, { once: true });
+    window.print();
+    window.setTimeout(restoreTitle, 30000);
+  }
+
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -2962,7 +2979,7 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
           <div className="flex flex-wrap gap-2">
             {canEdit ? <button type="button" onClick={editSelected} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit Selected")}</button> : null}
             {canDelete ? <button type="button" onClick={deleteSelected} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50">{t("Delete Selected")}</button> : null}
-            <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"><Printer className="h-4 w-4" />{t("Export PDF")}</button>
+            <button type="button" onClick={exportWorkOrderPdf} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"><Printer className="h-4 w-4" />{t("Export PDF")}</button>
             {canCreate ? <button type="button" onClick={newWorkOrder} className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">{t("New Work Order")}</button> : null}
           </div>
         }
@@ -4638,6 +4655,14 @@ function buildWorkOrderReference(form, customer, equipmentItem) {
   const customerName = customer?.name || form.location || "Location";
   const assetName = equipmentItem?.name || "Asset";
   return `${customerName} ${assetName} -${form.wo_no || "0000"}`.replace(/\s+/g, " ").trim();
+}
+
+function sanitizePdfFileName(value) {
+  return String(value || "Work Order")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120) || "Work Order";
 }
 
 function calculateDuration(start, end) {
