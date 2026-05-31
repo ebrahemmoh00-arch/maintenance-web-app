@@ -1075,9 +1075,11 @@ export default function App() {
                   {t("Add Work Order")}
                 </button>
               ) : null}
-              <span className={`rounded-lg border px-3 py-2 text-xs font-black ${isAdmin ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-orange-200 bg-orange-50 text-orange-700"}`}>
-                {isAdmin ? t("Full Admin Access") : t("View Only Access")}
-              </span>
+              {isAdmin ? (
+                <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                  {t("Full Admin Access")}
+                </span>
+              ) : null}
               <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-red-300 hover:text-red-700">
                 <LogOut className="h-4 w-4" />
                 {t("Logout")}
