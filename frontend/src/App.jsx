@@ -2778,7 +2778,25 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
   }
 
   function exportWorkOrderPdf() {
-    const pdfTitle = buildWorkOrderPdfFileName(form, selectedCustomer, selectedEquipment, selectedSavedOrder);
+    if (selectedSavedOrder) {
+      const exportForm = formFromSavedOrder(selectedSavedOrder, equipment, customers, engineers);
+      const exportCustomer = customers.find((item) => Number(item.id) === Number(exportForm.customer_id));
+      const exportEquipment = equipment.find((item) => Number(item.id) === Number(exportForm.equipment_id));
+      const pdfTitle = buildWorkOrderPdfFileName(exportForm, exportCustomer, exportEquipment, selectedSavedOrder);
+
+      setEditingId(selectedSavedOrder.id);
+      setForm(exportForm);
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => printWorkOrderPdf(pdfTitle));
+      });
+      return;
+    }
+
+    const pdfTitle = buildWorkOrderPdfFileName(form, selectedCustomer, selectedEquipment, null);
+    printWorkOrderPdf(pdfTitle);
+  }
+
+  function printWorkOrderPdf(pdfTitle) {
     const previousTitle = document.title;
 
     const restoreTitle = () => {
