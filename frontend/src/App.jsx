@@ -1376,14 +1376,20 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language }) {
         <MetricCard label={t("Average Downtime")} value={averageDowntime} icon={TimerReset} tone="orange" helper={t("Estimated operational impact")} />
       </div>
 
-      <DashboardAlertControls alerts={alerts} open={dashboardAlertsOpen} setOpen={setDashboardAlertsOpen} language={language} />
+      <DashboardAlertControls
+        alerts={alerts}
+        equipment={data.equipment}
+        workOrders={data["work-orders"]}
+        open={dashboardAlertsOpen}
+        setOpen={setDashboardAlertsOpen}
+        language={language}
+      />
       <AnalyticsSection data={data} alerts={alerts} language={language} />
       <WorkloadAnalyticsCharts workOrders={workOrders} language={language} />
 
       <EquipmentHealthMonitoring equipment={data.equipment} pmTasks={data["preventive-maintenance"]} language={language} />
       <SiteStatusOverview customers={data.customers} equipment={data.equipment} engineers={data.engineers} alerts={alerts} language={language} />
       <PreventiveMaintenanceDashboard pmTasks={data["preventive-maintenance"]} workOrders={data["work-orders"]} language={language} />
-      <AlertsAlarmsSection alerts={alerts} equipment={data.equipment} workOrders={data["work-orders"]} language={language} />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <InventoryMonitoringSection inventory={data.inventory} language={language} />
@@ -1401,7 +1407,7 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language }) {
   );
 }
 
-function DashboardAlertControls({ alerts, open, setOpen, language }) {
+function DashboardAlertControls({ alerts, equipment, workOrders, open, setOpen, language }) {
   const t = (text) => tr(language, text);
   const criticalAlerts = alerts.filter((alert) => alert.alert_level === "DUE NOW").length;
   return (
@@ -1427,9 +1433,9 @@ function DashboardAlertControls({ alerts, open, setOpen, language }) {
         >
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-100">{t("Show Alerts")}</p>
-              <p className="mt-3 text-2xl font-black">{t("Show Alerts")}</p>
-              <p className="mt-2 text-sm font-semibold text-blue-100">{t("Open alert list")}</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-100">{t("Show Alarms")}</p>
+              <p className="mt-3 text-2xl font-black">{t("Show Alarms")}</p>
+              <p className="mt-2 text-sm font-semibold text-blue-100">{t("Open alarm panel")}</p>
             </div>
             <span className="grid h-14 w-14 place-items-center rounded-xl bg-white/15">
               <AlertTriangle className="h-6 w-6" />
@@ -1439,9 +1445,7 @@ function DashboardAlertControls({ alerts, open, setOpen, language }) {
       </div>
 
       {open ? (
-        <Panel title={t("Alerts")} subtitle={t("Automatic notifications based on service hours and next maintenance date.")}>
-          <AlertList alerts={alerts} language={language} />
-        </Panel>
+        <AlertsAlarmsSection alerts={alerts} equipment={equipment} workOrders={workOrders} language={language} />
       ) : null}
     </div>
   );
