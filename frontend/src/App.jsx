@@ -1303,7 +1303,7 @@ function LoginScreen({ language, setLanguage, value, setValue, error, onSubmit }
                     value={value.username}
                     onChange={(event) => setValue({ ...value, username: event.target.value })}
                     className="w-full bg-transparent text-sm font-semibold text-slate-950 placeholder:text-slate-400"
-                    placeholder="ECS-ECS"
+                    placeholder="Enter username"
                     autoComplete="username"
                   />
                 </div>
@@ -1318,7 +1318,7 @@ function LoginScreen({ language, setLanguage, value, setValue, error, onSubmit }
                     value={value.password}
                     onChange={(event) => setValue({ ...value, password: event.target.value })}
                     className="w-full bg-transparent text-sm font-semibold text-slate-950 placeholder:text-slate-400"
-                    placeholder="E5C9S2@rom"
+                    placeholder="Enter password"
                     autoComplete="current-password"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-slate-400 hover:text-slate-700">
@@ -1333,15 +1333,6 @@ function LoginScreen({ language, setLanguage, value, setValue, error, onSubmit }
             <button type="submit" className="mt-6 w-full rounded-xl bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-blue-800">
               {t("Sign In")}
             </button>
-
-            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-black text-slate-900">{t("Admin credentials")}</p>
-              <p className="mt-2">Username: <span className="font-bold">{LOGIN_USERNAME}</span></p>
-              <p>Password: <span className="font-bold">{LOGIN_PASSWORD}</span></p>
-              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
-                {t("Full Admin Access")} - {t("View, add, edit, and delete all maintenance records.")}
-              </div>
-            </div>
           </form>
         </section>
       </div>
@@ -3622,7 +3613,7 @@ function AccessControlPage({ users, currentUser, onSaveUserPermissions, language
         subtitle="Admin can assign precise permissions by user email. New users start with view-only permissions until the admin increases access."
       >
         <div className="grid gap-4 md:grid-cols-3">
-          <InfoTile icon={ShieldCheck} title="Admin Master Access" text="The hardcoded ECS-ECS admin always has full permissions." />
+          <InfoTile icon={ShieldCheck} title="Admin Master Access" text="The master admin account always has full permissions." />
           <InfoTile icon={UsersRound} title="Users Synced Automatically" text={`${activeUsers.length} users from Resources are available here.`} />
           <InfoTile icon={Lock} title="Default Permission" text="New users receive least privilege: view only, no add/edit/delete." />
         </div>
