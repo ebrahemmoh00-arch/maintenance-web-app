@@ -2778,8 +2778,7 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
   }
 
   function exportWorkOrderPdf() {
-    const savedMeta = selectedSavedOrder ? parseWorkOrderNotes(selectedSavedOrder.notes) : {};
-    const pdfTitle = sanitizePdfFileName(woReference || savedMeta.wo_reference || selectedSavedOrder?.title || "Work Order");
+    const pdfTitle = buildWorkOrderPdfFileName(form, selectedCustomer, selectedEquipment, selectedSavedOrder);
     const previousTitle = document.title;
 
     const restoreTitle = () => {
@@ -4655,6 +4654,15 @@ function buildWorkOrderReference(form, customer, equipmentItem) {
   const customerName = customer?.name || form.location || "Location";
   const assetName = equipmentItem?.name || "Asset";
   return `${customerName} ${assetName} -${form.wo_no || "0000"}`.replace(/\s+/g, " ").trim();
+}
+
+function buildWorkOrderPdfFileName(form, customer, equipmentItem, savedOrder) {
+  const savedMeta = savedOrder ? parseWorkOrderNotes(savedOrder.notes) : {};
+  const siteName = customer?.name || savedOrder?.customer_name || savedMeta.location || form.location || "Location";
+  const assetName = equipmentItem?.name || savedOrder?.equipment_name || "Asset";
+  const savedNo = String(savedMeta.wo_reference || savedOrder?.title || "").match(/-(\d{1,})\b/)?.[1] || "";
+  const woNo = String(form.wo_no || savedMeta.wo_no || savedNo || "0000").replace(/^-+/, "");
+  return sanitizePdfFileName(`${siteName} ${assetName} -${woNo}`.replace(/\s+/g, " ").trim());
 }
 
 function sanitizePdfFileName(value) {
