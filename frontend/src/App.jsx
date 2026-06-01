@@ -1420,36 +1420,32 @@ function DashboardAlertControls({ alerts, equipment, workOrders, open, setOpen, 
   const criticalAlerts = alerts.filter((alert) => alert.alert_level === "DUE NOW").length;
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Alerts")}</p>
-              <p className="mt-3 text-4xl font-black text-slate-950">{alerts.length}</p>
-              <p className="mt-2 text-sm font-semibold text-slate-500">{criticalAlerts} {t("Critical")} / {Math.max(alerts.length - criticalAlerts, 0)} {t("Warning")}</p>
-            </div>
-            <span className={`grid h-14 w-14 place-items-center rounded-xl ${alerts.length ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}>
-              <Bell className="h-6 w-6" />
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Alerts")}</p>
+            <p className="mt-3 text-4xl font-black text-slate-950">{alerts.length}</p>
+            <p className="mt-2 text-sm font-semibold text-slate-500">{criticalAlerts} {t("Critical")} / {Math.max(alerts.length - criticalAlerts, 0)} {t("Warning")}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`hidden h-12 w-12 place-items-center rounded-xl sm:grid ${alerts.length ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}>
+              <Bell className="h-5 w-5" />
             </span>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className={`grid h-11 w-11 place-items-center rounded-lg border transition ${
+                open
+                  ? "border-blue-300 bg-blue-700 text-white shadow-sm"
+                  : "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100"
+              }`}
+              title={open ? t("Hide Alerts") : t("Show Alerts")}
+              aria-label={open ? t("Hide Alerts") : t("Show Alerts")}
+            >
+              <AlertTriangle className="h-5 w-5" />
+            </button>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="rounded-xl border border-blue-200 bg-blue-700 p-5 text-left text-white shadow-sm transition hover:bg-blue-800"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-100">{t("Show Alarms")}</p>
-              <p className="mt-3 text-2xl font-black">{t("Show Alarms")}</p>
-              <p className="mt-2 text-sm font-semibold text-blue-100">{t("Open alarm panel")}</p>
-            </div>
-            <span className="grid h-14 w-14 place-items-center rounded-xl bg-white/15">
-              <AlertTriangle className="h-6 w-6" />
-            </span>
-          </div>
-        </button>
       </div>
 
       {open ? (
