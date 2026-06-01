@@ -1374,15 +1374,23 @@ function pageTitle(active, language = "en") {
 
 function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashboardAlertsOpen, setDashboardAlertsOpen }) {
   const t = (text) => tr(language, text);
-  const workOrders = data["work-orders"];
+  const [filters, setFilters] = useState(createDashboardFilters);
+  const filterOptions = useMemo(() => buildDashboardFilterOptions(data, alerts, language), [data, alerts, language]);
+  const filteredScope = useMemo(() => applyDashboardFilters(data, alerts, filters), [data, alerts, filters]);
+  const filteredData = filteredScope.data;
+  const filteredAlerts = filteredScope.alerts;
+  const workOrders = filteredData["work-orders"];
+  const hasActiveDashboardFilters = Object.values(filters).some((value) => value !== "all");
   const activeOrders = workOrders.filter((item) => item.status !== "completed" && item.status !== "cancelled").length;
-  const breakdowns = data.equipment.filter((item) => item.status === "down").length + alerts.filter((item) => item.alert_level === "DUE NOW").length;
-  const completedThisWeek = workOrders.filter((item) => item.status === "completed").length || stats.completed_orders;
-  const availableTechnicians = data.engineers.filter((item) => item.status === "active").length;
+  const breakdowns = filteredData.equipment.filter((item) => item.status === "down").length + filteredAlerts.filter((item) => item.alert_level === "DUE NOW").length;
+  const completedThisWeek = workOrders.filter((item) => item.status === "completed").length || (hasActiveDashboardFilters ? 0 : stats.completed_orders);
+  const availableTechnicians = filteredData.engineers.filter((item) => item.status === "active").length;
   const averageDowntime = `${Math.max(1.2, breakdowns * 2.4 + activeOrders * 0.35).toFixed(1)}h`;
 
   return (
     <>
+      <DashboardFilterBar filters={filters} setFilters={setFilters} options={filterOptions} language={language} />
+
       <div className="grid gap-4 xl:grid-cols-5 md:grid-cols-2">
         <MetricCard label={t("Total Active Work Orders")} value={activeOrders} icon={Activity} tone="blue" helper={t("Open operational workload")} />
         <MetricCard label={t("Equipment Breakdowns")} value={breakdowns} icon={AlertTriangle} tone={breakdowns ? "red" : "green"} helper={t("Down or due-now assets")} />
@@ -1392,26 +1400,60 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
       </div>
 
       <DashboardAlertControls
-        alerts={alerts}
-        equipment={data.equipment}
-        workOrders={data["work-orders"]}
+        alerts={filteredAlerts}
+        equipment={filteredData.equipment}
+        workOrders={filteredData["work-orders"]}
         open={dashboardAlertsOpen}
         setOpen={setDashboardAlertsOpen}
         language={language}
       />
-      <AnalyticsSection data={data} alerts={alerts} language={language} />
+      <AnalyticsSection data={filteredData} alerts={filteredAlerts} language={language} />
       <WorkloadAnalyticsCharts workOrders={workOrders} language={language} />
 
-      <EquipmentHealthMonitoring equipment={data.equipment} pmTasks={data["preventive-maintenance"]} language={language} />
-      <SiteStatusOverview customers={data.customers} equipment={data.equipment} engineers={data.engineers} alerts={alerts} language={language} />
-      <PreventiveMaintenanceDashboard pmTasks={data["preventive-maintenance"]} workOrders={data["work-orders"]} language={language} />
+      <EquipmentHealthMonitoring equipment={filteredData.equipment} pmTasks={filteredData["preventive-maintenance"]} language={language} />
+      <SiteStatusOverview customers={filteredData.customers} equipment={filteredData.equipment} engineers={filteredData.engineers} alerts={filteredAlerts} language={language} />
+      <PreventiveMaintenanceDashboard pmTasks={filteredData["preventive-maintenance"]} workOrders={filteredData["work-orders"]} language={language} />
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <InventoryMonitoringSection inventory={data.inventory} language={language} />
-        <TechnicianPerformanceSection engineers={data.engineers} workOrders={data["work-orders"]} language={language} />
+        <InventoryMonitoringSection inventory={filteredData.inventory} language={language} />
+        <TechnicianPerformanceSection engineers={filteredData.engineers} workOrders={filteredData["work-orders"]} language={language} />
       </div>
 
     </>
+  );
+}
+
+function DashboardFilterBar({ filters, setFilters, options, language }) {
+  const t = (text) => tr(language, text);
+  const fields = [
+    { key: "year", label: "Year", options: options.years },
+    { key: "month", label: "Month Name", options: options.months },
+    { key: "category", label: "Category", options: options.categories },
+    { key: "location", label: "Location", options: options.locations },
+    { key: "priority", label: "Priority", options: options.priorities },
+    { key: "status", label: "Status", options: options.statuses }
+  ];
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        {fields.map((field) => (
+          <label key={field.key} className="block">
+            <span className="mb-2 block text-xs font-black text-slate-800">{t(field.label)}</span>
+            <select
+              value={filters[field.key]}
+              onChange={(event) => setFilters((current) => ({ ...current, [field.key]: event.target.value }))}
+              className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="all">{t("All")}</option>
+              {field.options.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -2502,6 +2544,162 @@ function jobTitleOptions(jobTitles = [], employees = []) {
 
 function uniqueSorted(values) {
   return [...new Set(values.filter(Boolean))].sort((first, second) => String(first).localeCompare(String(second), undefined, { sensitivity: "base" }));
+}
+
+function createDashboardFilters() {
+  return {
+    year: "all",
+    month: "all",
+    category: "all",
+    location: "all",
+    priority: "all",
+    status: "all"
+  };
+}
+
+function buildDashboardFilterOptions(data, alerts, language = "en") {
+  const equipment = data.equipment || [];
+  const workOrders = data["work-orders"] || [];
+  const pmTasks = data["preventive-maintenance"] || [];
+  const years = uniqueSorted([
+    ...workOrders.map((order) => dashboardDateParts(getWorkOrderSavedDate(order)).year),
+    ...pmTasks.map((task) => dashboardDateParts(task.next_due_date || task.last_service_date).year),
+    ...alerts.map((alert) => dashboardDateParts(alert.next_maintenance_date || alert.created_at).year)
+  ]).map((year) => ({ value: String(year), label: String(year) }));
+
+  const months = Array.from({ length: 12 }, (_, index) => {
+    const value = String(index + 1);
+    const label = new Date(2026, index, 1).toLocaleString(language === "ar" ? "ar-EG" : "en-US", { month: "long" });
+    return { value, label };
+  });
+
+  const categories = uniqueSorted([
+    ...equipment.map((asset) => asset.asset_type || asset.asset_level),
+    ...equipment.map((asset) => asset.asset_level),
+    ...workOrders.map((order) => parseWorkOrderNotes(order.notes).maintenance_type)
+  ]).map((value) => ({ value, label: value }));
+
+  const locations = uniqueSorted([
+    ...(data.customers || []).map((customer) => customer.name),
+    ...equipment.map((asset) => asset.customer_name || asset.location),
+    ...equipment.map((asset) => asset.location),
+    ...workOrders.map((order) => order.customer_name),
+    ...alerts.map((alert) => alert.location)
+  ]).map((value) => ({ value, label: value }));
+
+  const priorities = uniqueSorted([
+    ...workOrders.map((order) => order.priority),
+    "low",
+    "medium",
+    "high",
+    "critical"
+  ]).map((value) => ({ value, label: valueLabel(value, language) }));
+
+  const statuses = uniqueSorted([
+    ...workOrders.map((order) => order.status),
+    ...equipment.map((asset) => asset.status),
+    "pending",
+    "in_progress",
+    "completed",
+    "cancelled",
+    "active",
+    "down",
+    "maintenance"
+  ]).map((value) => ({ value, label: valueLabel(value, language) }));
+
+  return { years, months, categories, locations, priorities, statuses };
+}
+
+function applyDashboardFilters(data, alerts, filters) {
+  const equipment = data.equipment || [];
+  const workOrders = data["work-orders"] || [];
+  const equipmentById = new Map(equipment.map((asset) => [Number(asset.id), asset]));
+  const workOrderFiltered = workOrders.filter((order) => dashboardWorkOrderMatches(order, equipmentById.get(Number(order.equipment_id)), filters));
+  const filteredEquipmentIds = new Set(workOrderFiltered.map((order) => Number(order.equipment_id)).filter(Boolean));
+  const orderScoped = filters.year !== "all" || filters.month !== "all" || filters.priority !== "all";
+  const equipmentFiltered = equipment.filter((asset) => {
+    if (!dashboardEquipmentMatches(asset, filters)) return false;
+    return orderScoped ? filteredEquipmentIds.has(Number(asset.id)) : true;
+  });
+  const equipmentScopeIds = new Set(equipmentFiltered.map((asset) => Number(asset.id)));
+  const locationsInScope = new Set(equipmentFiltered.flatMap((asset) => [asset.customer_name, asset.location].filter(Boolean).map(normalizeChoice)));
+
+  return {
+    data: {
+      ...data,
+      customers: (data.customers || []).filter((customer) => filters.location === "all" || locationsInScope.has(normalizeChoice(customer.name))),
+      engineers: (data.engineers || []).filter((engineer) => filters.location === "all" || ["Available for All Sites", engineer.work_location, engineer.location].some((value) => matchesFilterValue(value, filters.location))),
+      equipment: equipmentFiltered,
+      "work-orders": workOrderFiltered,
+      inventory: (data.inventory || []).filter((item) => filters.location === "all" || matchesFilterValue(item.location, filters.location)),
+      "preventive-maintenance": (data["preventive-maintenance"] || []).filter((task) => {
+        const asset = equipmentById.get(Number(task.equipment_id));
+        if (!asset || !equipmentScopeIds.has(Number(asset.id))) return false;
+        if (!matchesDashboardDate(task.next_due_date || task.last_service_date, filters)) return false;
+        if (filters.status !== "all" && !matchesFilterValue(task.status, filters.status) && !matchesFilterValue(task.pm_alert, filters.status)) return false;
+        return true;
+      })
+    },
+    alerts: (alerts || []).filter((alert) => dashboardAlertMatches(alert, equipmentFiltered, filters))
+  };
+}
+
+function dashboardWorkOrderMatches(order, asset, filters) {
+  const meta = parseWorkOrderNotes(order.notes);
+  if (!matchesDashboardDate(getWorkOrderSavedDate(order) || order.scheduled_date || order.due_date, filters)) return false;
+  if (!matchesFilterValue(order.priority, filters.priority)) return false;
+  if (!matchesFilterValue(order.status, filters.status)) return false;
+  if (!matchesAnyFilterValue([asset?.asset_type, asset?.asset_level, meta.maintenance_type], filters.category)) return false;
+  if (!matchesAnyFilterValue([order.customer_name, asset?.customer_name, asset?.location, meta.location], filters.location)) return false;
+  return true;
+}
+
+function dashboardEquipmentMatches(asset, filters) {
+  if (!matchesAnyFilterValue([asset.asset_type, asset.asset_level], filters.category)) return false;
+  if (!matchesAnyFilterValue([asset.customer_name, asset.location], filters.location)) return false;
+  if (!matchesAnyFilterValue([asset.status, equipmentIndustrialStatus(asset)], filters.status)) return false;
+  return true;
+}
+
+function dashboardAlertMatches(alert, filteredEquipment, filters) {
+  if (!matchesDashboardDate(alert.next_maintenance_date || alert.created_at, filters)) return false;
+  if (!matchesAnyFilterValue([alert.location], filters.location)) return false;
+  if (filters.priority !== "all") {
+    const alertPriority = alert.alert_level === "DUE NOW" ? "critical" : "medium";
+    if (!matchesFilterValue(alertPriority, filters.priority)) return false;
+  }
+  if (filters.status !== "all" && !matchesFilterValue(alert.alert_level, filters.status)) return false;
+  if (filters.category === "all") return true;
+  const alertName = normalizeChoice(alert.equipment_name);
+  return filteredEquipment.some((asset) => normalizeChoice(asset.name) === alertName);
+}
+
+function matchesDashboardDate(value, filters) {
+  const parts = dashboardDateParts(value);
+  if (filters.year !== "all" && String(parts.year) !== String(filters.year)) return false;
+  if (filters.month !== "all" && String(parts.month) !== String(filters.month)) return false;
+  return true;
+}
+
+function dashboardDateParts(value) {
+  if (!value) return { year: "", month: "" };
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { year: "", month: "" };
+  return { year: String(date.getFullYear()), month: String(date.getMonth() + 1) };
+}
+
+function matchesAnyFilterValue(values, selected) {
+  if (selected === "all") return true;
+  return values.some((value) => matchesFilterValue(value, selected));
+}
+
+function matchesFilterValue(value, selected) {
+  if (selected === "all") return true;
+  return normalizeChoice(value) === normalizeChoice(selected);
+}
+
+function normalizeChoice(value) {
+  return String(value || "").replace(/_/g, " ").trim().toLowerCase();
 }
 
 function calculateIntervalDays(intervalHours) {
