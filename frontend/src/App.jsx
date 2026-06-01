@@ -1820,7 +1820,7 @@ function WorkloadAnalyticsCharts({ workOrders, language }) {
   return (
     <div className="grid gap-6 xl:grid-cols-3">
       <Panel title={t("Engineer Workload")} subtitle={t("Engineer name vs number of work orders.")}>
-        <BarChart data={engineerData} />
+        <BarChart data={engineerData} layout="horizontal" />
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{t("Unit")}: {t("Orders")}</p>
       </Panel>
       <Panel title={t("Technician Workload")} subtitle={t("Technician name vs number of work orders.")}>
@@ -4372,7 +4372,11 @@ function splitChartNames(value) {
 }
 
 function cleanChartLabel(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
+  const normalized = String(value || "")
+    .replace(/\s*\/+\s*/g, " / ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized.split(" / ").map((part) => part.trim()).filter(Boolean)[0] || "";
 }
 
 function addChartValue(counter, label, value) {

@@ -33,8 +33,39 @@ export function LineChart({ data, color = "#2563eb" }) {
   );
 }
 
-export function BarChart({ data }) {
+export function BarChart({ data, layout = "vertical" }) {
   const max = Math.max(...data.map((item) => item.value), 1);
+  if (layout === "horizontal") {
+    return (
+      <div className="space-y-3">
+        {data.map((item, index) => (
+          <div key={item.label} className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded bg-slate-100 text-[11px] font-black text-slate-600">
+                  {index + 1}
+                </span>
+                <p className="min-w-0 text-sm font-black leading-snug text-slate-900" title={item.label}>
+                  {item.label}
+                </p>
+              </div>
+              <span className="shrink-0 rounded bg-blue-50 px-2 py-1 text-sm font-black text-blue-700">
+                {item.value}
+              </span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full ${item.color || "bg-blue-600"}`}
+                style={{ width: `${Math.max((item.value / max) * 100, item.value ? 8 : 0)}%` }}
+                title={`${item.label}: ${item.value}`}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-56 items-end gap-5">
       {data.map((item) => (
