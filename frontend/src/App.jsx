@@ -1824,7 +1824,7 @@ function WorkloadAnalyticsCharts({ workOrders, language }) {
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{t("Unit")}: {t("Orders")}</p>
       </Panel>
       <Panel title={t("Technician Workload")} subtitle={t("Technician name vs number of work orders.")}>
-        <BarChart data={technicianData} />
+        <BarChart data={technicianData} layout="horizontal" />
         <p className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{t("Unit")}: {t("Orders")}</p>
       </Panel>
       <Panel title={t("Equipment Maintenance Time")} subtitle={t("Equipment name vs total maintenance duration.")}>
