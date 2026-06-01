@@ -679,6 +679,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationAnchor, setNotificationAnchor] = useState(null);
+  const [dashboardAlertsOpen, setDashboardAlertsOpen] = useState(false);
   const [language, setLanguage] = useState(() => {
     const queryLanguage = new URLSearchParams(window.location.search).get("lang");
     return queryLanguage === "ar" || localStorage.getItem("maintenance-language") === "ar" ? "ar" : "en";
@@ -1051,7 +1052,9 @@ export default function App() {
                       anchor={notificationAnchor}
                       onViewAlerts={() => {
                         setActive("dashboard");
+                        setDashboardAlertsOpen(true);
                         setNotificationsOpen(false);
+                        window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
                       }}
                     />
                   </>
@@ -1091,7 +1094,18 @@ export default function App() {
         {error ? <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
         <div className="min-w-[920px] space-y-6 p-6">
           {loading && <SkeletonDashboard />}
-          {!loading && page === "dashboard" && <Dashboard stats={stats} data={data} alerts={alerts} openCreate={openCreate} canManage={canAddWorkOrders} language={language} />}
+          {!loading && page === "dashboard" && (
+            <Dashboard
+              stats={stats}
+              data={data}
+              alerts={alerts}
+              openCreate={openCreate}
+              canManage={canAddWorkOrders}
+              language={language}
+              dashboardAlertsOpen={dashboardAlertsOpen}
+              setDashboardAlertsOpen={setDashboardAlertsOpen}
+            />
+          )}
           {!loading && page === "work-orders" && (
             <WorkOrdersPage
               rows={data["work-orders"]}
@@ -1358,9 +1372,8 @@ function pageTitle(active, language = "en") {
   return tr(language, titles[active] || active);
 }
 
-function Dashboard({ stats, data, alerts, openCreate, canManage, language }) {
+function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashboardAlertsOpen, setDashboardAlertsOpen }) {
   const t = (text) => tr(language, text);
-  const [dashboardAlertsOpen, setDashboardAlertsOpen] = useState(false);
   const workOrders = data["work-orders"];
   const activeOrders = workOrders.filter((item) => item.status !== "completed" && item.status !== "cancelled").length;
   const breakdowns = data.equipment.filter((item) => item.status === "down").length + alerts.filter((item) => item.alert_level === "DUE NOW").length;
