@@ -1417,33 +1417,65 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
 
 function DashboardAlertControls({ alerts, equipment, workOrders, open, setOpen, language }) {
   const t = (text) => tr(language, text);
+  const [reliabilityOpen, setReliabilityOpen] = useState(false);
   const criticalAlerts = alerts.filter((alert) => alert.alert_level === "DUE NOW").length;
+  const reliability = useMemo(() => buildAssetReliability(workOrders, equipment, language), [workOrders, equipment, language]);
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Alerts")}</p>
-            <p className="mt-3 text-4xl font-black text-slate-950">{alerts.length}</p>
-            <p className="mt-2 text-sm font-semibold text-slate-500">{criticalAlerts} {t("Critical")} / {Math.max(alerts.length - criticalAlerts, 0)} {t("Warning")}</p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Alerts")}</p>
+              <p className="mt-3 text-4xl font-black text-slate-950">{alerts.length}</p>
+              <p className="mt-2 text-sm font-semibold text-slate-500">{criticalAlerts} {t("Critical")} / {Math.max(alerts.length - criticalAlerts, 0)} {t("Warning")}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`hidden h-12 w-12 place-items-center rounded-xl sm:grid ${alerts.length ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}>
+                <Bell className="h-5 w-5" />
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className={`grid h-11 w-11 place-items-center rounded-lg border transition ${
+                  open
+                    ? "border-blue-300 bg-blue-700 text-white shadow-sm"
+                    : "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100"
+                }`}
+                title={open ? t("Hide Alerts") : t("Show Alerts")}
+                aria-label={open ? t("Hide Alerts") : t("Show Alerts")}
+              >
+                <AlertTriangle className="h-5 w-5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`hidden h-12 w-12 place-items-center rounded-xl sm:grid ${alerts.length ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"}`}>
-              <Bell className="h-5 w-5" />
-            </span>
-            <button
-              type="button"
-              onClick={() => setOpen(!open)}
-              className={`grid h-11 w-11 place-items-center rounded-lg border transition ${
-                open
-                  ? "border-blue-300 bg-blue-700 text-white shadow-sm"
-                  : "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100"
-              }`}
-              title={open ? t("Hide Alerts") : t("Show Alerts")}
-              aria-label={open ? t("Hide Alerts") : t("Show Alerts")}
-            >
-              <AlertTriangle className="h-5 w-5" />
-            </button>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Asset Reliability</p>
+              <p className="mt-3 text-4xl font-black text-slate-950">{reliability.score}%</p>
+              <p className="mt-2 text-sm font-semibold text-slate-500">MTTR {reliability.mttrLabel} / MTBF {reliability.mtbfLabel}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`hidden h-12 w-12 place-items-center rounded-xl sm:grid ${reliability.score < 70 ? "bg-orange-50 text-orange-600" : "bg-emerald-50 text-emerald-600"}`}>
+                <Cpu className="h-5 w-5" />
+              </span>
+              <button
+                type="button"
+                onClick={() => setReliabilityOpen((current) => !current)}
+                className={`grid h-11 w-11 place-items-center rounded-lg border transition ${
+                  reliabilityOpen
+                    ? "border-slate-800 bg-slate-950 text-white shadow-sm"
+                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                }`}
+                title="Show Asset Reliability"
+                aria-label="Show Asset Reliability"
+              >
+                <Activity className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1451,7 +1483,61 @@ function DashboardAlertControls({ alerts, equipment, workOrders, open, setOpen, 
       {open ? (
         <AlertsAlarmsSection alerts={alerts} equipment={equipment} workOrders={workOrders} language={language} />
       ) : null}
+      {reliabilityOpen ? (
+        <AssetReliabilityPanel reliability={reliability} language={language} />
+      ) : null}
     </div>
+  );
+}
+
+function AssetReliabilityPanel({ reliability, language }) {
+  const t = (text) => tr(language, text);
+  return (
+    <Panel title="Asset Reliability" subtitle="Bad actors, downtime tracking, MTTR, and MTBF indicators for production reliability.">
+      <div className="mb-4 grid gap-3 md:grid-cols-4">
+        <PmStat label="Bad Actors" value={reliability.badActors.length} tone={reliability.badActors.length ? "orange" : "green"} />
+        <PmStat label="Downtime Hours" value={reliability.downtimeLabel} tone={reliability.totalDowntimeHours > 0 ? "red" : "green"} />
+        <PmStat label="MTTR" value={reliability.mttrLabel} tone={reliability.mttrHours > 4 ? "orange" : "green"} />
+        <PmStat label="MTBF" value={reliability.mtbfLabel} tone={reliability.mtbfHours < 100 && reliability.mtbfHours > 0 ? "orange" : "blue"} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_1.3fr]">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-black text-slate-950">Bad Actors</h3>
+              <p className="text-xs font-semibold text-slate-500">Top 5 assets causing production downtime.</p>
+            </div>
+            <Wrench className="h-5 w-5 text-orange-500" />
+          </div>
+          <div className="space-y-2">
+            {reliability.badActors.map((asset, index) => (
+              <div key={asset.id || asset.name} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-slate-950">{index + 1}. {asset.name}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{asset.faults} faults / {asset.downtimeLabel} downtime</p>
+                  </div>
+                  <span className="rounded bg-red-50 px-2 py-1 text-xs font-black text-red-700">{asset.impactScore}</span>
+                </div>
+              </div>
+            ))}
+            {!reliability.badActors.length ? <EmptyState title={t("No data")} message="No breakdown-related work orders found." /> : null}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-black text-slate-950">Downtime Tracking</h3>
+              <p className="text-xs font-semibold text-slate-500">Production line downtime hours by date.</p>
+            </div>
+            <TimerReset className="h-5 w-5 text-blue-600" />
+          </div>
+          <LineChart data={reliability.downtimeSeries} color="#dc2626" />
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -4407,6 +4493,143 @@ function workOrderDurationMinutes(order) {
   if (savedDuration > 0) return savedDuration;
   const calculatedDuration = durationTextToMinutes(calculateDuration(meta.start_time, meta.finished_time));
   return calculatedDuration;
+}
+
+function buildAssetReliability(workOrders, equipment, language = "en") {
+  const equipmentById = new Map(equipment.map((asset) => [Number(asset.id), asset]));
+  const faultOrders = workOrders.filter(isReliabilityFaultOrder);
+  const byAsset = new Map();
+  const downtimeByDate = new Map();
+  let totalDowntimeMinutes = 0;
+
+  for (const order of faultOrders) {
+    const meta = parseWorkOrderNotes(order.notes);
+    const asset = equipmentById.get(Number(order.equipment_id));
+    const assetKey = Number(order.equipment_id) || `order-${order.id || order.title}`;
+    const assetName = cleanChartLabel(order.equipment_name || asset?.name || meta.equipment_name || meta.asset_name || order.title || "") || tr(language, "Unassigned");
+    const downtimeMinutes = workOrderDurationMinutes(order);
+    const downtimeHours = downtimeMinutes / 60;
+    totalDowntimeMinutes += downtimeMinutes;
+
+    const current = byAsset.get(assetKey) || {
+      id: assetKey,
+      name: assetName,
+      faults: 0,
+      downtimeHours: 0,
+      impactScore: 0
+    };
+    current.faults += 1;
+    current.downtimeHours += downtimeHours;
+    current.impactScore = Math.round(current.faults * 10 + current.downtimeHours * 2);
+    byAsset.set(assetKey, current);
+
+    const dateKey = getWorkOrderSavedDate(order) || todayIso();
+    downtimeByDate.set(dateKey, (downtimeByDate.get(dateKey) || 0) + downtimeHours);
+  }
+
+  for (const asset of equipment.filter((item) => equipmentIndustrialStatus(item) === "Breakdown")) {
+    const key = Number(asset.id);
+    if (byAsset.has(key)) continue;
+    byAsset.set(key, {
+      id: key,
+      name: asset.name || `Asset ${asset.id}`,
+      faults: 1,
+      downtimeHours: 0,
+      impactScore: 10
+    });
+  }
+
+  const badActors = [...byAsset.values()]
+    .sort((first, second) => second.downtimeHours - first.downtimeHours || second.faults - first.faults || first.name.localeCompare(second.name))
+    .slice(0, 5)
+    .map((asset) => ({
+      ...asset,
+      downtimeLabel: formatReliabilityHours(asset.downtimeHours)
+    }));
+
+  const downtimeSeries = [...downtimeByDate.entries()]
+    .sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate))
+    .slice(-8)
+    .map(([date, hours]) => ({ label: formatShortDate(date) || date, value: Number(hours.toFixed(1)) }));
+
+  const mttrHours = faultOrders.length ? totalDowntimeMinutes / faultOrders.length / 60 : 0;
+  const mtbfHours = calculateMtbfHours(faultOrders, equipment);
+  const totalDowntimeHours = totalDowntimeMinutes / 60;
+  const incidentCount = [...byAsset.values()].reduce((sum, asset) => sum + asset.faults, 0);
+  const score = Math.max(0, Math.min(100, Math.round(100 - incidentCount * 3 - totalDowntimeHours * 1.2)));
+
+  return {
+    badActors,
+    downtimeSeries: downtimeSeries.length ? downtimeSeries : [{ label: tr(language, "No data"), value: 0 }],
+    totalDowntimeHours,
+    downtimeLabel: formatReliabilityHours(totalDowntimeHours),
+    mttrHours,
+    mttrLabel: faultOrders.length ? formatReliabilityHours(mttrHours) : "0h",
+    mtbfHours,
+    mtbfLabel: mtbfHours ? formatReliabilityHours(mtbfHours) : "N/A",
+    score
+  };
+}
+
+function isReliabilityFaultOrder(order) {
+  const meta = parseWorkOrderNotes(order.notes);
+  const priority = String(order.priority || "").toLowerCase();
+  const status = String(order.status || "").toLowerCase();
+  const maintenanceType = String(meta.maintenance_type || order.type || "").toLowerCase();
+  const text = `${order.title || ""} ${order.description || ""}`.toLowerCase();
+  return (
+    ["critical", "high"].includes(priority) ||
+    ["breakdown", "fault", "down"].some((keyword) => maintenanceType.includes(keyword) || status.includes(keyword) || text.includes(keyword))
+  );
+}
+
+function calculateMtbfHours(faultOrders, equipment) {
+  const intervals = [];
+  const grouped = new Map();
+  for (const order of faultOrders) {
+    const key = Number(order.equipment_id) || order.equipment_name || "unassigned";
+    grouped.set(key, [...(grouped.get(key) || []), order]);
+  }
+
+  for (const orders of grouped.values()) {
+    const sorted = orders.slice().sort((first, second) => {
+      const firstHours = Number(first.service_hours || 0);
+      const secondHours = Number(second.service_hours || 0);
+      if (firstHours && secondHours && firstHours !== secondHours) return firstHours - secondHours;
+      return workOrderDateMs(first) - workOrderDateMs(second);
+    });
+
+    for (let index = 1; index < sorted.length; index += 1) {
+      const previous = sorted[index - 1];
+      const current = sorted[index];
+      const previousHours = Number(previous.service_hours || 0);
+      const currentHours = Number(current.service_hours || 0);
+      if (currentHours > previousHours) {
+        intervals.push(currentHours - previousHours);
+        continue;
+      }
+      const diffHours = (workOrderDateMs(current) - workOrderDateMs(previous)) / 36e5;
+      if (diffHours > 0) intervals.push(diffHours);
+    }
+  }
+
+  if (intervals.length) return intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
+  if (!faultOrders.length) return 0;
+  const totalRunningHours = equipment.reduce((sum, asset) => sum + Number(asset.current_hours || 0), 0);
+  return totalRunningHours > 0 ? totalRunningHours / faultOrders.length : 0;
+}
+
+function workOrderDateMs(order) {
+  const value = getWorkOrderSavedDate(order) || order.created_at || order.due_date || "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function formatReliabilityHours(value) {
+  const hours = Number(value || 0);
+  if (!Number.isFinite(hours) || hours <= 0) return "0h";
+  if (hours < 10) return `${hours.toFixed(1)}h`;
+  return `${Math.round(hours).toLocaleString()}h`;
 }
 
 function durationTextToMinutes(value) {
