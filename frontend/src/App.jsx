@@ -1387,9 +1387,13 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
     <>
       <DashboardFilterBar filters={filters} setFilters={setFilters} options={filterOptions} language={language} />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <MetricCard label="Total Assets" value={filteredData.equipment.length} icon={Cpu} tone="blue" helper="Assets under maintenance control" />
         <MetricCard label="Total Work Orders" value={workOrders.length} icon={Wrench} tone="blue" helper="All work orders in scope" />
+        <MetricCard label="Average Downtime" value={metrics.averageDowntimeLabel} icon={TimerReset} tone={metrics.averageDowntimeHours > 4 ? "orange" : "green"} helper="Average downtime per breakdown" />
+        <MetricCard label="Overdue PM Tasks" value={metrics.overduePmTasks.length} icon={AlertTriangle} tone={metrics.overduePmTasks.length ? "red" : "green"} helper="Preventive tasks past due" />
+        <MetricCard label="Breakdown Count" value={metrics.breakdownCount} icon={Activity} tone={metrics.breakdownCount ? "red" : "green"} helper="Breakdown incidents in scope" />
+        <MetricCard label="Asset Health Index" value={`${metrics.assetHealthAverage}%`} icon={CheckCircle2} tone={metrics.assetHealthAverage < 60 ? "red" : metrics.assetHealthAverage < 75 ? "orange" : "green"} helper="Overall calculated asset health" />
       </div>
 
       <DashboardAlertControls
@@ -1402,7 +1406,6 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
         language={language}
       />
 
-      <MaintenancePerformanceSummary metrics={metrics} />
       <DashboardMiddleRow metrics={metrics} />
       <DashboardBottomRow metrics={metrics} language={language} />
     </>
@@ -1543,24 +1546,9 @@ function MaintenancePerformanceSummary({ metrics }) {
 
 function DashboardMiddleRow({ metrics }) {
   return (
-    <div className="grid gap-6 xl:grid-cols-3">
+    <div className="grid gap-6 xl:grid-cols-2">
       <Panel title="Breakdown Trend Chart" subtitle="Monthly breakdown incidents during the selected period.">
         <LineChart data={metrics.breakdownTrend} color="#dc2626" />
-      </Panel>
-      <Panel title="Maintenance Cost Chart" subtitle="Monthly cost trend with labor, spare parts, and support categories.">
-        <LineChart data={metrics.cost.monthlyTrend} color="#2563eb" />
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {metrics.cost.categories.map((item) => (
-            <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
-              <p className="mt-1 text-lg font-black text-slate-950">{formatCurrency(item.value)}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <CostRanking title="Cost by Site" rows={metrics.cost.bySite} />
-          <CostRanking title="Cost by Equipment" rows={metrics.cost.byEquipment} />
-        </div>
       </Panel>
       <Panel title="Work Order Status Pie Chart" subtitle="Open and closed work orders grouped by current status.">
         <DonutChart data={metrics.workOrderStatusPie} centerLabel="Orders" />
