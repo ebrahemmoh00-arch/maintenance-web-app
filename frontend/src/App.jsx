@@ -1629,8 +1629,8 @@ function PivotColumnChart({ data, title, xAxisLabel, yAxisLabel }) {
               style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(40px, 1fr))` }}
             >
               {rows.map((item) => (
-                <div key={item.label} className="relative h-24">
-                  <span className="absolute left-1 top-3 origin-left -rotate-45 whitespace-nowrap text-[11px] font-medium text-slate-600" title={item.label}>{item.label}</span>
+                <div key={item.label} className="flex min-h-14 items-start justify-center px-1 pt-3">
+                  <span className="max-w-[96px] text-center text-xs font-black leading-snug text-slate-800" title={item.label}>{item.label}</span>
                 </div>
               ))}
             </div>
