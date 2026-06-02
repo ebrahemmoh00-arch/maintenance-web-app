@@ -4202,10 +4202,10 @@ function EmployeesManagementPage({ rows, jobTitles = [], onCreate, onEdit, onDel
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <EmployeeMetricButton label={t("Total Employees")} value={rows.length} icon={UsersRound} tone="blue" helper={t("All registered staff")} active={activeGroup === "all"} onClick={() => setActiveGroup("all")} />
         <EmployeeMetricButton label={t("Active Staff")} value={activeStaff} icon={CheckCircle2} tone="green" helper={t("Active staff")} active={activeGroup === "active"} onClick={() => setActiveGroup("active")} />
-        <EmployeeMetricButton label={t("Technicians")} value={technicians} icon={Wrench} tone="cyan" helper={t("Technical execution roles")} active={activeGroup === "technicians"} onClick={() => setActiveGroup("technicians")} />
-        <EmployeeMetricButton label={t("Engineers")} value={engineers} icon={ShieldCheck} tone="orange" helper={t("Engineering roles")} active={activeGroup === "engineers"} onClick={() => setActiveGroup("engineers")} />
         <EmployeeMetricButton label={t("Management")} value={management} icon={Building2} tone="slate" helper={t("Branch, site, and O&M managers")} active={activeGroup === "management"} onClick={() => setActiveGroup("management")} />
+        <EmployeeMetricButton label={t("Engineers")} value={engineers} icon={ShieldCheck} tone="orange" helper={t("Engineering roles")} active={activeGroup === "engineers"} onClick={() => setActiveGroup("engineers")} />
         <EmployeeMetricButton label={t("Supervisors")} value={supervisors} icon={ShieldCheck} tone="green" helper={t("Supervision and team leadership roles")} active={activeGroup === "supervisors"} onClick={() => setActiveGroup("supervisors")} />
+        <EmployeeMetricButton label={t("Technicians")} value={technicians} icon={Wrench} tone="cyan" helper={t("Technical execution roles")} active={activeGroup === "technicians"} onClick={() => setActiveGroup("technicians")} />
       </div>
 
       {activeGroup ? (
