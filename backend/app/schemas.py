@@ -46,7 +46,7 @@ class EngineerBase(BaseModel):
     supervisor: str = ""
     username: str = ""
     password: str = ""
-    role: Literal["admin", "supervisor", "technician", "viewer", "user"] = "viewer"
+    role: Literal["admin", "engineer", "supervisor", "technician", "viewer", "user"] = "viewer"
     permissions: str = ""
     status: Literal["active", "on_shift", "off_duty", "inactive"] = "active"
 

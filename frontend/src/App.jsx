@@ -45,7 +45,7 @@ import EmptyState from "./components/EmptyState";
 
 const LOGIN_USERNAME = "ECS-ECS";
 const LOGIN_PASSWORD = "E5C9S2@rom";
-const EMPLOYEE_ROLE_OPTIONS = ["viewer", "technician", "supervisor", "admin"];
+const EMPLOYEE_ROLE_OPTIONS = ["viewer", "engineer", "admin"];
 const MANAGEMENT_JOB_TITLES = [
   "Branch Manager",
   "Operation & Maintenance Manager",
@@ -330,6 +330,7 @@ function createFullPermissions() {
 function normalizeEmployeeRole(role = "viewer") {
   const normalized = String(role || "viewer").toLowerCase();
   if (normalized === "user") return "viewer";
+  if (["supervisor", "technician"].includes(normalized)) return "engineer";
   return EMPLOYEE_ROLE_OPTIONS.includes(normalized) ? normalized : "viewer";
 }
 
@@ -337,12 +338,7 @@ function createRolePermissions(role = "viewer") {
   const normalized = normalizeEmployeeRole(role);
   if (normalized === "admin") return createFullPermissions();
   const permissions = createDefaultPermissions();
-  if (normalized === "supervisor") {
-    for (const module of PERMISSION_MODULES) {
-      permissions[module.key] = { view: true, add: true, edit: true, delete: ["work-orders", "preventive-maintenance"].includes(module.key) };
-    }
-  }
-  if (normalized === "technician") {
+  if (normalized === "engineer") {
     permissions["work-orders"] = { view: true, add: true, edit: true, delete: false };
     permissions["preventive-maintenance"] = { view: true, add: false, edit: true, delete: false };
     permissions.inventory = { view: true, add: false, edit: false, delete: false };
@@ -736,7 +732,7 @@ export default function App() {
   });
   const [authenticated, setAuthenticated] = useState(() => {
     const auth = getAuthSession();
-    return auth.authenticated && ["admin", "supervisor", "technician", "viewer", "user"].includes(auth.role) && Boolean(auth.username);
+    return auth.authenticated && ["admin", "engineer", "supervisor", "technician", "viewer", "user"].includes(auth.role) && Boolean(auth.username);
   });
   const [currentUser, setCurrentUser] = useState(() => {
     const auth = getAuthSession();
@@ -2939,7 +2935,7 @@ function employeeRole(role) {
 }
 
 function isTechnicianEmployee(employee) {
-  return employeeRole(employee?.role) === "technician" || /technician/i.test(employeeJobTitle(employee));
+  return String(employee?.role || "").toLowerCase() === "technician" || /technician/i.test(employeeJobTitle(employee));
 }
 
 function isEngineerEmployee(employee) {
@@ -2952,7 +2948,7 @@ function isManagementEmployee(employee) {
 }
 
 function isSupervisorEmployee(employee) {
-  return employeeRole(employee?.role) === "supervisor" || /supervisor/i.test(employeeJobTitle(employee));
+  return String(employee?.role || "").toLowerCase() === "supervisor" || /supervisor/i.test(employeeJobTitle(employee));
 }
 
 function employeeMatchesGroup(employee, group) {
@@ -2981,8 +2977,7 @@ function employeeGroupTitle(group, language = "en") {
 function employeeRoleLabel(role) {
   const labels = {
     admin: "Admin",
-    supervisor: "Supervisor",
-    technician: "Technician",
+    engineer: "Engineer",
     viewer: "Viewer",
     user: "Viewer"
   };
@@ -4397,8 +4392,7 @@ function RoleBadge({ value }) {
   const role = employeeRole(value);
   const tone = {
     admin: "border-red-200 bg-red-50 text-red-700",
-    supervisor: "border-blue-200 bg-blue-50 text-blue-700",
-    technician: "border-cyan-200 bg-cyan-50 text-cyan-700",
+    engineer: "border-blue-200 bg-blue-50 text-blue-700",
     viewer: "border-slate-200 bg-slate-100 text-slate-600"
   }[role] || "border-slate-200 bg-slate-100 text-slate-600";
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${tone}`}>{employeeRoleLabel(role)}</span>;
