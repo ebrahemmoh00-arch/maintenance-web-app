@@ -1559,84 +1559,128 @@ function DashboardMiddleRow({ metrics }) {
 }
 
 function DashboardWorkOrderCountCharts({ workOrders, language }) {
-  const technicianData = useMemo(() => technicianWorkloadData(workOrders, language, 14), [workOrders, language]);
-  const engineerData = useMemo(() => engineerWorkloadData(workOrders, language, 14), [workOrders, language]);
+  const technicianData = useMemo(() => technicianWorkloadData(workOrders, language, 100), [workOrders, language]);
+  const engineerData = useMemo(() => engineerWorkloadData(workOrders, language, 100), [workOrders, language]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-2">
-      <Panel title="No of order per technician" subtitle="Work order count grouped by technician name from saved work orders.">
-        <PivotColumnChart
-          data={technicianData}
-          title="No of order per technician"
-          xAxisLabel="technician Name"
-          yAxisLabel="No of order"
-        />
-      </Panel>
-      <Panel title="No of order per Engineer" subtitle="Work order count grouped by engineer name from saved work orders.">
-        <PivotColumnChart
-          data={engineerData}
-          title="No of order per Engineer"
-          xAxisLabel="Engineer Name"
-          yAxisLabel="No of orders"
-        />
-      </Panel>
+      <WorkOrderParticipationPanel
+        title="Technician Work Order Participation"
+        subtitle="Technician name linked to the number of work orders he participated in."
+        filterTitle="Technicians"
+        data={technicianData}
+        color="cyan"
+      />
+      <WorkOrderParticipationPanel
+        title="Engineer Work Order Participation"
+        subtitle="Engineer name linked to the number of work orders assigned or issued."
+        filterTitle="Engineers"
+        data={engineerData}
+        color="blue"
+      />
     </div>
   );
 }
 
-function PivotColumnChart({ data, title, xAxisLabel, yAxisLabel }) {
-  const rows = data.filter((item) => item.value > 0 && item.label !== "No data").slice(0, 14);
-  const maxValue = Math.max(...rows.map((item) => Number(item.value || 0)), 1);
-  const topTick = Math.max(1, Math.ceil(maxValue / 2) * 2);
-  const ticks = Array.from({ length: 5 }, (_, index) => Math.round((topTick / 4) * (4 - index)));
+function WorkOrderParticipationPanel({ title, subtitle, filterTitle, data, color }) {
+  const rows = useMemo(
+    () => data.filter((item) => item.value > 0 && item.label !== "No data"),
+    [data]
+  );
+  const [selectedNames, setSelectedNames] = useState([]);
+  const visibleRows = selectedNames.length ? rows.filter((item) => selectedNames.includes(item.label)) : rows;
+
+  useEffect(() => {
+    setSelectedNames((current) => current.filter((name) => rows.some((item) => item.label === name)));
+  }, [rows]);
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[620px] rounded-lg bg-white p-3">
-        <h3 className="text-center text-base font-semibold text-slate-700">{title}</h3>
-        <div className="mt-4 grid grid-cols-[42px_1fr] gap-3">
-          <div className="relative flex items-center justify-center">
-            <span className="-rotate-90 whitespace-nowrap text-xs font-semibold text-slate-600">{yAxisLabel}</span>
-          </div>
-          <div>
-            <div className="relative h-56 border-b border-l border-slate-300">
-              {ticks.map((tick, index) => {
-                const bottom = `${(tick / topTick) * 100}%`;
-                return (
-                  <div key={`${tick}-${index}`} className="absolute left-0 right-0" style={{ bottom }}>
-                    <span className="absolute -left-8 -top-2 w-6 text-right text-xs text-slate-500">{tick}</span>
-                    <span className="block border-t border-slate-200" />
-                  </div>
-                );
-              })}
-              <div className="absolute inset-x-3 bottom-0 top-0 flex items-end justify-around gap-3">
-                {rows.map((item) => {
-                  const height = `${Math.max((Number(item.value || 0) / topTick) * 100, 4)}%`;
-                  return (
-                    <div key={item.label} className="flex h-full min-w-10 flex-1 flex-col items-center justify-end">
-                      <span className="mb-1 text-xs font-semibold text-slate-700">{item.value}</span>
-                      <div className="w-5 rounded-t-sm bg-blue-600" style={{ height }} title={`${item.label}: ${item.value}`} />
-                    </div>
-                  );
-                })}
+    <Panel title={title} subtitle={subtitle}>
+      <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
+        <ParticipantFilterList
+          title={filterTitle}
+          rows={rows}
+          selectedNames={selectedNames}
+          setSelectedNames={setSelectedNames}
+        />
+        <ParticipationBarChart rows={visibleRows} color={color} />
+      </div>
+    </Panel>
+  );
+}
+
+function ParticipantFilterList({ title, rows, selectedNames, setSelectedNames }) {
+  const allSelected = selectedNames.length === 0;
+  return (
+    <aside className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{title}</p>
+        <button
+          type="button"
+          onClick={() => setSelectedNames([])}
+          className={`rounded-md px-2 py-1 text-xs font-black ${allSelected ? "bg-blue-700 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"}`}
+        >
+          All
+        </button>
+      </div>
+      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+        {rows.map((row) => {
+          const checked = allSelected || selectedNames.includes(row.label);
+          return (
+            <label key={row.label} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${checked ? "border-blue-200 bg-white text-slate-950 shadow-sm" : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white"}`}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(event) => {
+                  const nextChecked = event.target.checked;
+                  setSelectedNames((current) => {
+                    const starting = current.length ? current : rows.map((item) => item.label);
+                    return nextChecked
+                      ? uniqueSorted([...starting, row.label])
+                      : starting.filter((name) => name !== row.label);
+                  });
+                }}
+                className="h-4 w-4 rounded border-slate-300 text-blue-700"
+              />
+              <span className="min-w-0 flex-1 truncate font-bold" title={row.label}>{row.label}</span>
+              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-700">{row.value}</span>
+            </label>
+          );
+        })}
+        {!rows.length ? <p className="py-8 text-center text-sm font-semibold text-slate-400">No data</p> : null}
+      </div>
+    </aside>
+  );
+}
+
+function ParticipationBarChart({ rows, color }) {
+  const maxValue = Math.max(...rows.map((item) => Number(item.value || 0)), 1);
+  const barColor = color === "cyan" ? "bg-cyan-600" : "bg-blue-700";
+
+  return (
+    <div className="min-h-80 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-sm font-black text-slate-950">Work Orders Count</p>
+        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Name vs Orders</p>
+      </div>
+      <div className="space-y-3">
+        {rows.map((row) => {
+          const width = `${Math.max((Number(row.value || 0) / maxValue) * 100, row.value ? 8 : 0)}%`;
+          return (
+            <div key={row.label} className="grid gap-2 sm:grid-cols-[minmax(150px,220px)_1fr_52px] sm:items-center">
+              <p className="truncate text-sm font-black text-slate-800" title={row.label}>{row.label}</p>
+              <div className="h-5 overflow-hidden rounded-full bg-slate-100">
+                <div className={`h-full rounded-full ${barColor}`} style={{ width }} />
               </div>
-              {!rows.length ? (
-                <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-slate-400">No data</div>
-              ) : null}
+              <p className="text-right text-sm font-black text-slate-950">{row.value}</p>
             </div>
-            <div
-              className="ml-3 grid min-h-24 gap-3"
-              style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(40px, 1fr))` }}
-            >
-              {rows.map((item) => (
-                <div key={item.label} className="flex min-h-14 items-start justify-center px-1 pt-3">
-                  <span className="max-w-[96px] text-center text-xs font-black leading-snug text-slate-800" title={item.label}>{item.label}</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-1 text-center text-xs font-semibold text-slate-600">{xAxisLabel}</p>
+          );
+        })}
+        {!rows.length ? (
+          <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm font-semibold text-slate-400">
+            No selected names
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );
