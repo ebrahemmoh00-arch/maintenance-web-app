@@ -1380,45 +1380,35 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
   const filteredData = filteredScope.data;
   const filteredAlerts = filteredScope.alerts;
   const workOrders = filteredData["work-orders"];
-  const hasActiveDashboardFilters = Object.values(filters).some((value) => value !== "all");
+  const reliability = useMemo(() => buildAssetReliability(workOrders, filteredData.equipment, language), [workOrders, filteredData.equipment, language]);
+  const metrics = useMemo(() => buildMaintenanceDashboardMetrics(filteredData, filteredAlerts, reliability, language), [filteredData, filteredAlerts, reliability, language]);
   const activeOrders = workOrders.filter((item) => item.status !== "completed" && item.status !== "cancelled").length;
-  const breakdowns = filteredData.equipment.filter((item) => item.status === "down").length + filteredAlerts.filter((item) => item.alert_level === "DUE NOW").length;
-  const completedThisWeek = workOrders.filter((item) => item.status === "completed").length || (hasActiveDashboardFilters ? 0 : stats.completed_orders);
-  const availableTechnicians = filteredData.engineers.filter((item) => item.status === "active").length;
-  const averageDowntime = `${Math.max(1.2, breakdowns * 2.4 + activeOrders * 0.35).toFixed(1)}h`;
 
   return (
     <>
       <DashboardFilterBar filters={filters} setFilters={setFilters} options={filterOptions} language={language} />
 
       <div className="grid gap-4 xl:grid-cols-5 md:grid-cols-2">
-        <MetricCard label={t("Total Active Work Orders")} value={activeOrders} icon={Activity} tone="blue" helper={t("Open operational workload")} />
-        <MetricCard label={t("Equipment Breakdowns")} value={breakdowns} icon={AlertTriangle} tone={breakdowns ? "red" : "green"} helper={t("Down or due-now assets")} />
-        <MetricCard label={t("Completed This Week")} value={completedThisWeek} icon={CheckCircle2} tone="green" helper={t("Closed maintenance orders")} />
-        <MetricCard label={t("Available Technicians")} value={availableTechnicians} icon={UsersRound} tone="cyan" helper={t("Ready for assignment")} />
-        <MetricCard label={t("Average Downtime")} value={averageDowntime} icon={TimerReset} tone="orange" helper={t("Estimated operational impact")} />
+        <MetricCard label="Total Assets" value={filteredData.equipment.length} icon={Cpu} tone="blue" helper="Assets under maintenance control" />
+        <MetricCard label="Equipment Availability" value={`${metrics.availabilityPercent}%`} icon={Activity} tone={availabilityTone(metrics.availabilityPercent)} helper="Planned time vs downtime" />
+        <MetricCard label="MTTR" value={metrics.mttrLabel} icon={TimerReset} tone={metrics.mttrHours > 4 ? "orange" : "green"} helper="Mean time to repair" />
+        <MetricCard label="MTBF" value={metrics.mtbfLabel} icon={CheckCircle2} tone={metrics.mtbfHours > 0 && metrics.mtbfHours < 100 ? "orange" : "green"} helper="Mean time between failures" />
+        <MetricCard label="Open Work Orders" value={activeOrders} icon={Wrench} tone={activeOrders ? "orange" : "green"} helper="Not completed work orders" />
       </div>
 
       <DashboardAlertControls
         alerts={filteredAlerts}
         equipment={filteredData.equipment}
         workOrders={filteredData["work-orders"]}
+        reliability={reliability}
         open={dashboardAlertsOpen}
         setOpen={setDashboardAlertsOpen}
         language={language}
       />
-      <AnalyticsSection data={filteredData} alerts={filteredAlerts} language={language} />
-      <WorkloadAnalyticsCharts workOrders={workOrders} language={language} />
 
-      <EquipmentHealthMonitoring equipment={filteredData.equipment} pmTasks={filteredData["preventive-maintenance"]} language={language} />
-      <SiteStatusOverview customers={filteredData.customers} equipment={filteredData.equipment} engineers={filteredData.engineers} alerts={filteredAlerts} language={language} />
-      <PreventiveMaintenanceDashboard pmTasks={filteredData["preventive-maintenance"]} workOrders={filteredData["work-orders"]} language={language} />
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <InventoryMonitoringSection inventory={filteredData.inventory} language={language} />
-        <TechnicianPerformanceSection engineers={filteredData.engineers} workOrders={filteredData["work-orders"]} language={language} />
-      </div>
-
+      <MaintenancePerformanceSummary metrics={metrics} />
+      <DashboardMiddleRow metrics={metrics} />
+      <DashboardBottomRow metrics={metrics} language={language} />
     </>
   );
 }
@@ -1428,15 +1418,17 @@ function DashboardFilterBar({ filters, setFilters, options, language }) {
   const fields = [
     { key: "year", label: "Year", options: options.years },
     { key: "month", label: "Month Name", options: options.months },
-    { key: "category", label: "Category", options: options.categories },
-    { key: "location", label: "Location", options: options.locations },
-    { key: "priority", label: "Priority", options: options.priorities },
+    { key: "location", label: "Site", options: options.locations },
+    { key: "category", label: "Asset Category", options: options.categories },
+    { key: "equipment", label: "Equipment", options: options.equipment },
+    { key: "maintenanceType", label: "Maintenance Type", options: options.maintenanceTypes },
+    { key: "priority", label: "Priority Level", options: options.priorities },
     { key: "status", label: "Status", options: options.statuses }
   ];
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
         {fields.map((field) => (
           <label key={field.key} className="block">
             <span className="mb-2 block text-xs font-black text-slate-800">{t(field.label)}</span>
@@ -1457,11 +1449,11 @@ function DashboardFilterBar({ filters, setFilters, options, language }) {
   );
 }
 
-function DashboardAlertControls({ alerts, equipment, workOrders, open, setOpen, language }) {
+function DashboardAlertControls({ alerts, equipment, workOrders, reliability, open, setOpen, language }) {
   const t = (text) => tr(language, text);
   const [reliabilityOpen, setReliabilityOpen] = useState(false);
   const criticalAlerts = alerts.filter((alert) => alert.alert_level === "DUE NOW").length;
-  const reliability = useMemo(() => buildAssetReliability(workOrders, equipment, language), [workOrders, equipment, language]);
+  const reliabilityData = reliability || buildAssetReliability(workOrders, equipment, language);
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-2">
@@ -1497,11 +1489,11 @@ function DashboardAlertControls({ alerts, equipment, workOrders, open, setOpen, 
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Asset Reliability</p>
-              <p className="mt-3 text-4xl font-black text-slate-950">{reliability.score}%</p>
-              <p className="mt-2 text-sm font-semibold text-slate-500">MTTR {reliability.mttrLabel} / MTBF {reliability.mtbfLabel}</p>
+              <p className="mt-3 text-4xl font-black text-slate-950">{reliabilityData.score}%</p>
+              <p className="mt-2 text-sm font-semibold text-slate-500">MTTR {reliabilityData.mttrLabel} / MTBF {reliabilityData.mtbfLabel}</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className={`hidden h-12 w-12 place-items-center rounded-xl sm:grid ${reliability.score < 70 ? "bg-orange-50 text-orange-600" : "bg-emerald-50 text-emerald-600"}`}>
+              <span className={`hidden h-12 w-12 place-items-center rounded-xl sm:grid ${reliabilityData.score < 70 ? "bg-orange-50 text-orange-600" : "bg-emerald-50 text-emerald-600"}`}>
                 <Cpu className="h-5 w-5" />
               </span>
               <button
@@ -1526,9 +1518,212 @@ function DashboardAlertControls({ alerts, equipment, workOrders, open, setOpen, 
         <AlertsAlarmsSection alerts={alerts} equipment={equipment} workOrders={workOrders} language={language} />
       ) : null}
       {reliabilityOpen ? (
-        <AssetReliabilityPanel reliability={reliability} language={language} />
+        <AssetReliabilityPanel reliability={reliabilityData} language={language} />
       ) : null}
     </div>
+  );
+}
+
+function MaintenancePerformanceSummary({ metrics }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <PmStat label="Average Downtime" value={metrics.averageDowntimeLabel} tone={metrics.averageDowntimeHours > 4 ? "orange" : "green"} />
+      <PmStat label="Overdue PM Tasks" value={metrics.overduePmTasks.length} tone={metrics.overduePmTasks.length ? "red" : "green"} />
+      <PmStat label="Maintenance Cost" value={metrics.cost.totalLabel} tone={metrics.cost.currentMonth > metrics.cost.previousMonth ? "orange" : "blue"} />
+      <PmStat label="Breakdown Count" value={metrics.breakdownCount} tone={metrics.breakdownCount ? "red" : "green"} />
+      <PmStat label="Asset Health Index" value={`${metrics.assetHealthAverage}%`} tone={metrics.assetHealthAverage < 60 ? "red" : metrics.assetHealthAverage < 75 ? "orange" : "green"} />
+    </div>
+  );
+}
+
+function DashboardMiddleRow({ metrics }) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-3">
+      <Panel title="Breakdown Trend Chart" subtitle="Monthly breakdown incidents during the selected period.">
+        <LineChart data={metrics.breakdownTrend} color="#dc2626" />
+      </Panel>
+      <Panel title="Maintenance Cost Chart" subtitle="Monthly cost trend with labor, spare parts, and support categories.">
+        <LineChart data={metrics.cost.monthlyTrend} color="#2563eb" />
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {metrics.cost.categories.map((item) => (
+            <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+              <p className="mt-1 text-lg font-black text-slate-950">{formatCurrency(item.value)}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <CostRanking title="Cost by Site" rows={metrics.cost.bySite} />
+          <CostRanking title="Cost by Equipment" rows={metrics.cost.byEquipment} />
+        </div>
+      </Panel>
+      <Panel title="Work Order Status Pie Chart" subtitle="Open and closed work orders grouped by current status.">
+        <DonutChart data={metrics.workOrderStatusPie} centerLabel="Orders" />
+      </Panel>
+    </div>
+  );
+}
+
+function DashboardBottomRow({ metrics, language }) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      <CriticalEquipmentStatusPanel rows={metrics.criticalEquipment} siteSummary={metrics.siteSummary} />
+      <OverduePmTasksPanel rows={metrics.overduePmTasks} language={language} />
+      <TopDowntimeAssetsPanel rows={metrics.topDowntimeAssets} />
+      <AssetHealthRankingPanel rows={metrics.assetHealthRanking} average={metrics.assetHealthAverage} />
+    </div>
+  );
+}
+
+function CostRanking({ title, rows }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-slate-500">{title}</p>
+      <div className="space-y-2">
+        {rows.slice(0, 3).map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-3 text-sm">
+            <span className="truncate font-bold text-slate-700">{row.label}</span>
+            <span className="shrink-0 font-black text-slate-950">{formatCurrency(row.value)}</span>
+          </div>
+        ))}
+        {!rows.length ? <p className="text-sm font-semibold text-slate-400">No cost records</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function CriticalEquipmentStatusPanel({ rows, siteSummary }) {
+  return (
+    <Panel title="Critical Equipment Status" subtitle="Critical assets grouped by running, maintenance, breakdown, and out-of-service states.">
+      <div className="mb-4 grid gap-2 sm:grid-cols-2">
+        {siteSummary.slice(0, 4).map((site) => (
+          <div key={site.name} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="truncate text-sm font-black text-slate-950">{site.name}</p>
+            <p className="text-xs font-semibold text-slate-500">{site.running}/{site.assets} running / {site.breakdown} breakdown</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {rows.slice(0, 8).map((asset) => (
+          <div key={asset.id} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black text-slate-950">{asset.name}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">{asset.customer_name || asset.location || "Unassigned site"}</p>
+              </div>
+              <IndustrialStatusBadge status={asset.statusLabel} />
+            </div>
+            <div className="flex items-center gap-3">
+              <ProgressBar value={asset.health} tone={healthTone(asset.health)} />
+              <span className="w-12 text-right text-sm font-black text-slate-800">{asset.health}%</span>
+            </div>
+          </div>
+        ))}
+        {!rows.length ? <EmptyState title="No critical equipment" message="Mark assets as High or Critical to monitor operational status." /> : null}
+      </div>
+    </Panel>
+  );
+}
+
+function OverduePmTasksPanel({ rows, language }) {
+  const t = (text) => tr(language, text);
+  return (
+    <Panel title="Overdue Preventive Maintenance Tasks" subtitle="Tasks that passed due date or exceeded scheduled service hours.">
+      {rows.length ? (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700">
+          Critical Alert: {rows.length} preventive maintenance tasks are overdue.
+        </div>
+      ) : null}
+      <div className="overflow-auto rounded-xl border border-slate-200">
+        <table className="min-w-[760px] w-full text-sm">
+          <thead className="bg-slate-100 text-xs uppercase tracking-[0.12em] text-slate-500">
+            <tr>
+              <th className="px-3 py-3 text-left">PM Number</th>
+              <th className="px-3 py-3 text-left">Asset</th>
+              <th className="px-3 py-3 text-left">Site</th>
+              <th className="px-3 py-3 text-left">Due Date</th>
+              <th className="px-3 py-3 text-left">Days Overdue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 10).map((task) => (
+              <tr key={task.id} className="bg-red-50">
+                <td className="border-t border-slate-200 px-3 py-3 font-black text-slate-950">PM-{String(task.id).padStart(4, "0")}</td>
+                <td className="border-t border-slate-200 px-3 py-3 text-slate-700">{task.equipment_name || "-"}</td>
+                <td className="border-t border-slate-200 px-3 py-3 text-slate-700">{task.site || "-"}</td>
+                <td className="border-t border-slate-200 px-3 py-3 text-slate-700">{task.dueLabel}</td>
+                <td className="border-t border-slate-200 px-3 py-3 font-black text-red-700">{task.daysOverdue}</td>
+              </tr>
+            ))}
+            {!rows.length ? <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-500">{t("No data")}</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
+function TopDowntimeAssetsPanel({ rows }) {
+  return (
+    <Panel title="Top 10 Assets by Downtime" subtitle="Equipment with the highest downtime exposure in the selected period.">
+      <BarChart data={rows.slice(0, 10).map((asset) => ({ label: asset.name, value: Math.round(asset.downtimeHours), color: "bg-red-600" }))} layout="horizontal" />
+    </Panel>
+  );
+}
+
+function AssetHealthRankingPanel({ rows, average }) {
+  return (
+    <Panel title="Asset Health Ranking" subtitle="Calculated health score based on breakdown frequency, MTTR, MTBF, availability, and PM exposure.">
+      <div className="mb-5 flex flex-wrap items-center gap-5">
+        <GaugeChart value={average} />
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Health Categories</p>
+          <p className="mt-2 text-sm font-semibold text-slate-600">90-100 Excellent / 75-89 Good / 60-74 Fair / Below 60 Poor</p>
+        </div>
+      </div>
+      <div className="overflow-auto rounded-xl border border-slate-200">
+        <table className="min-w-[720px] w-full text-sm">
+          <thead className="bg-slate-100 text-xs uppercase tracking-[0.12em] text-slate-500">
+            <tr>
+              <th className="px-3 py-3 text-left">Asset</th>
+              <th className="px-3 py-3 text-left">Site</th>
+              <th className="px-3 py-3 text-left">Health</th>
+              <th className="px-3 py-3 text-left">Category</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 10).map((asset) => (
+              <tr key={asset.id} className="bg-white hover:bg-slate-50">
+                <td className="border-t border-slate-200 px-3 py-3 font-black text-slate-950">{asset.name}</td>
+                <td className="border-t border-slate-200 px-3 py-3 text-slate-600">{asset.site || "-"}</td>
+                <td className="border-t border-slate-200 px-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <ProgressBar value={asset.health} tone={healthTone(asset.health)} />
+                    <span className="w-12 text-right font-black">{asset.health}%</span>
+                  </div>
+                </td>
+                <td className="border-t border-slate-200 px-3 py-3 font-bold text-slate-700">{asset.category}</td>
+              </tr>
+            ))}
+            {!rows.length ? <tr><td colSpan={4} className="px-3 py-8 text-center text-slate-500">No asset health records.</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
+function GaugeChart({ value }) {
+  const safe = Math.max(0, Math.min(100, Number(value || 0)));
+  const dash = `${safe} ${100 - safe}`;
+  const stroke = safe < 60 ? "#dc2626" : safe < 75 ? "#f97316" : safe < 90 ? "#2563eb" : "#10b981";
+  return (
+    <svg viewBox="0 0 42 42" className="h-32 w-32 shrink-0">
+      <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#e2e8f0" strokeWidth="5" />
+      <circle cx="21" cy="21" r="15.915" fill="transparent" stroke={stroke} strokeWidth="5" strokeDasharray={dash} strokeDashoffset="25" strokeLinecap="round" />
+      <text x="21" y="20" textAnchor="middle" className="fill-slate-900 text-[0.42rem] font-black">{Math.round(safe)}%</text>
+      <text x="21" y="25" textAnchor="middle" className="fill-slate-500 text-[0.18rem] uppercase">Health</text>
+    </svg>
   );
 }
 
@@ -2551,7 +2746,9 @@ function createDashboardFilters() {
     year: "all",
     month: "all",
     category: "all",
+    equipment: "all",
     location: "all",
+    maintenanceType: "all",
     priority: "all",
     status: "all"
   };
@@ -2575,9 +2772,22 @@ function buildDashboardFilterOptions(data, alerts, language = "en") {
 
   const categories = uniqueSorted([
     ...equipment.map((asset) => asset.asset_type || asset.asset_level),
-    ...equipment.map((asset) => asset.asset_level),
-    ...workOrders.map((order) => parseWorkOrderNotes(order.notes).maintenance_type)
+    ...equipment.map((asset) => asset.asset_level)
   ]).map((value) => ({ value, label: value }));
+
+  const equipmentOptions = sortEquipmentByName(equipment).map((asset) => ({
+    value: String(asset.id),
+    label: asset.name || `Asset ${asset.id}`
+  }));
+
+  const maintenanceTypes = uniqueSorted([
+    ...workOrders.map((order) => parseWorkOrderNotes(order.notes).maintenance_type),
+    ...pmTasks.map((task) => task.task_name),
+    "Service",
+    "Condition Based / Predictive",
+    "Periodic / Time based",
+    "Breakdown"
+  ]).map((value) => ({ value, label: valueLabel(value, language) }));
 
   const locations = uniqueSorted([
     ...(data.customers || []).map((customer) => customer.name),
@@ -2607,7 +2817,7 @@ function buildDashboardFilterOptions(data, alerts, language = "en") {
     "maintenance"
   ]).map((value) => ({ value, label: valueLabel(value, language) }));
 
-  return { years, months, categories, locations, priorities, statuses };
+  return { years, months, categories, equipment: equipmentOptions, locations, maintenanceTypes, priorities, statuses };
 }
 
 function applyDashboardFilters(data, alerts, filters) {
@@ -2616,7 +2826,7 @@ function applyDashboardFilters(data, alerts, filters) {
   const equipmentById = new Map(equipment.map((asset) => [Number(asset.id), asset]));
   const workOrderFiltered = workOrders.filter((order) => dashboardWorkOrderMatches(order, equipmentById.get(Number(order.equipment_id)), filters));
   const filteredEquipmentIds = new Set(workOrderFiltered.map((order) => Number(order.equipment_id)).filter(Boolean));
-  const orderScoped = filters.year !== "all" || filters.month !== "all" || filters.priority !== "all";
+  const orderScoped = filters.year !== "all" || filters.month !== "all" || filters.priority !== "all" || filters.equipment !== "all" || filters.maintenanceType !== "all";
   const equipmentFiltered = equipment.filter((asset) => {
     if (!dashboardEquipmentMatches(asset, filters)) return false;
     return orderScoped ? filteredEquipmentIds.has(Number(asset.id)) : true;
@@ -2636,6 +2846,7 @@ function applyDashboardFilters(data, alerts, filters) {
         const asset = equipmentById.get(Number(task.equipment_id));
         if (!asset || !equipmentScopeIds.has(Number(asset.id))) return false;
         if (!matchesDashboardDate(task.next_due_date || task.last_service_date, filters)) return false;
+        if (!matchesAnyFilterValue([task.task_name], filters.maintenanceType)) return false;
         if (filters.status !== "all" && !matchesFilterValue(task.status, filters.status) && !matchesFilterValue(task.pm_alert, filters.status)) return false;
         return true;
       })
@@ -2647,14 +2858,17 @@ function applyDashboardFilters(data, alerts, filters) {
 function dashboardWorkOrderMatches(order, asset, filters) {
   const meta = parseWorkOrderNotes(order.notes);
   if (!matchesDashboardDate(getWorkOrderSavedDate(order) || order.scheduled_date || order.due_date, filters)) return false;
+  if (filters.equipment !== "all" && String(order.equipment_id || "") !== String(filters.equipment)) return false;
   if (!matchesFilterValue(order.priority, filters.priority)) return false;
   if (!matchesFilterValue(order.status, filters.status)) return false;
-  if (!matchesAnyFilterValue([asset?.asset_type, asset?.asset_level, meta.maintenance_type], filters.category)) return false;
+  if (!matchesAnyFilterValue([asset?.asset_type, asset?.asset_level], filters.category)) return false;
+  if (!matchesAnyFilterValue([meta.maintenance_type], filters.maintenanceType)) return false;
   if (!matchesAnyFilterValue([order.customer_name, asset?.customer_name, asset?.location, meta.location], filters.location)) return false;
   return true;
 }
 
 function dashboardEquipmentMatches(asset, filters) {
+  if (filters.equipment !== "all" && String(asset.id || "") !== String(filters.equipment)) return false;
   if (!matchesAnyFilterValue([asset.asset_type, asset.asset_level], filters.category)) return false;
   if (!matchesAnyFilterValue([asset.customer_name, asset.location], filters.location)) return false;
   if (!matchesAnyFilterValue([asset.status, equipmentIndustrialStatus(asset)], filters.status)) return false;
@@ -2669,6 +2883,10 @@ function dashboardAlertMatches(alert, filteredEquipment, filters) {
     if (!matchesFilterValue(alertPriority, filters.priority)) return false;
   }
   if (filters.status !== "all" && !matchesFilterValue(alert.alert_level, filters.status)) return false;
+  if (filters.equipment !== "all") {
+    const selectedAsset = filteredEquipment.find((asset) => String(asset.id) === String(filters.equipment));
+    return selectedAsset ? normalizeChoice(selectedAsset.name) === normalizeChoice(alert.equipment_name) : false;
+  }
   if (filters.category === "all") return true;
   const alertName = normalizeChoice(alert.equipment_name);
   return filteredEquipment.some((asset) => normalizeChoice(asset.name) === alertName);
@@ -4613,6 +4831,358 @@ function plannedBreakdownData(data, alerts, language = "en") {
     { label: tr(language, "Planned"), value: plannedOrders, color: "bg-blue-600" },
     { label: tr(language, "Breakdown"), value: breakdownOrders, color: "bg-red-600" }
   ];
+}
+
+function buildMaintenanceDashboardMetrics(data, alerts, reliability, language = "en") {
+  const equipment = data.equipment || [];
+  const workOrders = data["work-orders"] || [];
+  const pmTasks = data["preventive-maintenance"] || [];
+  const inventory = data.inventory || [];
+  const customers = data.customers || [];
+  const equipmentById = new Map(equipment.map((asset) => [Number(asset.id), asset]));
+  const faultOrders = workOrders.filter(isReliabilityFaultOrder);
+  const totalDowntimeHours = Number(reliability?.totalDowntimeHours || 0);
+  const plannedHours = calculatePlannedOperatingHours(equipment, workOrders);
+  const availabilityPercent = plannedHours
+    ? clampPercent(((plannedHours - totalDowntimeHours) / plannedHours) * 100)
+    : 100;
+  const averageDowntimeHours = faultOrders.length ? totalDowntimeHours / faultOrders.length : 0;
+  const mttrHours = Number(reliability?.mttrHours || 0);
+  const mtbfHours = Number(reliability?.mtbfHours || 0);
+  const breakdownEquipment = equipment.filter((asset) => equipmentIndustrialStatus(asset) === "Breakdown").length;
+  const breakdownCount = faultOrders.length + breakdownEquipment + alerts.filter((alert) => alert.alert_level === "DUE NOW").length;
+  const overduePmTasks = buildOverduePmRows(pmTasks, equipmentById);
+  const cost = buildMaintenanceCostMetrics(workOrders, equipmentById, language);
+  const assetReliabilityRows = buildAssetReliabilityRows(workOrders, equipment, pmTasks);
+  const assetHealthRanking = assetReliabilityRows
+    .map((row) => ({ ...row, category: assetHealthCategory(row.health) }))
+    .sort((first, second) => first.health - second.health || first.name.localeCompare(second.name));
+  const assetHealthAverage = assetHealthRanking.length
+    ? Math.round(assetHealthRanking.reduce((sum, asset) => sum + asset.health, 0) / assetHealthRanking.length)
+    : 0;
+  const criticalEquipment = assetReliabilityRows
+    .filter((asset) => ["critical", "high"].includes(String(asset.criticality || "").toLowerCase()) || ["Breakdown", "Under Maintenance", "Offline"].includes(asset.statusLabel))
+    .sort((first, second) => first.health - second.health || first.name.localeCompare(second.name));
+
+  return {
+    availabilityPercent,
+    averageDowntimeHours,
+    averageDowntimeLabel: formatReliabilityHours(averageDowntimeHours),
+    mttrHours,
+    mttrLabel: reliability?.mttrLabel || "0h",
+    mtbfHours,
+    mtbfLabel: reliability?.mtbfLabel || "N/A",
+    breakdownCount,
+    overduePmTasks,
+    cost,
+    assetHealthAverage,
+    criticalEquipment,
+    siteSummary: buildSiteSummary(customers, equipment, alerts),
+    topDowntimeAssets: buildTopDowntimeAssets(workOrders, equipment).slice(0, 10),
+    assetHealthRanking,
+    breakdownTrend: buildBreakdownTrend(workOrders, equipment),
+    workOrderStatusPie: buildWorkOrderStatusPie(workOrders, language)
+  };
+}
+
+function availabilityTone(value) {
+  if (Number(value) > 95) return "green";
+  if (Number(value) >= 90) return "orange";
+  return "red";
+}
+
+function calculatePlannedOperatingHours(equipment, workOrders) {
+  const currentHoursTotal = equipment.reduce((sum, asset) => sum + Number(asset.current_hours || 0), 0);
+  if (currentHoursTotal > 0) return currentHoursTotal;
+  const serviceHoursTotal = workOrders.reduce((sum, order) => sum + Number(order.service_hours || 0), 0);
+  if (serviceHoursTotal > 0) return serviceHoursTotal;
+  return Math.max(equipment.length, 1) * 720;
+}
+
+function clampPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function buildOverduePmRows(pmTasks, equipmentById) {
+  return pmTasks
+    .filter(isPmOverdue)
+    .map((task) => {
+      const asset = equipmentById.get(Number(task.equipment_id));
+      const dueDate = task.next_due_date || task.last_service_date || "";
+      return {
+        ...task,
+        equipment_name: task.equipment_name || asset?.name || "-",
+        site: asset?.customer_name || asset?.location || "-",
+        dueLabel: dueDate ? formatShortDate(dueDate) : "Hours exceeded",
+        daysOverdue: calculateDaysOverdue(task)
+      };
+    })
+    .sort((first, second) => Number(second.daysOverdue || 0) - Number(first.daysOverdue || 0));
+}
+
+function calculateDaysOverdue(task) {
+  const dateValue = task.next_due_date || task.last_service_date;
+  const dueDate = dateValue ? new Date(dateValue) : null;
+  if (dueDate && !Number.isNaN(dueDate.getTime())) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.ceil((today.getTime() - dueDate.getTime()) / 86400000));
+  }
+  const overdueHours = Math.abs(Math.min(Number(task.hours_until_due || 0), 0));
+  return overdueHours ? Math.ceil(overdueHours / 24) : 0;
+}
+
+function buildMaintenanceCostMetrics(workOrders, equipmentById, language = "en") {
+  const categoryTotals = {
+    Labor: 0,
+    "Spare Parts": 0,
+    Contractors: 0,
+    Tools: 0,
+    Miscellaneous: 0
+  };
+  const monthlyBuckets = createMonthBuckets();
+  const siteTotals = new Map();
+  const equipmentTotals = new Map();
+  const now = new Date();
+  const currentMonthKey = toMonthKey(now);
+  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonthKey = toMonthKey(previousMonth);
+
+  for (const order of workOrders) {
+    const asset = equipmentById.get(Number(order.equipment_id));
+    const orderCosts = extractWorkOrderCosts(order);
+    const total = Object.values(orderCosts).reduce((sum, value) => sum + value, 0);
+    for (const [key, value] of Object.entries(orderCosts)) categoryTotals[key] += value;
+    const key = toMonthKey(getWorkOrderSavedDate(order) || order.scheduled_date || order.due_date || order.created_at);
+    if (monthlyBuckets.has(key)) monthlyBuckets.set(key, monthlyBuckets.get(key) + total);
+    addChartValue(siteTotals, order.customer_name || asset?.customer_name || asset?.location || tr(language, "Unassigned"), total);
+    addChartValue(equipmentTotals, order.equipment_name || asset?.name || tr(language, "Unassigned"), total);
+  }
+
+  const total = Object.values(categoryTotals).reduce((sum, value) => sum + value, 0);
+  const categories = Object.entries(categoryTotals).map(([label, value]) => ({ label, value }));
+
+  return {
+    total,
+    totalLabel: formatCurrency(total),
+    currentMonth: monthlyBuckets.get(currentMonthKey) || 0,
+    previousMonth: monthlyBuckets.get(previousMonthKey) || 0,
+    monthlyTrend: [...monthlyBuckets.entries()].map(([key, value]) => ({ label: monthLabel(key), value: Math.round(value) })),
+    categories,
+    bySite: chartCostRows(siteTotals),
+    byEquipment: chartCostRows(equipmentTotals)
+  };
+}
+
+function extractWorkOrderCosts(order) {
+  const meta = parseWorkOrderNotes(order.notes);
+  const sparePartItems = Array.isArray(meta.spare_parts_items) ? meta.spare_parts_items : [];
+  const sparePartTotal = sparePartItems.reduce((sum, item) => (
+    sum + Number(item.total_cost || item.cost || item.unit_cost || 0) * Math.max(Number(item.qty || item.quantity || 1), 1)
+  ), 0);
+
+  return {
+    Labor: numberFromAny(meta.labor_cost, meta.cost_labor, order.labor_cost),
+    "Spare Parts": numberFromAny(meta.spare_parts_cost, meta.cost_spare_parts, sparePartTotal, order.spare_parts_cost),
+    Contractors: numberFromAny(meta.contractors_cost, meta.contractor_cost, order.contractors_cost),
+    Tools: numberFromAny(meta.tools_cost, order.tools_cost),
+    Miscellaneous: numberFromAny(meta.miscellaneous_cost, meta.misc_cost, order.cost)
+  };
+}
+
+function numberFromAny(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return 0;
+}
+
+function chartCostRows(counter) {
+  return [...counter.entries()]
+    .filter(([, value]) => Number(value) > 0)
+    .sort(([firstLabel, firstValue], [secondLabel, secondValue]) => secondValue - firstValue || firstLabel.localeCompare(secondLabel))
+    .slice(0, 6)
+    .map(([label, value]) => ({ label, value: Math.round(value) }));
+}
+
+function formatCurrency(value) {
+  return `${Math.round(Number(value || 0)).toLocaleString()} EGP`;
+}
+
+function createMonthBuckets() {
+  const buckets = new Map();
+  const start = new Date();
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  for (let index = 11; index >= 0; index -= 1) {
+    const date = new Date(start.getFullYear(), start.getMonth() - index, 1);
+    buckets.set(toMonthKey(date), 0);
+  }
+  return buckets;
+}
+
+function toMonthKey(value) {
+  const date = value instanceof Date ? value : new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(key) {
+  const [year, month] = String(key || "").split("-").map(Number);
+  if (!year || !month) return "N/A";
+  return new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+}
+
+function buildAssetReliabilityRows(workOrders, equipment, pmTasks) {
+  const assetStats = buildAssetFaultStats(workOrders, equipment);
+  return equipment.map((asset) => {
+    const stats = assetStats.get(Number(asset.id)) || { faults: 0, downtimeHours: 0, mttrHours: 0, mtbfHours: 0 };
+    const overduePmCount = pmTasks.filter((task) => Number(task.equipment_id) === Number(asset.id) && isPmOverdue(task)).length;
+    const availability = assetAvailabilityPercent(asset, stats.downtimeHours);
+    const health = calculateAssetHealthScore(asset, stats, overduePmCount, availability);
+    return {
+      ...asset,
+      site: asset.customer_name || asset.location || "-",
+      statusLabel: equipmentIndustrialStatus(asset),
+      health,
+      availability,
+      faults: stats.faults,
+      downtimeHours: stats.downtimeHours,
+      downtimeLabel: formatReliabilityHours(stats.downtimeHours),
+      mttrHours: stats.mttrHours,
+      mtbfHours: stats.mtbfHours
+    };
+  });
+}
+
+function buildAssetFaultStats(workOrders, equipment) {
+  const stats = new Map();
+  const equipmentById = new Map(equipment.map((asset) => [Number(asset.id), asset]));
+  for (const order of workOrders.filter(isReliabilityFaultOrder)) {
+    const asset = equipmentById.get(Number(order.equipment_id));
+    const key = Number(order.equipment_id);
+    if (!key && !asset) continue;
+    const duration = workOrderDurationMinutes(order) / 60;
+    const current = stats.get(key) || { faults: 0, downtimeHours: 0, orders: [] };
+    current.faults += 1;
+    current.downtimeHours += duration;
+    current.orders.push(order);
+    stats.set(key, current);
+  }
+
+  for (const [key, value] of stats.entries()) {
+    value.mttrHours = value.faults ? value.downtimeHours / value.faults : 0;
+    value.mtbfHours = calculateMtbfHours(value.orders, equipment);
+    stats.set(key, value);
+  }
+
+  return stats;
+}
+
+function assetAvailabilityPercent(asset, downtimeHours) {
+  const planned = Math.max(Number(asset.current_hours || asset.maintenance_interval_hours || 720), 1);
+  return clampPercent(((planned - Number(downtimeHours || 0)) / planned) * 100);
+}
+
+function calculateAssetHealthScore(asset, stats, overduePmCount, availability) {
+  const base = equipmentHealthPercent(asset);
+  const mttrPenalty = Math.min(Number(stats.mttrHours || 0) * 2, 15);
+  const mtbfBoost = Number(stats.mtbfHours || 0) >= 500 ? 5 : 0;
+  const score = base - Number(stats.faults || 0) * 5 - Number(stats.downtimeHours || 0) * 1.5 - overduePmCount * 8 - (100 - availability) * 0.35 - mttrPenalty + mtbfBoost;
+  return clampPercent(score);
+}
+
+function assetHealthCategory(value) {
+  if (value >= 90) return "Excellent";
+  if (value >= 75) return "Good";
+  if (value >= 60) return "Fair";
+  return "Poor";
+}
+
+function buildSiteSummary(customers, equipment, alerts) {
+  const siteNames = uniqueSorted([
+    ...customers.map((customer) => customer.name),
+    ...equipment.map((asset) => asset.customer_name || asset.location),
+    ...alerts.map((alert) => alert.location)
+  ]);
+
+  return siteNames.map((name) => {
+    const siteAssets = equipment.filter((asset) => matchesAnyFilterValue([asset.customer_name, asset.location], name));
+    const breakdown = siteAssets.filter((asset) => ["Breakdown", "Offline"].includes(equipmentIndustrialStatus(asset))).length;
+    return {
+      name,
+      assets: siteAssets.length,
+      running: siteAssets.filter((asset) => equipmentIndustrialStatus(asset) === "Running").length,
+      breakdown,
+      operational: siteOperationalPercent(siteAssets, alerts.filter((alert) => matchesFilterValue(alert.location, name) && alert.alert_level === "DUE NOW").length + breakdown)
+    };
+  }).filter((site) => site.assets || alerts.some((alert) => matchesFilterValue(alert.location, site.name)));
+}
+
+function buildTopDowntimeAssets(workOrders, equipment) {
+  const stats = buildAssetFaultStats(workOrders, equipment);
+  const rows = equipment.map((asset) => {
+    const item = stats.get(Number(asset.id)) || { faults: 0, downtimeHours: 0 };
+    return {
+      id: asset.id,
+      name: asset.name || `Asset ${asset.id}`,
+      site: asset.customer_name || asset.location || "-",
+      faults: item.faults || 0,
+      downtimeHours: item.downtimeHours || 0,
+      downtimeLabel: formatReliabilityHours(item.downtimeHours || 0)
+    };
+  });
+  return rows.sort((first, second) => second.downtimeHours - first.downtimeHours || second.faults - first.faults || first.name.localeCompare(second.name));
+}
+
+function buildBreakdownTrend(workOrders, equipment) {
+  const buckets = createMonthBuckets();
+  for (const order of workOrders.filter(isReliabilityFaultOrder)) {
+    const key = toMonthKey(getWorkOrderSavedDate(order) || order.scheduled_date || order.due_date || order.created_at);
+    if (buckets.has(key)) buckets.set(key, buckets.get(key) + 1);
+  }
+  const currentKey = toMonthKey(new Date());
+  const activeBreakdowns = equipment.filter((asset) => equipmentIndustrialStatus(asset) === "Breakdown").length;
+  if (activeBreakdowns && buckets.has(currentKey)) buckets.set(currentKey, buckets.get(currentKey) + activeBreakdowns);
+  return [...buckets.entries()].map(([key, value]) => ({ label: monthLabel(key), value }));
+}
+
+function buildWorkOrderStatusPie(workOrders, language = "en") {
+  const openOrders = workOrders.filter((order) => !["completed", "cancelled"].includes(String(order.status || "").toLowerCase()));
+  const buckets = new Map([
+    ["New", 0],
+    ["Assigned", 0],
+    ["In Progress", 0],
+    ["Waiting for Parts", 0],
+    ["Waiting for Approval", 0]
+  ]);
+  for (const order of openOrders) {
+    const bucket = workOrderStatusBucket(order);
+    buckets.set(bucket, (buckets.get(bucket) || 0) + 1);
+  }
+  const colors = {
+    New: "#64748b",
+    Assigned: "#2563eb",
+    "In Progress": "#0ea5e9",
+    "Waiting for Parts": "#f97316",
+    "Waiting for Approval": "#8b5cf6"
+  };
+  return [...buckets.entries()].map(([label, value]) => ({ label: tr(language, label), value, color: colors[label] }));
+}
+
+function workOrderStatusBucket(order) {
+  const meta = parseWorkOrderNotes(order.notes);
+  const status = String(order.status || "").toLowerCase();
+  const text = `${status} ${order.title || ""} ${order.description || ""} ${meta.spare_parts || ""}`.toLowerCase();
+  if (text.includes("part") || text.includes("spare")) return "Waiting for Parts";
+  if (text.includes("approval")) return "Waiting for Approval";
+  if (status.includes("progress")) return "In Progress";
+  if (order.engineer_id || meta.shift_engineer_name || meta.executor_name || meta.assigned_to) return "Assigned";
+  return "New";
 }
 
 function engineerWorkloadData(workOrders, language = "en") {
