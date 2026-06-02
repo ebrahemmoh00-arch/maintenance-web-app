@@ -2951,6 +2951,10 @@ function isManagementEmployee(employee) {
   return MANAGEMENT_JOB_TITLE_ALIASES.some((value) => title === String(value).toLowerCase());
 }
 
+function isSupervisorEmployee(employee) {
+  return employeeRole(employee?.role) === "supervisor" || /supervisor/i.test(employeeJobTitle(employee));
+}
+
 function employeeMatchesGroup(employee, group) {
   if (!group) return false;
   if (group === "all") return true;
@@ -2958,6 +2962,7 @@ function employeeMatchesGroup(employee, group) {
   if (group === "technicians") return isTechnicianEmployee(employee);
   if (group === "engineers") return isEngineerEmployee(employee);
   if (group === "management") return isManagementEmployee(employee);
+  if (group === "supervisors") return isSupervisorEmployee(employee);
   return true;
 }
 
@@ -2967,7 +2972,8 @@ function employeeGroupTitle(group, language = "en") {
     active: "Active Staff",
     technicians: "Technicians",
     engineers: "Engineers",
-    management: "Management"
+    management: "Management",
+    supervisors: "Supervisors"
   };
   return tr(language, titles[group] || "Employees");
 }
@@ -4188,16 +4194,18 @@ function EmployeesManagementPage({ rows, jobTitles = [], onCreate, onEdit, onDel
   const technicians = rows.filter(isTechnicianEmployee).length;
   const engineers = rows.filter(isEngineerEmployee).length;
   const management = rows.filter(isManagementEmployee).length;
+  const supervisors = rows.filter(isSupervisorEmployee).length;
   const activeGroupTitle = employeeGroupTitle(activeGroup, language);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <EmployeeMetricButton label={t("Total Employees")} value={rows.length} icon={UsersRound} tone="blue" helper={t("All registered staff")} active={activeGroup === "all"} onClick={() => setActiveGroup("all")} />
         <EmployeeMetricButton label={t("Active Staff")} value={activeStaff} icon={CheckCircle2} tone="green" helper={t("Active staff")} active={activeGroup === "active"} onClick={() => setActiveGroup("active")} />
         <EmployeeMetricButton label={t("Technicians")} value={technicians} icon={Wrench} tone="cyan" helper={t("Technical execution roles")} active={activeGroup === "technicians"} onClick={() => setActiveGroup("technicians")} />
         <EmployeeMetricButton label={t("Engineers")} value={engineers} icon={ShieldCheck} tone="orange" helper={t("Engineering roles")} active={activeGroup === "engineers"} onClick={() => setActiveGroup("engineers")} />
         <EmployeeMetricButton label={t("Management")} value={management} icon={Building2} tone="slate" helper={t("Branch, site, and O&M managers")} active={activeGroup === "management"} onClick={() => setActiveGroup("management")} />
+        <EmployeeMetricButton label={t("Supervisors")} value={supervisors} icon={ShieldCheck} tone="green" helper={t("Supervision and team leadership roles")} active={activeGroup === "supervisors"} onClick={() => setActiveGroup("supervisors")} />
       </div>
 
       {activeGroup ? (
