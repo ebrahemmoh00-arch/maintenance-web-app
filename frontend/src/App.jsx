@@ -45,6 +45,44 @@ import EmptyState from "./components/EmptyState";
 const LOGIN_USERNAME = "ECS-ECS";
 const LOGIN_PASSWORD = "E5C9S2@rom";
 const EMPLOYEE_ROLE_OPTIONS = ["viewer", "technician", "supervisor", "admin"];
+const AUTH_STORAGE_KEYS = [
+  "maintenance-authenticated",
+  "maintenance-role",
+  "maintenance-auth-user",
+  "maintenance-auth-name",
+  "maintenance-permissions"
+];
+
+function clearPersistentAuthStorage() {
+  AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+}
+
+function getAuthSession() {
+  clearPersistentAuthStorage();
+  return {
+    authenticated: sessionStorage.getItem("maintenance-authenticated") === "true",
+    role: sessionStorage.getItem("maintenance-role") || "",
+    username: sessionStorage.getItem("maintenance-auth-user") || "",
+    name: sessionStorage.getItem("maintenance-auth-name") || "",
+    permissions: sessionStorage.getItem("maintenance-permissions") || ""
+  };
+}
+
+function saveAuthSession({ role, username, name, permissions }) {
+  clearPersistentAuthStorage();
+  sessionStorage.setItem("maintenance-authenticated", "true");
+  sessionStorage.setItem("maintenance-role", role);
+  sessionStorage.setItem("maintenance-auth-user", username);
+  sessionStorage.setItem("maintenance-auth-name", name);
+  sessionStorage.setItem("maintenance-permissions", permissions || "");
+}
+
+function clearAuthSession() {
+  AUTH_STORAGE_KEYS.forEach((key) => {
+    sessionStorage.removeItem(key);
+    localStorage.removeItem(key);
+  });
+}
 
 const resources = {
   customers: {
@@ -684,18 +722,19 @@ export default function App() {
     const queryLanguage = new URLSearchParams(window.location.search).get("lang");
     return queryLanguage === "ar" || localStorage.getItem("maintenance-language") === "ar" ? "ar" : "en";
   });
-  const [authenticated, setAuthenticated] = useState(
-    () =>
-      localStorage.getItem("maintenance-authenticated") === "true" &&
-      ["admin", "supervisor", "technician", "viewer", "user"].includes(localStorage.getItem("maintenance-role") || "") &&
-      Boolean(localStorage.getItem("maintenance-auth-user"))
-  );
-  const [currentUser, setCurrentUser] = useState(() => ({
-    username: localStorage.getItem("maintenance-auth-user") || "",
-    name: localStorage.getItem("maintenance-auth-name") || "",
-    role: localStorage.getItem("maintenance-role") || "",
-    permissions: localStorage.getItem("maintenance-permissions") || ""
-  }));
+  const [authenticated, setAuthenticated] = useState(() => {
+    const auth = getAuthSession();
+    return auth.authenticated && ["admin", "supervisor", "technician", "viewer", "user"].includes(auth.role) && Boolean(auth.username);
+  });
+  const [currentUser, setCurrentUser] = useState(() => {
+    const auth = getAuthSession();
+    return {
+      username: auth.username,
+      name: auth.name,
+      role: auth.role,
+      permissions: auth.permissions
+    };
+  });
   const [loginValue, setLoginValue] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [data, setData] = useState({ customers: [], engineers: [], equipment: [], "work-orders": [], inventory: [], "preventive-maintenance": [], "job-titles": [] });
@@ -740,12 +779,12 @@ export default function App() {
       setData({ customers, engineers, equipment, "work-orders": workOrders, inventory, "preventive-maintenance": preventiveMaintenance, "job-titles": jobTitles });
       setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance));
       setStats(dashboard);
-      const storedUsername = localStorage.getItem("maintenance-auth-user") || "";
+      const storedUsername = sessionStorage.getItem("maintenance-auth-user") || "";
       if (storedUsername && storedUsername !== LOGIN_USERNAME) {
         const refreshedUser = engineers.find((user) => user.username === storedUsername);
         if (refreshedUser) {
           const permissions = refreshedUser.permissions || "";
-          localStorage.setItem("maintenance-permissions", permissions);
+          sessionStorage.setItem("maintenance-permissions", permissions);
           setCurrentUser({
             username: refreshedUser.username,
             name: refreshedUser.name,
@@ -778,11 +817,12 @@ export default function App() {
     const usernameMatches = loginValue.username.trim() === LOGIN_USERNAME;
     const passwordMatches = loginValue.password === LOGIN_PASSWORD;
     if (usernameMatches && passwordMatches) {
-      localStorage.setItem("maintenance-authenticated", "true");
-      localStorage.setItem("maintenance-role", "admin");
-      localStorage.setItem("maintenance-auth-user", LOGIN_USERNAME);
-      localStorage.setItem("maintenance-auth-name", "Administrator");
-      localStorage.setItem("maintenance-permissions", JSON.stringify(createFullPermissions()));
+      saveAuthSession({
+        role: "admin",
+        username: LOGIN_USERNAME,
+        name: "Administrator",
+        permissions: JSON.stringify(createFullPermissions())
+      });
       setCurrentUser({ username: LOGIN_USERNAME, name: "Administrator", role: "admin", permissions: JSON.stringify(createFullPermissions()) });
       setAuthenticated(true);
       setLoginError("");
@@ -803,11 +843,12 @@ export default function App() {
         return;
       }
       const role = normalizeEmployeeRole(matchedUser.role);
-      localStorage.setItem("maintenance-authenticated", "true");
-      localStorage.setItem("maintenance-role", role);
-      localStorage.setItem("maintenance-auth-user", matchedUser.username);
-      localStorage.setItem("maintenance-auth-name", matchedUser.name);
-      localStorage.setItem("maintenance-permissions", matchedUser.permissions || "");
+      saveAuthSession({
+        role,
+        username: matchedUser.username,
+        name: matchedUser.name,
+        permissions: matchedUser.permissions || ""
+      });
       setCurrentUser({ username: matchedUser.username, name: matchedUser.name, role, permissions: matchedUser.permissions || "" });
       setAuthenticated(true);
       setLoginError("");
@@ -817,11 +858,7 @@ export default function App() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("maintenance-authenticated");
-    localStorage.removeItem("maintenance-role");
-    localStorage.removeItem("maintenance-auth-user");
-    localStorage.removeItem("maintenance-auth-name");
-    localStorage.removeItem("maintenance-permissions");
+    clearAuthSession();
     setAuthenticated(false);
     setCurrentUser({ username: "", name: "", role: "", permissions: "" });
     setLoginValue({ username: "", password: "" });
