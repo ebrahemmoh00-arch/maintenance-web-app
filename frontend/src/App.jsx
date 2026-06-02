@@ -1382,7 +1382,6 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
   const workOrders = filteredData["work-orders"];
   const reliability = useMemo(() => buildAssetReliability(workOrders, filteredData.equipment, language), [workOrders, filteredData.equipment, language]);
   const metrics = useMemo(() => buildMaintenanceDashboardMetrics(filteredData, filteredAlerts, reliability, language), [filteredData, filteredAlerts, reliability, language]);
-  const activeOrders = workOrders.filter((item) => item.status !== "completed" && item.status !== "cancelled").length;
 
   return (
     <>
@@ -1393,7 +1392,7 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
         <MetricCard label="Equipment Availability" value={`${metrics.availabilityPercent}%`} icon={Activity} tone={availabilityTone(metrics.availabilityPercent)} helper="Planned time vs downtime" />
         <MetricCard label="MTTR" value={metrics.mttrLabel} icon={TimerReset} tone={metrics.mttrHours > 4 ? "orange" : "green"} helper="Mean time to repair" />
         <MetricCard label="MTBF" value={metrics.mtbfLabel} icon={CheckCircle2} tone={metrics.mtbfHours > 0 && metrics.mtbfHours < 100 ? "orange" : "green"} helper="Mean time between failures" />
-        <MetricCard label="Open Work Orders" value={activeOrders} icon={Wrench} tone={activeOrders ? "orange" : "green"} helper="Not completed work orders" />
+        <MetricCard label="Total Work Orders" value={workOrders.length} icon={Wrench} tone="blue" helper="All work orders in scope" />
       </div>
 
       <DashboardAlertControls
