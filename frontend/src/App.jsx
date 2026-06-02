@@ -1568,7 +1568,6 @@ function DashboardWorkOrderCountCharts({ workOrders, language }) {
         <PivotColumnChart
           data={technicianData}
           title="No of order per technician"
-          fieldLabel="Count of technician"
           xAxisLabel="technician Name"
           yAxisLabel="No of order"
         />
@@ -1577,7 +1576,6 @@ function DashboardWorkOrderCountCharts({ workOrders, language }) {
         <PivotColumnChart
           data={engineerData}
           title="No of order per Engineer"
-          fieldLabel="Count of ENGINEER NAME"
           xAxisLabel="Engineer Name"
           yAxisLabel="No of orders"
         />
@@ -1586,7 +1584,7 @@ function DashboardWorkOrderCountCharts({ workOrders, language }) {
   );
 }
 
-function PivotColumnChart({ data, title, fieldLabel, xAxisLabel, yAxisLabel }) {
+function PivotColumnChart({ data, title, xAxisLabel, yAxisLabel }) {
   const rows = data.filter((item) => item.value > 0 && item.label !== "No data").slice(0, 14);
   const maxValue = Math.max(...rows.map((item) => Number(item.value || 0)), 1);
   const topTick = Math.max(1, Math.ceil(maxValue / 2) * 2);
@@ -1595,8 +1593,7 @@ function PivotColumnChart({ data, title, fieldLabel, xAxisLabel, yAxisLabel }) {
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[620px] rounded-lg bg-white p-3">
-        <span className="inline-flex rounded-sm bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700">{fieldLabel}</span>
-        <h3 className="mt-3 text-center text-base font-semibold text-slate-700">{title}</h3>
+        <h3 className="text-center text-base font-semibold text-slate-700">{title}</h3>
         <div className="mt-4 grid grid-cols-[42px_1fr] gap-3">
           <div className="relative flex items-center justify-center">
             <span className="-rotate-90 whitespace-nowrap text-xs font-semibold text-slate-600">{yAxisLabel}</span>
@@ -1638,7 +1635,6 @@ function PivotColumnChart({ data, title, fieldLabel, xAxisLabel, yAxisLabel }) {
               ))}
             </div>
             <p className="mt-1 text-center text-xs font-semibold text-slate-600">{xAxisLabel}</p>
-            <span className="mt-3 inline-flex rounded-sm bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700">{xAxisLabel} v</span>
           </div>
         </div>
       </div>
