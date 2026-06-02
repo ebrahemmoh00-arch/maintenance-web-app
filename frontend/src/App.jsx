@@ -46,6 +46,17 @@ import EmptyState from "./components/EmptyState";
 const LOGIN_USERNAME = "ECS-ECS";
 const LOGIN_PASSWORD = "E5C9S2@rom";
 const EMPLOYEE_ROLE_OPTIONS = ["viewer", "technician", "supervisor", "admin"];
+const MANAGEMENT_JOB_TITLES = [
+  "Branch Manager",
+  "Operation & Maintenance Manager",
+  "Site Manager"
+];
+const MANAGEMENT_JOB_TITLE_ALIASES = [
+  ...MANAGEMENT_JOB_TITLES,
+  "مدير فرع",
+  "مدير تشغيل وصيانة",
+  "مدير موقع"
+];
 const AUTH_STORAGE_KEYS = [
   "maintenance-authenticated",
   "maintenance-role",
@@ -2935,12 +2946,18 @@ function isEngineerEmployee(employee) {
   return /engineer/i.test(employeeJobTitle(employee));
 }
 
+function isManagementEmployee(employee) {
+  const title = employeeJobTitle(employee).toLowerCase();
+  return MANAGEMENT_JOB_TITLE_ALIASES.some((value) => title === String(value).toLowerCase());
+}
+
 function employeeMatchesGroup(employee, group) {
   if (!group) return false;
   if (group === "all") return true;
   if (group === "active") return employee?.status === "active";
   if (group === "technicians") return isTechnicianEmployee(employee);
   if (group === "engineers") return isEngineerEmployee(employee);
+  if (group === "management") return isManagementEmployee(employee);
   return true;
 }
 
@@ -2949,7 +2966,8 @@ function employeeGroupTitle(group, language = "en") {
     all: "Total Employees",
     active: "Active Staff",
     technicians: "Technicians",
-    engineers: "Engineers"
+    engineers: "Engineers",
+    management: "Management"
   };
   return tr(language, titles[group] || "Employees");
 }
@@ -2971,6 +2989,7 @@ function jobTitleOptions(jobTitles = [], employees = []) {
     ...employees.map((employee) => employee.job_title || employee.specialty),
     "Shift Engineer",
     "Maintenance Engineer",
+    ...MANAGEMENT_JOB_TITLES,
     "Senior Electrical Technician",
     "Mechanical Technician",
     "Electrical Technician",
@@ -4168,15 +4187,17 @@ function EmployeesManagementPage({ rows, jobTitles = [], onCreate, onEdit, onDel
   const activeStaff = rows.filter((employee) => employee.status === "active").length;
   const technicians = rows.filter(isTechnicianEmployee).length;
   const engineers = rows.filter(isEngineerEmployee).length;
+  const management = rows.filter(isManagementEmployee).length;
   const activeGroupTitle = employeeGroupTitle(activeGroup, language);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <EmployeeMetricButton label={t("Total Employees")} value={rows.length} icon={UsersRound} tone="blue" helper={t("All registered staff")} active={activeGroup === "all"} onClick={() => setActiveGroup("all")} />
         <EmployeeMetricButton label={t("Active Staff")} value={activeStaff} icon={CheckCircle2} tone="green" helper={t("Active staff")} active={activeGroup === "active"} onClick={() => setActiveGroup("active")} />
         <EmployeeMetricButton label={t("Technicians")} value={technicians} icon={Wrench} tone="cyan" helper={t("Technical execution roles")} active={activeGroup === "technicians"} onClick={() => setActiveGroup("technicians")} />
         <EmployeeMetricButton label={t("Engineers")} value={engineers} icon={ShieldCheck} tone="orange" helper={t("Engineering roles")} active={activeGroup === "engineers"} onClick={() => setActiveGroup("engineers")} />
+        <EmployeeMetricButton label={t("Management")} value={management} icon={Building2} tone="slate" helper={t("Branch, site, and O&M managers")} active={activeGroup === "management"} onClick={() => setActiveGroup("management")} />
       </div>
 
       {activeGroup ? (
