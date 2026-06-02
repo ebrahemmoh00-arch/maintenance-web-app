@@ -1692,33 +1692,77 @@ function ParticipantFilterList({ title, rows, selectedNames, setSelectedNames })
 
 function ParticipationBarChart({ rows, color }) {
   const maxValue = Math.max(...rows.map((item) => Number(item.value || 0)), 1);
+  const topTick = Math.max(1, Math.ceil(maxValue / 2) * 2);
+  const ticks = Array.from({ length: 5 }, (_, index) => Math.round((topTick / 4) * (4 - index)));
   const barColor = color === "cyan" ? "bg-cyan-600" : "bg-blue-700";
+  const chartWidth = Math.max(560, rows.length * 96);
 
   return (
     <div className="min-h-80 rounded-xl border border-slate-200 bg-white p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-sm font-black text-slate-950">Work Orders Count</p>
-        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Name vs Orders</p>
+        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Name vs Work Orders</p>
       </div>
-      <div className="space-y-3">
-        {rows.map((row) => {
-          const width = `${Math.max((Number(row.value || 0) / maxValue) * 100, row.value ? 8 : 0)}%`;
-          return (
-            <div key={row.label} className="grid gap-2 sm:grid-cols-[minmax(150px,220px)_1fr_52px] sm:items-center">
-              <p className="truncate text-sm font-black text-slate-800" title={row.label}>{row.label}</p>
-              <div className="h-5 overflow-hidden rounded-full bg-slate-100">
-                <div className={`h-full rounded-full ${barColor}`} style={{ width }} />
-              </div>
-              <p className="text-right text-sm font-black text-slate-950">{row.value}</p>
+      {rows.length ? (
+        <div className="overflow-x-auto pb-2">
+          <div className="grid grid-cols-[44px_1fr] gap-3" style={{ minWidth: `${chartWidth}px` }}>
+            <div className="relative h-72">
+              {ticks.map((tick, index) => (
+                <span
+                  key={`${tick}-${index}`}
+                  className="absolute right-1 -translate-y-1/2 text-xs font-bold text-slate-500"
+                  style={{ bottom: `${(tick / topTick) * 100}%` }}
+                >
+                  {tick}
+                </span>
+              ))}
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 whitespace-nowrap text-xs font-black text-slate-600">Work Orders</span>
             </div>
-          );
-        })}
-        {!rows.length ? (
-          <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm font-semibold text-slate-400">
-            No selected names
+
+            <div className="min-w-0">
+              <div className="relative h-72 border-b border-l border-slate-300">
+                {ticks.map((tick, index) => (
+                  <span
+                    key={`${tick}-grid-${index}`}
+                    className="absolute left-0 right-0 border-t border-slate-200"
+                    style={{ bottom: `${(tick / topTick) * 100}%` }}
+                  />
+                ))}
+                <div
+                  className="absolute inset-x-4 bottom-0 top-0 grid items-end gap-4"
+                  style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(64px, 1fr))` }}
+                >
+                  {rows.map((row) => {
+                    const height = `${Math.max((Number(row.value || 0) / topTick) * 100, row.value ? 8 : 0)}%`;
+                    return (
+                      <div key={row.label} className="flex h-full flex-col items-center justify-end">
+                        <span className="mb-2 text-sm font-black text-slate-900">{row.value}</span>
+                        <div className={`w-full max-w-10 rounded-t-md ${barColor} shadow-sm`} style={{ height }} title={`${row.label}: ${row.value}`} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div
+                className="mt-3 grid gap-4 px-4"
+                style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(64px, 1fr))` }}
+              >
+                {rows.map((row) => (
+                  <p key={row.label} className="text-center text-xs font-black leading-snug text-slate-800" title={row.label}>
+                    {row.label}
+                  </p>
+                ))}
+              </div>
+              <p className="mt-3 text-center text-xs font-black uppercase tracking-[0.12em] text-slate-500">Name</p>
+            </div>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : (
+        <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm font-semibold text-slate-400">
+          No selected names
+        </div>
+      )}
     </div>
   );
 }
