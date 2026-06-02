@@ -1407,6 +1407,7 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
       />
 
       <DashboardMiddleRow metrics={metrics} />
+      <DashboardWorkOrderCountCharts workOrders={workOrders} language={language} />
       <DashboardBottomRow metrics={metrics} language={language} />
     </>
   );
@@ -1553,6 +1554,94 @@ function DashboardMiddleRow({ metrics }) {
       <Panel title="Work Order Status Pie Chart" subtitle="Open and closed work orders grouped by current status.">
         <DonutChart data={metrics.workOrderStatusPie} centerLabel="Orders" />
       </Panel>
+    </div>
+  );
+}
+
+function DashboardWorkOrderCountCharts({ workOrders, language }) {
+  const technicianData = useMemo(() => technicianWorkloadData(workOrders, language, 14), [workOrders, language]);
+  const engineerData = useMemo(() => engineerWorkloadData(workOrders, language, 14), [workOrders, language]);
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      <Panel title="No of order per technician" subtitle="Work order count grouped by technician name from saved work orders.">
+        <PivotColumnChart
+          data={technicianData}
+          title="No of order per technician"
+          fieldLabel="Count of technician"
+          xAxisLabel="technician Name"
+          yAxisLabel="No of order"
+        />
+      </Panel>
+      <Panel title="No of order per Engineer" subtitle="Work order count grouped by engineer name from saved work orders.">
+        <PivotColumnChart
+          data={engineerData}
+          title="No of order per Engineer"
+          fieldLabel="Count of ENGINEER NAME"
+          xAxisLabel="Engineer Name"
+          yAxisLabel="No of orders"
+        />
+      </Panel>
+    </div>
+  );
+}
+
+function PivotColumnChart({ data, title, fieldLabel, xAxisLabel, yAxisLabel }) {
+  const rows = data.filter((item) => item.value > 0 && item.label !== "No data").slice(0, 14);
+  const maxValue = Math.max(...rows.map((item) => Number(item.value || 0)), 1);
+  const topTick = Math.max(1, Math.ceil(maxValue / 2) * 2);
+  const ticks = Array.from({ length: 5 }, (_, index) => Math.round((topTick / 4) * (4 - index)));
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[620px] rounded-lg bg-white p-3">
+        <span className="inline-flex rounded-sm bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700">{fieldLabel}</span>
+        <h3 className="mt-3 text-center text-base font-semibold text-slate-700">{title}</h3>
+        <div className="mt-4 grid grid-cols-[42px_1fr] gap-3">
+          <div className="relative flex items-center justify-center">
+            <span className="-rotate-90 whitespace-nowrap text-xs font-semibold text-slate-600">{yAxisLabel}</span>
+          </div>
+          <div>
+            <div className="relative h-56 border-b border-l border-slate-300">
+              {ticks.map((tick, index) => {
+                const bottom = `${(tick / topTick) * 100}%`;
+                return (
+                  <div key={`${tick}-${index}`} className="absolute left-0 right-0" style={{ bottom }}>
+                    <span className="absolute -left-8 -top-2 w-6 text-right text-xs text-slate-500">{tick}</span>
+                    <span className="block border-t border-slate-200" />
+                  </div>
+                );
+              })}
+              <div className="absolute inset-x-3 bottom-0 top-0 flex items-end justify-around gap-3">
+                {rows.map((item) => {
+                  const height = `${Math.max((Number(item.value || 0) / topTick) * 100, 4)}%`;
+                  return (
+                    <div key={item.label} className="flex h-full min-w-10 flex-1 flex-col items-center justify-end">
+                      <span className="mb-1 text-xs font-semibold text-slate-700">{item.value}</span>
+                      <div className="w-5 rounded-t-sm bg-blue-600" style={{ height }} title={`${item.label}: ${item.value}`} />
+                    </div>
+                  );
+                })}
+              </div>
+              {!rows.length ? (
+                <div className="absolute inset-0 grid place-items-center text-sm font-semibold text-slate-400">No data</div>
+              ) : null}
+            </div>
+            <div
+              className="ml-3 grid min-h-24 gap-3"
+              style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(40px, 1fr))` }}
+            >
+              {rows.map((item) => (
+                <div key={item.label} className="relative h-24">
+                  <span className="absolute left-1 top-3 origin-left -rotate-45 whitespace-nowrap text-[11px] font-medium text-slate-600" title={item.label}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-1 text-center text-xs font-semibold text-slate-600">{xAxisLabel}</p>
+            <span className="mt-3 inline-flex rounded-sm bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700">{xAxisLabel} v</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -5197,17 +5286,17 @@ function workOrderStatusBucket(order) {
   return "New";
 }
 
-function engineerWorkloadData(workOrders, language = "en") {
+function engineerWorkloadData(workOrders, language = "en", limit = 6) {
   const counts = new Map();
   for (const order of workOrders) {
     const meta = parseWorkOrderNotes(order.notes);
     const name = cleanChartLabel(meta.shift_engineer_name || order.engineer_name || "") || tr(language, "Unassigned");
     addChartValue(counts, name, 1);
   }
-  return chartRowsFromMap(counts, "bg-blue-600", language);
+  return chartRowsFromMap(counts, "bg-blue-600", language, limit);
 }
 
-function technicianWorkloadData(workOrders, language = "en") {
+function technicianWorkloadData(workOrders, language = "en", limit = 6) {
   const counts = new Map();
   for (const order of workOrders) {
     const meta = parseWorkOrderNotes(order.notes);
@@ -5215,7 +5304,7 @@ function technicianWorkloadData(workOrders, language = "en") {
     const uniqueNames = names.length ? [...new Set(names)] : [tr(language, "Unassigned")];
     for (const name of uniqueNames) addChartValue(counts, name, 1);
   }
-  return chartRowsFromMap(counts, "bg-cyan-600", language);
+  return chartRowsFromMap(counts, "bg-cyan-600", language, limit);
 }
 
 function equipmentMaintenanceTimeData(workOrders, language = "en") {
