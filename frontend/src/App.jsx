@@ -14,6 +14,7 @@ import {
   Cpu,
   Eye,
   EyeOff,
+  Filter,
   Globe2,
   Lock,
   LogOut,
@@ -1632,61 +1633,87 @@ function WorkOrderParticipationPanel({ title, subtitle, filterTitle, data, color
   }, [rows]);
 
   return (
-    <Panel title={title} subtitle={subtitle}>
-      <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
+    <Panel
+      title={title}
+      subtitle={subtitle}
+      actions={(
         <ParticipantFilterList
           title={filterTitle}
           rows={rows}
           selectedNames={selectedNames}
           setSelectedNames={setSelectedNames}
         />
-        <ParticipationBarChart rows={visibleRows} color={color} />
-      </div>
+      )}
+    >
+      <ParticipationBarChart rows={visibleRows} color={color} />
     </Panel>
   );
 }
 
 function ParticipantFilterList({ title, rows, selectedNames, setSelectedNames }) {
+  const [open, setOpen] = useState(false);
   const allSelected = selectedNames.length === 0;
+  const label = allSelected ? "All" : `${selectedNames.length} selected`;
+
+  function toggleName(name) {
+    setSelectedNames((current) => {
+      if (!current.length) return [name];
+      return current.includes(name)
+        ? current.filter((item) => item !== name)
+        : uniqueSorted([...current, name]);
+    });
+  }
+
   return (
-    <aside className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{title}</p>
-        <button
-          type="button"
-          onClick={() => setSelectedNames([])}
-          className={`rounded-md px-2 py-1 text-xs font-black ${allSelected ? "bg-blue-700 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"}`}
-        >
-          All
-        </button>
-      </div>
-      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-        {rows.map((row) => {
-          const checked = allSelected || selectedNames.includes(row.label);
-          return (
-            <label key={row.label} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${checked ? "border-blue-200 bg-white text-slate-950 shadow-sm" : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white"}`}>
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={(event) => {
-                  const nextChecked = event.target.checked;
-                  setSelectedNames((current) => {
-                    const starting = current.length ? current : rows.map((item) => item.label);
-                    return nextChecked
-                      ? uniqueSorted([...starting, row.label])
-                      : starting.filter((name) => name !== row.label);
-                  });
-                }}
-                className="h-4 w-4 rounded border-slate-300 text-blue-700"
-              />
-              <span className="min-w-0 flex-1 truncate font-bold" title={row.label}>{row.label}</span>
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-700">{row.value}</span>
-            </label>
-          );
-        })}
-        {!rows.length ? <p className="py-8 text-center text-sm font-semibold text-slate-400">No data</p> : null}
-      </div>
-    </aside>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex min-w-32 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+        title={title}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Filter className="h-4 w-4" />
+          {label}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-11 z-40 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{title}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedNames([]);
+                setOpen(false);
+              }}
+              className={`rounded-md px-2 py-1 text-xs font-black ${allSelected ? "bg-blue-700 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"}`}
+            >
+              All
+            </button>
+          </div>
+          <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+            {rows.map((row) => {
+              const checked = allSelected || selectedNames.includes(row.label);
+              return (
+                <label key={row.label} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${checked ? "border-blue-200 bg-blue-50 text-slate-950" : "border-transparent bg-white text-slate-600 hover:border-slate-200 hover:bg-slate-50"}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleName(row.label)}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-700"
+                  />
+                  <span className="min-w-0 flex-1 truncate font-bold" title={row.label}>{row.label}</span>
+                  <span className="rounded bg-white px-2 py-0.5 text-xs font-black text-slate-700">{row.value}</span>
+                </label>
+              );
+            })}
+            {!rows.length ? <p className="py-8 text-center text-sm font-semibold text-slate-400">No data</p> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1695,7 +1722,7 @@ function ParticipationBarChart({ rows, color }) {
   const topTick = Math.max(1, Math.ceil(maxValue / 2) * 2);
   const ticks = Array.from({ length: 5 }, (_, index) => Math.round((topTick / 4) * (4 - index)));
   const barColor = color === "cyan" ? "bg-cyan-600" : "bg-blue-700";
-  const chartWidth = Math.max(560, rows.length * 96);
+  const chartWidth = Math.max(720, rows.length * 128);
 
   return (
     <div className="min-h-80 rounded-xl border border-slate-200 bg-white p-4">
@@ -1729,15 +1756,15 @@ function ParticipationBarChart({ rows, color }) {
                   />
                 ))}
                 <div
-                  className="absolute inset-x-4 bottom-0 top-0 grid items-end gap-4"
-                  style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(64px, 1fr))` }}
+                  className="absolute inset-x-5 bottom-0 top-0 grid items-end gap-8"
+                  style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(96px, 1fr))` }}
                 >
                   {rows.map((row) => {
                     const height = `${Math.max((Number(row.value || 0) / topTick) * 100, row.value ? 8 : 0)}%`;
                     return (
                       <div key={row.label} className="flex h-full flex-col items-center justify-end">
                         <span className="mb-2 text-sm font-black text-slate-900">{row.value}</span>
-                        <div className={`w-full max-w-10 rounded-t-md ${barColor} shadow-sm`} style={{ height }} title={`${row.label}: ${row.value}`} />
+                        <div className={`w-full max-w-12 rounded-t-md ${barColor} shadow-sm`} style={{ height }} title={`${row.label}: ${row.value}`} />
                       </div>
                     );
                   })}
@@ -1745,11 +1772,11 @@ function ParticipationBarChart({ rows, color }) {
               </div>
 
               <div
-                className="mt-3 grid gap-4 px-4"
-                style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(64px, 1fr))` }}
+                className="mt-4 grid gap-8 px-5"
+                style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(96px, 1fr))` }}
               >
                 {rows.map((row) => (
-                  <p key={row.label} className="text-center text-xs font-black leading-snug text-slate-800" title={row.label}>
+                  <p key={row.label} className="min-h-12 break-words text-center text-xs font-black leading-snug text-slate-800" title={row.label}>
                     {row.label}
                   </p>
                 ))}
