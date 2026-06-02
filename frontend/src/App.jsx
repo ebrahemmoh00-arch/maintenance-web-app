@@ -1416,8 +1416,6 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
 function DashboardFilterBar({ filters, setFilters, options, language }) {
   const t = (text) => tr(language, text);
   const fields = [
-    { key: "year", label: "Year", options: options.years },
-    { key: "month", label: "Month Name", options: options.months },
     { key: "dateFrom", label: "From Date", type: "date" },
     { key: "dateTo", label: "To Date", type: "date" },
     { key: "location", label: "Site", options: options.locations },
