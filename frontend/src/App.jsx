@@ -1560,7 +1560,6 @@ function DashboardMiddleRow({ metrics }) {
 function DashboardBottomRow({ metrics, language }) {
   return (
     <div className="grid gap-6 xl:grid-cols-2">
-      <CriticalEquipmentStatusPanel rows={metrics.criticalEquipment} siteSummary={metrics.siteSummary} />
       <OverduePmTasksPanel rows={metrics.overduePmTasks} language={language} />
       <TopDowntimeAssetsPanel rows={metrics.topDowntimeAssets} />
       <AssetHealthRankingPanel rows={metrics.assetHealthRanking} average={metrics.assetHealthAverage} />
@@ -1633,6 +1632,7 @@ function OverduePmTasksPanel({ rows, language }) {
             <tr>
               <th className="px-3 py-3 text-left">PM Number</th>
               <th className="px-3 py-3 text-left">Asset</th>
+              <th className="px-3 py-3 text-left">Required Maintenance</th>
               <th className="px-3 py-3 text-left">Site</th>
               <th className="px-3 py-3 text-left">Due Date</th>
               <th className="px-3 py-3 text-left">Days Overdue</th>
@@ -1643,12 +1643,13 @@ function OverduePmTasksPanel({ rows, language }) {
               <tr key={task.id} className="bg-red-50">
                 <td className="border-t border-slate-200 px-3 py-3 font-black text-slate-950">PM-{String(task.id).padStart(4, "0")}</td>
                 <td className="border-t border-slate-200 px-3 py-3 text-slate-700">{task.equipment_name || "-"}</td>
+                <td className="border-t border-slate-200 px-3 py-3 font-black text-slate-950">{task.task_name || "-"}</td>
                 <td className="border-t border-slate-200 px-3 py-3 text-slate-700">{task.site || "-"}</td>
                 <td className="border-t border-slate-200 px-3 py-3 text-slate-700">{task.dueLabel}</td>
                 <td className="border-t border-slate-200 px-3 py-3 font-black text-red-700">{task.daysOverdue}</td>
               </tr>
             ))}
-            {!rows.length ? <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-500">{t("No data")}</td></tr> : null}
+            {!rows.length ? <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-500">{t("No data")}</td></tr> : null}
           </tbody>
         </table>
       </div>
