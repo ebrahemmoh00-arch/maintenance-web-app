@@ -1387,11 +1387,8 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
     <>
       <DashboardFilterBar filters={filters} setFilters={setFilters} options={filterOptions} language={language} />
 
-      <div className="grid gap-4 xl:grid-cols-5 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         <MetricCard label="Total Assets" value={filteredData.equipment.length} icon={Cpu} tone="blue" helper="Assets under maintenance control" />
-        <MetricCard label="Equipment Availability" value={`${metrics.availabilityPercent}%`} icon={Activity} tone={availabilityTone(metrics.availabilityPercent)} helper="Planned time vs downtime" />
-        <MetricCard label="MTTR" value={metrics.mttrLabel} icon={TimerReset} tone={metrics.mttrHours > 4 ? "orange" : "green"} helper="Mean time to repair" />
-        <MetricCard label="MTBF" value={metrics.mtbfLabel} icon={CheckCircle2} tone={metrics.mtbfHours > 0 && metrics.mtbfHours < 100 ? "orange" : "green"} helper="Mean time between failures" />
         <MetricCard label="Total Work Orders" value={workOrders.length} icon={Wrench} tone="blue" helper="All work orders in scope" />
       </div>
 
