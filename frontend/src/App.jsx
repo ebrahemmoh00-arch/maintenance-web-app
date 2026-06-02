@@ -4190,7 +4190,7 @@ function EmployeesManagementPage({ rows, jobTitles = [], onCreate, onEdit, onDel
     });
   }, [scopedRows, search, filters]);
 
-  const activeStaff = rows.filter((employee) => employee.status === "active").length;
+  const activeStaff = rows.filter((employee) => employee.status === "active" && !isManagementEmployee(employee)).length;
   const technicians = rows.filter(isTechnicianEmployee).length;
   const engineers = rows.filter(isEngineerEmployee).length;
   const management = rows.filter(isManagementEmployee).length;
