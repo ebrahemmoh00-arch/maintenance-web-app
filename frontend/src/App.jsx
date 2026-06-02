@@ -1722,7 +1722,14 @@ function ParticipationBarChart({ rows, color }) {
   const topTick = Math.max(1, Math.ceil(maxValue / 2) * 2);
   const ticks = Array.from({ length: 5 }, (_, index) => Math.round((topTick / 4) * (4 - index)));
   const barColor = color === "cyan" ? "bg-cyan-600" : "bg-blue-700";
-  const chartWidth = Math.max(720, rows.length * 128);
+  const rowCount = Math.max(rows.length, 1);
+  const columnWidth = rowCount <= 6 ? 92 : rowCount <= 10 ? 78 : rowCount <= 16 ? 66 : 56;
+  const columnMinWidth = Math.max(columnWidth - 10, 46);
+  const barMaxWidth = rowCount <= 8 ? 44 : rowCount <= 16 ? 34 : 26;
+  const chartWidth = Math.max(560, rowCount * columnWidth + 64);
+  const columnTemplate = `repeat(${rowCount}, minmax(${columnMinWidth}px, 1fr))`;
+  const columnGap = rowCount <= 8 ? "1rem" : rowCount <= 16 ? "0.65rem" : "0.4rem";
+  const labelFontSize = rowCount > 16 ? "10px" : "11px";
 
   return (
     <div className="min-h-80 rounded-xl border border-slate-200 bg-white p-4">
@@ -1756,15 +1763,15 @@ function ParticipationBarChart({ rows, color }) {
                   />
                 ))}
                 <div
-                  className="absolute inset-x-5 bottom-0 top-0 grid items-end gap-8"
-                  style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(96px, 1fr))` }}
+                  className="absolute inset-x-3 bottom-0 top-0 grid items-end"
+                  style={{ gridTemplateColumns: columnTemplate, columnGap }}
                 >
                   {rows.map((row) => {
                     const height = `${Math.max((Number(row.value || 0) / topTick) * 100, row.value ? 8 : 0)}%`;
                     return (
                       <div key={row.label} className="flex h-full flex-col items-center justify-end">
                         <span className="mb-2 text-sm font-black text-slate-900">{row.value}</span>
-                        <div className={`w-full max-w-12 rounded-t-md ${barColor} shadow-sm`} style={{ height }} title={`${row.label}: ${row.value}`} />
+                        <div className={`w-full rounded-t-md ${barColor} shadow-sm`} style={{ height, maxWidth: `${barMaxWidth}px` }} title={`${row.label}: ${row.value}`} />
                       </div>
                     );
                   })}
@@ -1772,11 +1779,16 @@ function ParticipationBarChart({ rows, color }) {
               </div>
 
               <div
-                className="mt-4 grid gap-8 px-5"
-                style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(96px, 1fr))` }}
+                className="mt-3 grid px-3"
+                style={{ gridTemplateColumns: columnTemplate, columnGap }}
               >
                 {rows.map((row) => (
-                  <p key={row.label} className="min-h-12 break-words text-center text-xs font-black leading-snug text-slate-800" title={row.label}>
+                  <p
+                    key={row.label}
+                    className="break-words text-center font-black leading-snug text-slate-800"
+                    style={{ fontSize: labelFontSize, minHeight: rowCount > 14 ? "64px" : "48px", overflowWrap: "anywhere" }}
+                    title={row.label}
+                  >
                     {row.label}
                   </p>
                 ))}
