@@ -92,8 +92,8 @@ export function DonutChart({ data, centerLabel = "Assets" }) {
   let offset = 25;
 
   return (
-    <div className="flex items-center gap-6">
-      <svg viewBox="0 0 42 42" className="h-44 w-44 shrink-0">
+    <div className="flex flex-col items-center gap-6 sm:flex-row">
+      <svg viewBox="0 0 42 42" className="h-36 w-36 shrink-0 sm:h-44 sm:w-44">
         <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#e2e8f0" strokeWidth="6" />
         {data.map((item) => {
           const dash = (item.value / total) * 100;
@@ -120,7 +120,7 @@ export function DonutChart({ data, centerLabel = "Assets" }) {
           {centerLabel}
         </text>
       </svg>
-      <div className="flex-1 space-y-3">
+      <div className="w-full flex-1 space-y-3">
         {data.map((item) => (
           <div key={item.label} className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">

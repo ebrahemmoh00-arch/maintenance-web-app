@@ -998,16 +998,16 @@ export default function App() {
   }
 
   return (
-    <div dir={language === "ar" ? "rtl" : "ltr"} className={`flex min-h-screen w-full overflow-x-auto ${darkMode ? "bg-slate-900" : "bg-slate-100"} text-slate-900`}>
+    <div dir={language === "ar" ? "rtl" : "ltr"} className={`flex min-h-screen w-full flex-col overflow-x-hidden lg:flex-row ${darkMode ? "bg-slate-900" : "bg-slate-100"} text-slate-900`}>
       <Sidebar active={active} setActive={setActive} collapsed={collapsed} setCollapsed={setCollapsed} language={language} isAdmin={isAdmin} />
-      <main className="min-w-[920px] flex-1 overflow-x-auto">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
+      <main className="min-w-0 flex-1 overflow-x-hidden">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-3 py-4 backdrop-blur sm:px-4 lg:px-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">{t("Professional Industrial Maintenance Dashboard")}</p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">{pageTitle(active, language)}</h1>
+            <div className="min-w-0">
+              <p className="break-words text-[10px] font-black uppercase tracking-[0.14em] text-blue-700 sm:text-xs sm:tracking-[0.22em]">{t("Professional Industrial Maintenance Dashboard")}</p>
+              <h1 className="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{pageTitle(active, language)}</h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600">
                 <Globe2 className="h-4 w-4 text-blue-700" />
                 <span className="sr-only">{t("Language")}</span>
@@ -1092,7 +1092,7 @@ export default function App() {
         </header>
 
         {error ? <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
-        <div className="min-w-[920px] space-y-6 p-6">
+        <div className="min-w-0 space-y-6 p-3 sm:p-4 lg:p-6">
           {loading && <SkeletonDashboard />}
           {!loading && page === "dashboard" && (
             <Dashboard

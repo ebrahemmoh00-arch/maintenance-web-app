@@ -27,8 +27,8 @@ export default function Sidebar({ active, setActive, collapsed, setCollapsed, la
   const isArabic = language === "ar";
   const visibleItems = isAdmin ? items : items.filter(([key]) => key !== "access-control");
   return (
-    <aside className={`flex h-screen shrink-0 flex-col border-r border-slate-200 bg-slate-950 text-white transition-all duration-300 ${collapsed ? "w-20" : "w-72"}`}>
-      <div className="border-b border-white/10 p-4">
+    <aside className={`flex h-auto w-full shrink-0 flex-col border-b border-slate-800 bg-slate-950 text-white transition-all duration-300 lg:h-screen lg:border-b-0 lg:border-r lg:border-slate-200 ${collapsed ? "lg:w-20" : "lg:w-72"}`}>
+      <div className="border-b border-white/10 p-3 lg:p-4">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-cyan-400/70 bg-cyan-400/10">
             <Settings2 className="h-5 w-5 text-cyan-300" />
@@ -50,13 +50,13 @@ export default function Sidebar({ active, setActive, collapsed, setCollapsed, la
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav className="flex gap-2 overflow-x-auto px-3 py-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:overflow-y-auto lg:py-4">
         {visibleItems.map(([key, label, arabicLabel, Icon]) => (
           <button
             key={key}
             onClick={() => setActive(key)}
             title={collapsed ? (isArabic ? arabicLabel : label) : undefined}
-            className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm font-medium transition ${
+            className={`group flex w-auto shrink-0 items-center gap-3 rounded-lg border px-3 py-3 text-left text-sm font-medium transition lg:w-full ${
               active === key
                 ? "border-cyan-400/70 bg-cyan-400/10 text-white shadow-[inset_3px_0_0_#22d3ee]"
                 : "border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-white"
@@ -68,7 +68,7 @@ export default function Sidebar({ active, setActive, collapsed, setCollapsed, la
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
+      <div className="hidden border-t border-white/10 p-4 lg:block">
         <div className={`rounded-lg border border-white/10 bg-white/5 p-3 ${collapsed ? "text-center" : ""}`}>
           <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">{collapsed ? "API" : (isArabic ? "حالة النظام" : "System Status")}</p>
           {!collapsed ? (
