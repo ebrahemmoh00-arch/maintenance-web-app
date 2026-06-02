@@ -2958,7 +2958,7 @@ function isSupervisorEmployee(employee) {
 function employeeMatchesGroup(employee, group) {
   if (!group) return false;
   if (group === "all") return true;
-  if (group === "active") return employee?.status === "active";
+  if (group === "active") return employee?.status === "active" && !isManagementEmployee(employee);
   if (group === "technicians") return isTechnicianEmployee(employee);
   if (group === "engineers") return isEngineerEmployee(employee);
   if (group === "management") return isManagementEmployee(employee);
