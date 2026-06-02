@@ -1418,6 +1418,8 @@ function DashboardFilterBar({ filters, setFilters, options, language }) {
   const fields = [
     { key: "year", label: "Year", options: options.years },
     { key: "month", label: "Month Name", options: options.months },
+    { key: "dateFrom", label: "From Date", type: "date" },
+    { key: "dateTo", label: "To Date", type: "date" },
     { key: "location", label: "Site", options: options.locations },
     { key: "category", label: "Asset Category", options: options.categories },
     { key: "equipment", label: "Equipment", options: options.equipment },
@@ -1428,20 +1430,29 @@ function DashboardFilterBar({ filters, setFilters, options, language }) {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {fields.map((field) => (
           <label key={field.key} className="block">
             <span className="mb-2 block text-xs font-black text-slate-800">{t(field.label)}</span>
-            <select
-              value={filters[field.key]}
-              onChange={(event) => setFilters((current) => ({ ...current, [field.key]: event.target.value }))}
-              className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
-            >
-              <option value="all">{t("All")}</option>
-              {field.options.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+            {field.type === "date" ? (
+              <input
+                type="date"
+                value={filters[field.key]}
+                onChange={(event) => setFilters((current) => ({ ...current, [field.key]: event.target.value }))}
+                className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              />
+            ) : (
+              <select
+                value={filters[field.key]}
+                onChange={(event) => setFilters((current) => ({ ...current, [field.key]: event.target.value }))}
+                className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              >
+                <option value="all">{t("All")}</option>
+                {field.options.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            )}
           </label>
         ))}
       </div>
@@ -2745,6 +2756,8 @@ function createDashboardFilters() {
   return {
     year: "all",
     month: "all",
+    dateFrom: "",
+    dateTo: "",
     category: "all",
     equipment: "all",
     location: "all",
@@ -2826,7 +2839,7 @@ function applyDashboardFilters(data, alerts, filters) {
   const equipmentById = new Map(equipment.map((asset) => [Number(asset.id), asset]));
   const workOrderFiltered = workOrders.filter((order) => dashboardWorkOrderMatches(order, equipmentById.get(Number(order.equipment_id)), filters));
   const filteredEquipmentIds = new Set(workOrderFiltered.map((order) => Number(order.equipment_id)).filter(Boolean));
-  const orderScoped = filters.year !== "all" || filters.month !== "all" || filters.priority !== "all" || filters.equipment !== "all" || filters.maintenanceType !== "all";
+  const orderScoped = filters.year !== "all" || filters.month !== "all" || filters.dateFrom || filters.dateTo || filters.priority !== "all" || filters.equipment !== "all" || filters.maintenanceType !== "all";
   const equipmentFiltered = equipment.filter((asset) => {
     if (!dashboardEquipmentMatches(asset, filters)) return false;
     return orderScoped ? filteredEquipmentIds.has(Number(asset.id)) : true;
@@ -2896,14 +2909,30 @@ function matchesDashboardDate(value, filters) {
   const parts = dashboardDateParts(value);
   if (filters.year !== "all" && String(parts.year) !== String(filters.year)) return false;
   if (filters.month !== "all" && String(parts.month) !== String(filters.month)) return false;
+  const date = dashboardDateValue(value);
+  if (filters.dateFrom) {
+    const from = dashboardDateValue(filters.dateFrom);
+    if (!date || !from || date < from) return false;
+  }
+  if (filters.dateTo) {
+    const to = dashboardDateValue(filters.dateTo);
+    if (!date || !to || date > to) return false;
+  }
   return true;
 }
 
 function dashboardDateParts(value) {
-  if (!value) return { year: "", month: "" };
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return { year: "", month: "" };
+  const date = dashboardDateValue(value);
+  if (!date) return { year: "", month: "" };
   return { year: String(date.getFullYear()), month: String(date.getMonth() + 1) };
+}
+
+function dashboardDateValue(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
 function matchesAnyFilterValue(values, selected) {
