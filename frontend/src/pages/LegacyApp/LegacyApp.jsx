@@ -1672,21 +1672,21 @@ function ParticipantFilterList({ title, rows, selectedNames, setSelectedNames })
   }
 
   return (
-    <div className="relative">
+    <div className="relative z-30">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex min-w-32 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
+        className="inline-flex w-44 max-w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700"
         title={title}
       >
-        <span className="inline-flex items-center gap-2">
+        <span className="inline-flex min-w-0 items-center gap-2">
           <Filter className="h-4 w-4" />
-          {label}
+          <span className="truncate">{label}</span>
         </span>
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-11 z-40 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15">
+        <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15">
           <div className="mb-3 flex items-center justify-between gap-2">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{title}</p>
             <button
@@ -1711,7 +1711,7 @@ function ParticipantFilterList({ title, rows, selectedNames, setSelectedNames })
                     onChange={() => toggleName(row.label)}
                     className="h-4 w-4 rounded border-slate-300 text-blue-700"
                   />
-                  <span className="min-w-0 flex-1 truncate font-bold" title={row.label}>{row.label}</span>
+                  <span className="min-w-0 flex-1 text-right font-bold leading-snug" title={row.label}>{row.label}</span>
                   <span className="rounded bg-white px-2 py-0.5 text-xs font-black text-slate-700">{row.value}</span>
                 </label>
               );
@@ -1733,7 +1733,8 @@ function ParticipationBarChart({ rows, color }) {
   const columnWidth = rowCount <= 6 ? 92 : rowCount <= 10 ? 78 : rowCount <= 16 ? 66 : 56;
   const columnMinWidth = Math.max(columnWidth - 10, 46);
   const barMaxWidth = rowCount <= 8 ? 44 : rowCount <= 16 ? 34 : 26;
-  const chartWidth = Math.max(560, rowCount * columnWidth + 64);
+  const axisWidth = 76;
+  const chartWidth = Math.max(640, rowCount * columnWidth + axisWidth + 96);
   const columnTemplate = `repeat(${rowCount}, minmax(${columnMinWidth}px, 1fr))`;
   const columnGap = rowCount <= 8 ? "1rem" : rowCount <= 16 ? "0.65rem" : "0.4rem";
   const labelFontSize = rowCount > 16 ? "10px" : "11px";
@@ -1746,7 +1747,7 @@ function ParticipationBarChart({ rows, color }) {
       </div>
       {rows.length ? (
         <div className="overflow-x-auto pb-2">
-          <div className="grid grid-cols-[44px_1fr] gap-3" style={{ minWidth: `${chartWidth}px` }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: `${axisWidth}px 1fr`, minWidth: `${chartWidth}px` }}>
             <div className="relative h-72">
               {ticks.map((tick, index) => (
                 <span
@@ -1757,7 +1758,7 @@ function ParticipationBarChart({ rows, color }) {
                   {tick}
                 </span>
               ))}
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 -rotate-90 whitespace-nowrap text-xs font-black text-slate-600">Work Orders</span>
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 whitespace-nowrap text-xs font-black text-slate-600">Work Orders</span>
             </div>
 
             <div className="min-w-0">
@@ -1792,7 +1793,7 @@ function ParticipationBarChart({ rows, color }) {
                 {rows.map((row) => (
                   <p
                     key={row.label}
-                    className="break-words text-center font-black leading-snug text-slate-800"
+                    className="w-full break-words pr-1 text-right font-black leading-snug text-slate-800"
                     style={{ fontSize: labelFontSize, minHeight: rowCount > 14 ? "64px" : "48px", overflowWrap: "anywhere" }}
                     title={row.label}
                   >
