@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..auth import require_permission
 from ..schemas import MaintenanceAlert
 from ..services import EquipmentService
 
@@ -8,5 +9,5 @@ service = EquipmentService()
 
 
 @router.get("", response_model=list[MaintenanceAlert])
-def maintenance_alerts():
+def maintenance_alerts(_=Depends(require_permission("alerts:read"))):
     return service.alerts()

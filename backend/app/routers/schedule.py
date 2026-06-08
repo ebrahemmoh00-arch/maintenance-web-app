@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..auth import require_permission
 from ..schemas import WorkOrder
 from ..services import WorkOrderService
 
@@ -8,5 +9,5 @@ service = WorkOrderService()
 
 
 @router.get("", response_model=list[WorkOrder])
-def schedule():
+def schedule(_=Depends(require_permission("schedule:read"))):
     return service.schedule()

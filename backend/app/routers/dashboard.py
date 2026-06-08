@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..auth import require_permission
 from ..schemas import DashboardStats
 from ..services import WorkOrderService
 
@@ -8,5 +9,5 @@ service = WorkOrderService()
 
 
 @router.get("/stats", response_model=DashboardStats)
-def dashboard_stats():
+def dashboard_stats(_=Depends(require_permission("dashboard:read"))):
     return service.dashboard()

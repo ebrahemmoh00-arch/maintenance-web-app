@@ -1,17 +1,26 @@
 from datetime import datetime
 import os
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from .auth import authenticate_access_header, require_permission
 from .database import init_db
-from .routers import customers, dashboard, engineers, equipment, inventory, job_titles, maintenance_alerts, preventive_maintenance, schedule, work_orders
+from .routers import auth, customers, dashboard, engineers, equipment, inventory, job_titles, maintenance_alerts, preventive_maintenance, schedule, work_orders
 
 app = FastAPI(
     title="Maintenance Management API",
     version="1.0.0",
     description="REST API for departments, assets, resources, work orders, inventory, preventive maintenance, schedule, and dashboard metrics.",
 )
+
+PUBLIC_API_PATHS = {
+    "/api/login",
+    "/api/refresh-token",
+    "/api/health",
+    "/health",
+}
 
 frontend_origins = [
     "http://localhost:5173",
@@ -33,6 +42,18 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def protect_api_routes(request: Request, call_next):
+    path = request.url.path.rstrip("/") or "/"
+    if request.method == "OPTIONS" or path in PUBLIC_API_PATHS or not path.startswith("/api"):
+        return await call_next(request)
+    try:
+        request.state.current_user = authenticate_access_header(request.headers.get("Authorization"))
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": "Access Denied"})
+    return await call_next(request)
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
@@ -43,8 +64,13 @@ def health_check():
     return {"status": "ok"}
 
 
+@app.get("/health")
+def root_health_check():
+    return {"status": "ok"}
+
+
 @app.get("/api/server-time")
-def server_time():
+def server_time(_=Depends(require_permission("server_time:read"))):
     now = datetime.now()
     return {
         "date": now.date().isoformat(),
@@ -53,6 +79,7 @@ def server_time():
     }
 
 
+app.include_router(auth.router, prefix="/api")
 app.include_router(customers.router, prefix="/api")
 app.include_router(engineers.router, prefix="/api")
 app.include_router(job_titles.router, prefix="/api")

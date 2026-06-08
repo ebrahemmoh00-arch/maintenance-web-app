@@ -43,9 +43,7 @@ import MetricCard from "../../components/MetricCard";
 import { BarChart, DonutChart, LineChart } from "../../components/Charts";
 import EmptyState from "../../components/EmptyState";
 
-const LOGIN_USERNAME = "ECS-ECS";
-const LOGIN_PASSWORD = "E5C9S2@rom";
-const EMPLOYEE_ROLE_OPTIONS = ["viewer", "engineer", "admin"];
+const EMPLOYEE_ROLE_OPTIONS = ["viewer", "technician", "engineer", "supervisor", "store_keeper", "maintenance_manager", "branch_manager", "admin"];
 const MANAGEMENT_JOB_TITLES = [
   "Branch Manager",
   "Operation & Maintenance Manager",
@@ -62,7 +60,9 @@ const AUTH_STORAGE_KEYS = [
   "maintenance-role",
   "maintenance-auth-user",
   "maintenance-auth-name",
-  "maintenance-permissions"
+  "maintenance-permissions",
+  "maintenance-access-token",
+  "maintenance-refresh-token"
 ];
 
 function clearPersistentAuthStorage() {
@@ -72,7 +72,7 @@ function clearPersistentAuthStorage() {
 function getAuthSession() {
   clearPersistentAuthStorage();
   return {
-    authenticated: sessionStorage.getItem("maintenance-authenticated") === "true",
+    authenticated: sessionStorage.getItem("maintenance-authenticated") === "true" && Boolean(sessionStorage.getItem("maintenance-access-token")),
     role: sessionStorage.getItem("maintenance-role") || "",
     username: sessionStorage.getItem("maintenance-auth-user") || "",
     name: sessionStorage.getItem("maintenance-auth-name") || "",
@@ -80,8 +80,11 @@ function getAuthSession() {
   };
 }
 
-function saveAuthSession({ role, username, name, permissions }) {
+function saveAuthSession({ role, username, name, permissions, accessToken, refreshToken }) {
   clearPersistentAuthStorage();
+  if (accessToken || refreshToken) {
+    api.saveAuthTokens({ access_token: accessToken, refresh_token: refreshToken });
+  }
   sessionStorage.setItem("maintenance-authenticated", "true");
   sessionStorage.setItem("maintenance-role", role);
   sessionStorage.setItem("maintenance-auth-user", username);
@@ -90,6 +93,7 @@ function saveAuthSession({ role, username, name, permissions }) {
 }
 
 function clearAuthSession() {
+  api.clearAuthTokens();
   AUTH_STORAGE_KEYS.forEach((key) => {
     sessionStorage.removeItem(key);
     localStorage.removeItem(key);
@@ -328,9 +332,9 @@ function createFullPermissions() {
 }
 
 function normalizeEmployeeRole(role = "viewer") {
-  const normalized = String(role || "viewer").toLowerCase();
+  const normalized = String(role || "viewer").toLowerCase().trim().replaceAll(" ", "_").replaceAll("-", "_");
+  if (normalized === "super_admin") return "admin";
   if (normalized === "user") return "viewer";
-  if (["supervisor", "technician"].includes(normalized)) return "engineer";
   return EMPLOYEE_ROLE_OPTIONS.includes(normalized) ? normalized : "viewer";
 }
 
@@ -338,10 +342,39 @@ function createRolePermissions(role = "viewer") {
   const normalized = normalizeEmployeeRole(role);
   if (normalized === "admin") return createFullPermissions();
   const permissions = createDefaultPermissions();
+  if (normalized === "branch_manager") {
+    permissions.equipment = { view: true, add: true, edit: true, delete: true };
+    permissions["work-orders"] = { view: true, add: true, edit: true, delete: true };
+    permissions.reports = { view: true, add: false, edit: false, delete: false };
+    permissions.engineers = { view: true, add: false, edit: false, delete: false };
+  }
+  if (normalized === "maintenance_manager") {
+    permissions.equipment = { view: true, add: true, edit: true, delete: true };
+    permissions["work-orders"] = { view: true, add: true, edit: true, delete: true };
+    permissions["preventive-maintenance"] = { view: true, add: true, edit: true, delete: true };
+    permissions.inventory = { view: true, add: true, edit: true, delete: true };
+    permissions.reports = { view: true, add: false, edit: false, delete: false };
+    permissions.engineers = { view: true, add: false, edit: false, delete: false };
+  }
   if (normalized === "engineer") {
+    permissions.equipment = { view: true, add: false, edit: true, delete: false };
     permissions["work-orders"] = { view: true, add: true, edit: true, delete: false };
     permissions["preventive-maintenance"] = { view: true, add: false, edit: true, delete: false };
     permissions.inventory = { view: true, add: false, edit: false, delete: false };
+  }
+  if (normalized === "supervisor") {
+    permissions["work-orders"] = { view: true, add: true, edit: true, delete: false };
+    permissions["preventive-maintenance"] = { view: true, add: true, edit: true, delete: false };
+    permissions.engineers = { view: true, add: false, edit: false, delete: false };
+  }
+  if (normalized === "technician") {
+    permissions["work-orders"] = { view: true, add: false, edit: true, delete: false };
+    permissions["preventive-maintenance"] = { view: true, add: false, edit: false, delete: false };
+    permissions.inventory = { view: true, add: false, edit: false, delete: false };
+  }
+  if (normalized === "store_keeper") {
+    permissions.inventory = { view: true, add: true, edit: true, delete: true };
+    permissions["work-orders"] = { view: true, add: false, edit: false, delete: false };
   }
   return permissions;
 }
@@ -732,7 +765,7 @@ export default function LegacyApp({ initialPage = "" }) {
   });
   const [authenticated, setAuthenticated] = useState(() => {
     const auth = getAuthSession();
-    return auth.authenticated && ["admin", "engineer", "supervisor", "technician", "viewer", "user"].includes(auth.role) && Boolean(auth.username);
+    return auth.authenticated && EMPLOYEE_ROLE_OPTIONS.includes(normalizeEmployeeRole(auth.role)) && Boolean(auth.username);
   });
   const [currentUser, setCurrentUser] = useState(() => {
     const auth = getAuthSession();
@@ -794,15 +827,16 @@ export default function LegacyApp({ initialPage = "" }) {
       setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance));
       setStats(dashboard);
       const storedUsername = sessionStorage.getItem("maintenance-auth-user") || "";
-      if (storedUsername && storedUsername !== LOGIN_USERNAME) {
+      if (storedUsername) {
         const refreshedUser = engineers.find((user) => user.username === storedUsername);
         if (refreshedUser) {
-          const permissions = refreshedUser.permissions || "";
+          const role = normalizeEmployeeRole(refreshedUser.role);
+          const permissions = refreshedUser.permissions || stringifyPermissions(createRolePermissions(role));
           sessionStorage.setItem("maintenance-permissions", permissions);
           setCurrentUser({
             username: refreshedUser.username,
             name: refreshedUser.name,
-            role: normalizeEmployeeRole(refreshedUser.role),
+            role,
             permissions
           });
         }
@@ -828,50 +862,32 @@ export default function LegacyApp({ initialPage = "" }) {
 
   async function handleLogin(event) {
     event.preventDefault();
-    const usernameMatches = loginValue.username.trim() === LOGIN_USERNAME;
-    const passwordMatches = loginValue.password === LOGIN_PASSWORD;
-    if (usernameMatches && passwordMatches) {
-      saveAuthSession({
-        role: "admin",
-        username: LOGIN_USERNAME,
-        name: "Administrator",
-        permissions: JSON.stringify(createFullPermissions())
-      });
-      setCurrentUser({ username: LOGIN_USERNAME, name: "Administrator", role: "admin", permissions: JSON.stringify(createFullPermissions()) });
-      setAuthenticated(true);
-      setLoginError("");
-      return;
-    }
-
     try {
-      const users = await api.list("engineers");
-      const matchedUser = users.find(
-        (user) =>
-          user.status === "active" &&
-          user.username &&
-          user.username === loginValue.username.trim() &&
-          user.password === loginValue.password
-      );
-      if (!matchedUser) {
-        setLoginError(tr(language, "Invalid username or password"));
-        return;
-      }
+      const auth = await api.login({
+        username: loginValue.username.trim(),
+        password: loginValue.password
+      });
+      const matchedUser = auth.user || {};
       const role = normalizeEmployeeRole(matchedUser.role);
+      const permissions = matchedUser.permissions || stringifyPermissions(createRolePermissions(role));
       saveAuthSession({
         role,
         username: matchedUser.username,
         name: matchedUser.name,
-        permissions: matchedUser.permissions || ""
+        permissions,
+        accessToken: auth.access_token,
+        refreshToken: auth.refresh_token
       });
-      setCurrentUser({ username: matchedUser.username, name: matchedUser.name, role, permissions: matchedUser.permissions || "" });
+      setCurrentUser({ username: matchedUser.username, name: matchedUser.name, role, permissions });
       setAuthenticated(true);
       setLoginError("");
     } catch (err) {
-      setLoginError(err.message || tr(language, "Invalid username or password"));
+      setLoginError(err.message === "Access Denied" ? tr(language, "Invalid username or password") : err.message || tr(language, "Invalid username or password"));
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    await api.logout().catch(() => null);
     clearAuthSession();
     setAuthenticated(false);
     setCurrentUser({ username: "", name: "", role: "", permissions: "" });

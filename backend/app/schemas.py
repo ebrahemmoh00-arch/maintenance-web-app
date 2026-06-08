@@ -45,14 +45,13 @@ class EngineerBase(BaseModel):
     work_location: str = ""
     supervisor: str = ""
     username: str = ""
-    password: str = ""
-    role: Literal["admin", "engineer", "supervisor", "technician", "viewer", "user"] = "viewer"
+    role: str = "viewer"
     permissions: str = ""
     status: Literal["active", "on_shift", "off_duty", "inactive"] = "active"
 
 
 class EngineerCreate(EngineerBase):
-    pass
+    password: str = ""
 
 
 class EngineerUpdate(BaseModel):
@@ -76,6 +75,31 @@ class Engineer(EngineerBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     created_at: str
+
+
+class AuthUser(Engineer):
+    pass
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: AuthUser
 
 
 class JobTitleBase(BaseModel):

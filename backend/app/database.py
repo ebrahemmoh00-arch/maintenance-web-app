@@ -6,6 +6,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from .security import hash_password, is_password_hash
+
 try:
     import psycopg
     from psycopg.rows import dict_row
@@ -135,6 +137,16 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
     FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE CASCADE,
     FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    jti TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL,
+    token_type TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -254,6 +266,16 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
     FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE CASCADE,
     FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id SERIAL PRIMARY KEY,
+    jti TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL,
+    token_type TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text)
+);
 """
 
 
@@ -350,7 +372,20 @@ def init_db() -> None:
                 "criticality": "TEXT DEFAULT 'Medium'",
             },
         )
+        ensure_columns(
+            db,
+            "auth_tokens",
+            {
+                "jti": "TEXT DEFAULT ''",
+                "username": "TEXT DEFAULT ''",
+                "token_type": "TEXT DEFAULT ''",
+                "expires_at": "TEXT DEFAULT ''",
+                "revoked_at": "TEXT DEFAULT ''",
+            },
+        )
         seed_data(db)
+        ensure_super_admin(db)
+        migrate_plaintext_passwords(db)
 
 
 def ensure_columns(db: DatabaseConnection, table: str, columns: dict[str, str]) -> None:
@@ -400,8 +435,8 @@ def seed_data(db: DatabaseConnection) -> None:
             "Gabal Elasfar Power Plant",
             "Maintenance Manager",
             "ebrahim",
-            "123456",
-            "technician",
+            hash_password("123456"),
+            "engineer",
             "active",
         ),
     )
@@ -436,6 +471,63 @@ def seed_data(db: DatabaseConnection) -> None:
             "Initial seeded work order.",
         ),
     )
+
+
+def ensure_super_admin(db: DatabaseConnection) -> None:
+    username = os.getenv("ADMIN_USERNAME", "ECS-ECS").strip() or "ECS-ECS"
+    password = os.getenv("ADMIN_PASSWORD", "E5C9S2@rom")
+    email = os.getenv("ADMIN_EMAIL", "admin@ecs.local")
+    existing = db.execute("SELECT * FROM engineers WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
+    if existing:
+        row = dict(existing)
+        stored_password = row.get("password") or password
+        if os.getenv("ADMIN_PASSWORD"):
+            next_password = hash_password(password)
+        else:
+            next_password = stored_password if is_password_hash(stored_password) else hash_password(stored_password)
+        db.execute(
+            """
+            UPDATE engineers
+            SET name = ?, email = ?, job_title = ?, department = ?, role = ?, status = ?, password = ?
+            WHERE id = ?
+            """,
+            ("System Administrator", email, "Super Admin", "Administration", "admin", "active", next_password, row["id"]),
+        )
+        return
+
+    db.execute(
+        """
+        INSERT INTO engineers (
+            employee_code, name, email, phone, specialty, job_title, department,
+            work_location, supervisor, username, password, role, permissions, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "ADMIN-0001",
+            "System Administrator",
+            email,
+            "",
+            "Administration",
+            "Super Admin",
+            "Administration",
+            "Available for All Sites",
+            "",
+            username,
+            hash_password(password),
+            "admin",
+            "",
+            "active",
+        ),
+    )
+
+
+def migrate_plaintext_passwords(db: DatabaseConnection) -> None:
+    rows = db.execute("SELECT id, password FROM engineers WHERE password IS NOT NULL AND password != ''").fetchall()
+    for row in rows:
+        item = dict(row)
+        password = item.get("password", "")
+        if password and not is_password_hash(password):
+            db.execute("UPDATE engineers SET password = ? WHERE id = ?", (hash_password(password), item["id"]))
 
 
 def seed_job_titles(db: DatabaseConnection) -> None:
