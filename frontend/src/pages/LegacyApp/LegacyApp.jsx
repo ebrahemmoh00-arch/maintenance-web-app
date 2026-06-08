@@ -760,6 +760,7 @@ export default function LegacyApp({ initialPage = "" }) {
   const [data, setData] = useState({ customers: [], engineers: [], equipment: [], "work-orders": [], inventory: [], "preventive-maintenance": [], "job-titles": [], "audit-logs": [] });
   const [alerts, setAlerts] = useState([]);
   const [stats, setStats] = useState({ total_orders: 0, pending_orders: 0, completed_orders: 0 });
+  const [auditLogsLoaded, setAuditLogsLoaded] = useState(false);
   const [modal, setModal] = useState(null);
   const [formValue, setFormValue] = useState({});
   const [error, setError] = useState("");
@@ -791,8 +792,7 @@ export default function LegacyApp({ initialPage = "" }) {
     if (!silent) setLoading(true);
     setError("");
     try {
-      const canViewAuditLogs = hasPermission(currentUser, "audit-logs", "view");
-      const [customers, engineers, equipment, workOrders, inventory, preventiveMaintenance, jobTitles, dashboard, maintenanceAlerts, auditLogs] = await Promise.all([
+      const [customers, engineers, equipment, workOrders, inventory, preventiveMaintenance, jobTitles, dashboard, maintenanceAlerts] = await Promise.all([
         api.list("customers"),
         api.list("engineers"),
         api.list("equipment"),
@@ -801,10 +801,9 @@ export default function LegacyApp({ initialPage = "" }) {
         api.list("preventive-maintenance"),
         api.list("job-titles"),
         api.stats(),
-        api.alerts(),
-        canViewAuditLogs ? api.list("audit-logs").catch(() => []) : Promise.resolve([])
+        api.alerts()
       ]);
-      setData({ customers, engineers, equipment, "work-orders": workOrders, inventory, "preventive-maintenance": preventiveMaintenance, "job-titles": jobTitles, "audit-logs": auditLogs });
+      setData((current) => ({ ...current, customers, engineers, equipment, "work-orders": workOrders, inventory, "preventive-maintenance": preventiveMaintenance, "job-titles": jobTitles }));
       setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance));
       setStats(dashboard);
       const storedUsername = sessionStorage.getItem("maintenance-auth-user") || "";
@@ -829,6 +828,17 @@ export default function LegacyApp({ initialPage = "" }) {
     }
   }
 
+  async function loadAuditLogs() {
+    if (!hasPermission(currentUser, "audit-logs", "view")) return;
+    try {
+      const auditLogs = await api.list("audit-logs");
+      setData((current) => ({ ...current, "audit-logs": auditLogs }));
+      setAuditLogsLoaded(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   useEffect(() => {
     if (authenticated) {
       loadAll();
@@ -836,6 +846,12 @@ export default function LegacyApp({ initialPage = "" }) {
       setLoading(false);
     }
   }, [authenticated]);
+
+  useEffect(() => {
+    if (authenticated && active === "reports" && !auditLogsLoaded && hasPermission(currentUser, "audit-logs", "view")) {
+      loadAuditLogs();
+    }
+  }, [authenticated, active, auditLogsLoaded, currentUser]);
 
   const isAdmin = normalizeEmployeeRole(currentUser.role) === "admin";
   const canAddWorkOrders = hasPermission(currentUser, "work-orders", "add");
@@ -859,6 +875,8 @@ export default function LegacyApp({ initialPage = "" }) {
         accessToken: auth.access_token,
         refreshToken: auth.refresh_token
       });
+      setAuditLogsLoaded(false);
+      setData((current) => ({ ...current, "audit-logs": [] }));
       setCurrentUser({ username: matchedUser.username, name: matchedUser.name, role, permissions });
       setAuthenticated(true);
       setLoginError("");
@@ -873,6 +891,8 @@ export default function LegacyApp({ initialPage = "" }) {
     setAuthenticated(false);
     setCurrentUser({ username: "", name: "", role: "", permissions: "" });
     setLoginValue({ username: "", password: "" });
+    setAuditLogsLoaded(false);
+    setData((current) => ({ ...current, "audit-logs": [] }));
     setActive("dashboard");
   }
 
