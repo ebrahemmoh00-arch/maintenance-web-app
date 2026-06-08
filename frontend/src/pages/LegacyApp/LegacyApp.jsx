@@ -43,7 +43,7 @@ import MetricCard from "../../components/MetricCard";
 import { BarChart, DonutChart, LineChart } from "../../components/Charts";
 import EmptyState from "../../components/EmptyState";
 
-const EMPLOYEE_ROLE_OPTIONS = ["viewer", "technician", "engineer", "supervisor", "store_keeper", "maintenance_manager", "branch_manager", "admin"];
+const EMPLOYEE_ROLE_OPTIONS = ["admin", "engineer", "store_keeper", "viewer"];
 const MANAGEMENT_JOB_TITLES = [
   "Branch Manager",
   "Operation & Maintenance Manager",
@@ -336,6 +336,8 @@ function normalizeEmployeeRole(role = "viewer") {
   const normalized = String(role || "viewer").toLowerCase().trim().replaceAll(" ", "_").replaceAll("-", "_");
   if (normalized === "super_admin") return "admin";
   if (normalized === "user") return "viewer";
+  if (["technician", "supervisor", "maintenance_manager", "branch_manager"].includes(normalized)) return "engineer";
+  if (normalized === "storekeeper") return "store_keeper";
   return EMPLOYEE_ROLE_OPTIONS.includes(normalized) ? normalized : "viewer";
 }
 
@@ -343,36 +345,10 @@ function createRolePermissions(role = "viewer") {
   const normalized = normalizeEmployeeRole(role);
   if (normalized === "admin") return createFullPermissions();
   const permissions = createDefaultPermissions();
-  if (normalized === "branch_manager") {
-    permissions.equipment = { view: true, add: true, edit: true, delete: true };
-    permissions["work-orders"] = { view: true, add: true, edit: true, delete: true };
-    permissions.reports = { view: true, add: false, edit: false, delete: false };
-    permissions["audit-logs"] = { view: true, add: false, edit: false, delete: false };
-    permissions.engineers = { view: true, add: false, edit: false, delete: false };
-  }
-  if (normalized === "maintenance_manager") {
-    permissions.equipment = { view: true, add: true, edit: true, delete: true };
-    permissions["work-orders"] = { view: true, add: true, edit: true, delete: true };
-    permissions["preventive-maintenance"] = { view: true, add: true, edit: true, delete: true };
-    permissions.inventory = { view: true, add: true, edit: true, delete: true };
-    permissions.reports = { view: true, add: false, edit: false, delete: false };
-    permissions["audit-logs"] = { view: true, add: false, edit: false, delete: false };
-    permissions.engineers = { view: true, add: false, edit: false, delete: false };
-  }
   if (normalized === "engineer") {
     permissions.equipment = { view: true, add: false, edit: true, delete: false };
     permissions["work-orders"] = { view: true, add: true, edit: true, delete: false };
     permissions["preventive-maintenance"] = { view: true, add: false, edit: true, delete: false };
-    permissions.inventory = { view: true, add: false, edit: false, delete: false };
-  }
-  if (normalized === "supervisor") {
-    permissions["work-orders"] = { view: true, add: true, edit: true, delete: false };
-    permissions["preventive-maintenance"] = { view: true, add: true, edit: true, delete: false };
-    permissions.engineers = { view: true, add: false, edit: false, delete: false };
-  }
-  if (normalized === "technician") {
-    permissions["work-orders"] = { view: true, add: false, edit: true, delete: false };
-    permissions["preventive-maintenance"] = { view: true, add: false, edit: false, delete: false };
     permissions.inventory = { view: true, add: false, edit: false, delete: false };
   }
   if (normalized === "store_keeper") {
@@ -3005,10 +2981,11 @@ function employeeRoleLabel(role) {
   const labels = {
     admin: "Admin",
     engineer: "Engineer",
-    viewer: "Viewer",
-    user: "Viewer"
+    store_keeper: "Store Keeper",
+    viewer: "Regular User",
+    user: "Regular User"
   };
-  return labels[normalizeEmployeeRole(role)] || "Viewer";
+  return labels[normalizeEmployeeRole(role)] || "Regular User";
 }
 
 function jobTitleOptions(jobTitles = [], employees = []) {
@@ -4420,6 +4397,7 @@ function RoleBadge({ value }) {
   const tone = {
     admin: "border-red-200 bg-red-50 text-red-700",
     engineer: "border-blue-200 bg-blue-50 text-blue-700",
+    store_keeper: "border-amber-200 bg-amber-50 text-amber-700",
     viewer: "border-slate-200 bg-slate-100 text-slate-600"
   }[role] || "border-slate-200 bg-slate-100 text-slate-600";
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${tone}`}>{employeeRoleLabel(role)}</span>;
@@ -6415,6 +6393,7 @@ const VALUE_AR = {
 };
 
 function valueLabel(value, language) {
+  if (EMPLOYEE_ROLE_OPTIONS.includes(String(value))) return employeeRoleLabel(value);
   return language === "ar" ? VALUE_AR[value] || VALUE_AR[String(value).replace("_", " ")] || value : String(value || "unknown").replace("_", " ");
 }
 
