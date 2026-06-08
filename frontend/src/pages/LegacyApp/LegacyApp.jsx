@@ -4691,6 +4691,7 @@ function AuditLogDetails({ log, onClose }) {
   const oldValues = parseAuditJson(log.old_values);
   const newValues = parseAuditJson(log.new_values);
   const fields = auditChangedFields(oldValues, newValues);
+  const summary = auditChangeSummary(log, oldValues, newValues, fields);
   return (
     <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -4706,19 +4707,16 @@ function AuditLogDetails({ log, onClose }) {
         <InfoTile icon={Activity} title="Action" text={`${log.module} / ${log.action}`} />
         <InfoTile icon={Filter} title="Changed Fields" text={fields.length ? fields.join(", ") : "Snapshot only"} />
       </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <AuditJsonBlock title="Old Values" value={oldValues} />
-        <AuditJsonBlock title="New Values" value={newValues} />
-      </div>
+      <AuditChangeSummary text={summary} />
     </div>
   );
 }
 
-function AuditJsonBlock({ title, value }) {
+function AuditChangeSummary({ text }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <h4 className="text-sm font-black text-slate-950">{title}</h4>
-      <pre className="mt-3 max-h-80 overflow-auto rounded-lg bg-slate-950 p-4 text-xs font-semibold leading-6 text-slate-100">{JSON.stringify(value || {}, null, 2)}</pre>
+    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+      <h4 className="text-sm font-black text-slate-950">Change Summary</h4>
+      <p className="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">{text}</p>
     </div>
   );
 }
@@ -4759,6 +4757,41 @@ function parseAuditJson(value) {
 function auditChangedFields(oldValues, newValues) {
   const keys = new Set([...Object.keys(oldValues || {}), ...Object.keys(newValues || {})]);
   return [...keys].filter((key) => JSON.stringify(oldValues?.[key]) !== JSON.stringify(newValues?.[key]));
+}
+
+function auditChangeSummary(log, oldValues, newValues, fields) {
+  const action = String(log.action || "").toUpperCase();
+  if (oldValues?.deleted_count) {
+    return `Deleted ${oldValues.deleted_count} selected audit log entries.`;
+  }
+  if (fields.length) {
+    const readable = fields
+      .filter((field) => field !== "deleted_logs")
+      .slice(0, 3)
+      .map((field) => `${humanizeAuditField(field)} changed from ${formatAuditValue(oldValues?.[field])} to ${formatAuditValue(newValues?.[field])}`);
+    const extra = fields.length > 3 ? `, plus ${fields.length - 3} more field${fields.length - 3 === 1 ? "" : "s"}` : "";
+    return `${readable.join("; ")}${extra}.`;
+  }
+  if (action === "LOGIN") return log.status === "FAILED" ? "Login attempt failed." : "User logged in successfully.";
+  if (action === "LOGOUT") return "User logged out.";
+  if (action === "CREATE") return log.description || "A new record was created.";
+  if (action === "DELETE") return log.description || "The selected record was deleted.";
+  if (action === "EXPORT") return log.description || "A report export was completed.";
+  return log.description || "No field-level changes were recorded.";
+}
+
+function humanizeAuditField(field) {
+  return String(field || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatAuditValue(value) {
+  if (value === null || value === undefined || value === "") return "empty";
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  if (typeof value === "object") return "structured data";
+  const text = String(value);
+  return text.length > 70 ? `${text.slice(0, 70)}...` : text;
 }
 
 function formatAuditTimestamp(value) {
