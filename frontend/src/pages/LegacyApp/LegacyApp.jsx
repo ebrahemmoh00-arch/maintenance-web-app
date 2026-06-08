@@ -1672,7 +1672,7 @@ function ParticipantFilterList({ title, rows, selectedNames, setSelectedNames })
   }
 
   return (
-    <div className="relative z-30">
+    <div className="relative z-30 ml-auto">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -1686,7 +1686,7 @@ function ParticipantFilterList({ title, rows, selectedNames, setSelectedNames })
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15">
           <div className="mb-3 flex items-center justify-between gap-2">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{title}</p>
             <button
@@ -1793,7 +1793,7 @@ function ParticipationBarChart({ rows, color }) {
                 {rows.map((row) => (
                   <p
                     key={row.label}
-                    className="w-full break-words pr-1 text-right font-black leading-snug text-slate-800"
+                    className="w-full break-words text-center font-black leading-snug text-slate-800"
                     style={{ fontSize: labelFontSize, minHeight: rowCount > 14 ? "64px" : "48px", overflowWrap: "anywhere" }}
                     title={row.label}
                   >
