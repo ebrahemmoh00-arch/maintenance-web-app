@@ -5866,14 +5866,27 @@ function buildTopDowntimeAssets(workOrders, equipment) {
 
 function buildBreakdownTrend(workOrders, equipment) {
   const buckets = createMonthBuckets();
-  for (const order of workOrders.filter(isReliabilityFaultOrder)) {
-    const key = toMonthKey(getWorkOrderSavedDate(order) || order.scheduled_date || order.due_date || order.created_at);
+  for (const order of workOrders.filter(isBreakdownTrendOrder)) {
+    const key = toMonthKey(getWorkOrderOperationalDate(order));
     if (buckets.has(key)) buckets.set(key, buckets.get(key) + 1);
   }
   const currentKey = toMonthKey(new Date());
   const activeBreakdowns = equipment.filter((asset) => equipmentIndustrialStatus(asset) === "Breakdown").length;
   if (activeBreakdowns && buckets.has(currentKey)) buckets.set(currentKey, buckets.get(currentKey) + activeBreakdowns);
   return [...buckets.entries()].map(([key, value]) => ({ label: monthLabel(key), value }));
+}
+
+function getWorkOrderOperationalDate(order) {
+  const meta = parseWorkOrderNotes(order.notes);
+  return meta.start_date || order.scheduled_date || order.due_date || "";
+}
+
+function isBreakdownTrendOrder(order) {
+  const meta = parseWorkOrderNotes(order.notes);
+  const status = String(order.status || "").toLowerCase();
+  const maintenanceType = String(meta.maintenance_type || order.type || "").toLowerCase();
+  const text = `${order.title || ""} ${order.description || ""}`.toLowerCase();
+  return ["breakdown", "fault", "down"].some((keyword) => maintenanceType.includes(keyword) || status.includes(keyword) || text.includes(keyword));
 }
 
 function buildWorkOrderStatusPie(workOrders, language = "en") {
