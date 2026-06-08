@@ -1468,15 +1468,12 @@ function DashboardFilterBar({ filters, setFilters, options, language }) {
     { key: "dateTo", label: "To Date", type: "date" },
     { key: "location", label: "Site", options: options.locations },
     { key: "category", label: "Asset Category", options: options.categories },
-    { key: "equipment", label: "Equipment", options: options.equipment },
-    { key: "maintenanceType", label: "Maintenance Type", options: options.maintenanceTypes },
-    { key: "priority", label: "Priority Level", options: options.priorities },
-    { key: "status", label: "Status", options: options.statuses }
+    { key: "equipment", label: "Equipment", options: options.equipment }
   ];
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {fields.map((field) => (
           <label key={field.key} className="block">
             <span className="mb-2 block text-xs font-black text-slate-800">{t(field.label)}</span>
