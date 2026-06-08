@@ -4595,7 +4595,7 @@ function AuditLogsPanel({ logs = [], language, canDelete = false, onDeleteSelect
                       />
                     </th>
                   ) : null}
-                  {["Date & Time", "User", "Role", "Module", "Action", "Record", "Description", "IP Address", "Details"].map((heading) => (
+                  {["Date & Time", "User", "Role", "Module", "Action", "Description", "IP Address", "Details"].map((heading) => (
                     <th key={heading} className="whitespace-nowrap px-4 py-3 text-left font-black">{heading}</th>
                   ))}
                 </tr>
@@ -4623,7 +4623,6 @@ function AuditLogsPanel({ logs = [], language, canDelete = false, onDeleteSelect
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.role || "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.module}</td>
                     <td className="whitespace-nowrap px-4 py-3"><AuditActionBadge action={log.action} status={log.status} /></td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.record_id || "-"}</td>
                     <td className="max-w-[320px] truncate px-4 py-3 text-slate-600">{log.description}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.ip_address || "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -4636,7 +4635,7 @@ function AuditLogsPanel({ logs = [], language, canDelete = false, onDeleteSelect
                 ))}
                 {!filteredLogs.length ? (
                   <tr>
-                    <td colSpan={canDelete ? 10 : 9} className="px-4 py-12 text-center text-sm font-semibold text-slate-500">
+                    <td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-sm font-semibold text-slate-500">
                       No audit logs match the current filters.
                     </td>
                   </tr>
@@ -4786,7 +4785,6 @@ function auditExportRows(logs) {
     Role: log.role || "",
     Module: log.module || "",
     Action: log.action || "",
-    Record: log.record_id || "",
     Description: log.description || "",
     "IP Address": log.ip_address || "",
     Status: log.status || ""
@@ -4795,21 +4793,21 @@ function auditExportRows(logs) {
 
 function exportAuditCsv(logs) {
   const rows = auditExportRows(logs);
-  const headers = Object.keys(rows[0] || { "Date & Time": "", User: "", Role: "", Module: "", Action: "", Record: "", Description: "", "IP Address": "", Status: "" });
+  const headers = Object.keys(rows[0] || { "Date & Time": "", User: "", Role: "", Module: "", Action: "", Description: "", "IP Address": "", Status: "" });
   const csv = [headers.join(","), ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? "").replaceAll('"', '""')}"`).join(","))].join("\n");
   downloadTextFile(`audit-logs-${todayFileStamp()}.csv`, csv, "text/csv;charset=utf-8");
 }
 
 function exportAuditExcel(logs) {
   const rows = auditExportRows(logs);
-  const headers = Object.keys(rows[0] || { "Date & Time": "", User: "", Role: "", Module: "", Action: "", Record: "", Description: "", "IP Address": "", Status: "" });
+  const headers = Object.keys(rows[0] || { "Date & Time": "", User: "", Role: "", Module: "", Action: "", Description: "", "IP Address": "", Status: "" });
   const table = `<table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   downloadTextFile(`audit-logs-${todayFileStamp()}.xls`, table, "application/vnd.ms-excel;charset=utf-8");
 }
 
 function exportAuditPdf(logs) {
   const rows = auditExportRows(logs);
-  const headers = Object.keys(rows[0] || { "Date & Time": "", User: "", Role: "", Module: "", Action: "", Record: "", Description: "", "IP Address": "", Status: "" });
+  const headers = Object.keys(rows[0] || { "Date & Time": "", User: "", Role: "", Module: "", Action: "", Description: "", "IP Address": "", Status: "" });
   const table = `<table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   const win = window.open("", "_blank");
   if (!win) return;
