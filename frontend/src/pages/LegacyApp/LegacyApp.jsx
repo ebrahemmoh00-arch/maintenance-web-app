@@ -1473,7 +1473,7 @@ function DashboardFilterBar({ filters, setFilters, options, language }) {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {fields.map((field) => (
           <label key={field.key} className="block">
             <span className="mb-2 block text-xs font-black text-slate-800">{t(field.label)}</span>
