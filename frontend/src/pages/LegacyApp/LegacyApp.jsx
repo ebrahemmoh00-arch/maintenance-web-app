@@ -4691,9 +4691,19 @@ function auditChangedFields(oldValues, newValues) {
 
 function formatAuditTimestamp(value) {
   if (!value) return "-";
-  const date = new Date(value);
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(String(value));
+  const date = new Date(hasTimezone ? value : `${value}Z`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  }).format(date);
 }
 
 function auditExportRows(logs) {

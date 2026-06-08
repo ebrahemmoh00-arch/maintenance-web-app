@@ -4,10 +4,12 @@ import json
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .database import get_connection, insert_row
 
 AUDIT_CONTEXT: ContextVar[dict[str, Any] | None] = ContextVar("audit_context", default=None)
+EGYPT_TIMEZONE = ZoneInfo("Africa/Cairo")
 
 SENSITIVE_KEYS = {"password", "access_token", "refresh_token", "token", "token_jti"}
 
@@ -141,7 +143,7 @@ class AuditService:
     ) -> dict[str, Any]:
         context = {**current_audit_context(), **(context or {})}
         row = {
-            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "timestamp": datetime.now(EGYPT_TIMEZONE).isoformat(timespec="seconds"),
             "user_id": str(context.get("user_id", "")),
             "user_name": str(context.get("user_name", "")),
             "role": str(context.get("role", "")),
