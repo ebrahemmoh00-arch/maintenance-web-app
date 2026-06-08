@@ -613,6 +613,8 @@ Object.assign(AR, {
   "View Only Access": "صلاحية مشاهدة فقط",
   "You are signed in with view-only permissions. Editing, adding, deleting, and saving are available for admin only.": "تم تسجيل الدخول بصلاحية مشاهدة فقط. الإضافة والتعديل والحذف والحفظ متاحة للمدير فقط.",
   "Admin Only": "للمدير فقط",
+  "Open Selected": "فتح المحدد",
+  "Viewing Saved Work Order": "عرض أمر عمل محفوظ",
   "All Equipment": "كل المعدات",
   "All Dates": "كل التواريخ",
   "Select equipment first": "اختر المعدة أولاً",
@@ -3304,9 +3306,11 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
   const [selectedSavedId, setSelectedSavedId] = useState(rows[0]?.id || "");
   const [savedFilter, setSavedFilter] = useState({ equipmentId: "", date: "" });
   const [editingId, setEditingId] = useState(null);
+  const [viewingSavedId, setViewingSavedId] = useState(null);
   const [form, setForm] = useState(() => createWorkOrderForm({ equipment, customers, engineers, rows }));
   const [qrOpen, setQrOpen] = useState(false);
   const [qrMessage, setQrMessage] = useState("");
+  const workOrderSectionRef = useRef(null);
   const videoRef = useRef(null);
   const qrStreamRef = useRef(null);
   const selectedEquipment = equipment.find((item) => Number(item.id) === Number(form.equipment_id));
@@ -3492,15 +3496,32 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
 
   function newWorkOrder() {
     setEditingId(null);
+    setViewingSavedId(null);
     setForm(createWorkOrderForm({ equipment, customers, engineers, rows }));
+  }
+
+  function openSelected(id = selectedSavedId) {
+    const selected = rows.find((row) => Number(row.id) === Number(id));
+    if (!selected) return;
+    setSelectedSavedId(selected.id);
+    setEditingId(null);
+    setViewingSavedId(selected.id);
+    setForm(formFromSavedOrder(selected, equipment, customers, engineers));
+    window.requestAnimationFrame(() => {
+      workOrderSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function editSelected() {
     if (!canEdit) return;
     const selected = rows.find((row) => Number(row.id) === Number(selectedSavedId));
     if (!selected) return;
+    setViewingSavedId(null);
     setEditingId(selected.id);
     setForm(formFromSavedOrder(selected, equipment, customers, engineers));
+    window.requestAnimationFrame(() => {
+      workOrderSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function deleteSelected() {
@@ -3510,10 +3531,12 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
     if (!confirmed) return;
     await onDelete(selectedSavedId);
     setEditingId(null);
+    setViewingSavedId(null);
     setSelectedSavedId("");
   }
 
   async function saveWorkOrder() {
+    if (viewingSavedId && !editingId) return;
     if (editingId && !canEdit) return;
     if (!editingId && !canCreate) return;
     if (!form.customer_id || !form.equipment_id || !form.engineer_id) {
@@ -3555,6 +3578,7 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
       }
       setEditingId(null);
       if (!wasEditing) {
+        setViewingSavedId(null);
         setForm((current) => ({ ...current, wo_no: String(Number(current.wo_no || 0) + 1).padStart(4, "0") }));
       }
     }
@@ -3595,11 +3619,16 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section ref={workOrderSectionRef} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 px-5 py-4 text-white">
           <div>
             <h2 className="text-xl font-black">{t("Work Order")}: {selectedCustomer?.name || "Customer"} / {selectedEquipment?.name || "Asset"}</h2>
             <p className="mt-1 text-sm text-slate-300">{t("Create a work order using the current service hours from the maintenance record.")}</p>
+            {viewingSavedId ? (
+              <p className="mt-2 inline-flex rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">
+                {t("Viewing Saved Work Order")}
+              </p>
+            ) : null}
           </div>
           <button type="button" onClick={onBackToEquipment} className="rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950 hover:bg-slate-100">
             {t("Back to Equipment")}
@@ -3764,7 +3793,7 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
           <PhotoUploader title={t("After Maintenance Photos")} photos={form.after_photos} onChange={(photos) => updatePhotos("after_photos", photos)} uploadLabel={t("Upload Photos")} />
         </div>
 
-        {(canCreate || (editingId && canEdit)) ? (
+        {((editingId && canEdit) || (!editingId && !viewingSavedId && canCreate)) ? (
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
             <button type="button" onClick={saveWorkOrder} className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-800">
               <Save className="h-4 w-4" /> {editingId ? t("Save Changes") : t("Save Work Order")}
@@ -3777,6 +3806,7 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
         title={t("Saved Work Orders")}
         actions={
           <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={openSelected} disabled={!selectedSavedId} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">{t("Open Selected")}</button>
             {canEdit ? <button type="button" onClick={editSelected} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit Selected")}</button> : null}
             {canDelete ? <button type="button" onClick={deleteSelected} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50">{t("Delete Selected")}</button> : null}
             <button type="button" onClick={exportWorkOrderPdf} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"><Printer className="h-4 w-4" />{t("Export PDF")}</button>
@@ -3797,7 +3827,7 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
           }}
           language={language}
         />
-        <SavedWorkOrdersTable rows={filteredSavedRows} selectedId={selectedSavedId} setSelectedId={setSelectedSavedId} language={language} />
+        <SavedWorkOrdersTable rows={filteredSavedRows} selectedId={selectedSavedId} setSelectedId={setSelectedSavedId} onOpen={openSelected} language={language} />
       </Panel>
     </div>
   );
@@ -4094,7 +4124,7 @@ function SavedWorkOrderFilters({ equipment, dates, value, onChange, language }) 
   );
 }
 
-function SavedWorkOrdersTable({ rows, selectedId, setSelectedId, language }) {
+function SavedWorkOrdersTable({ rows, selectedId, setSelectedId, onOpen, language }) {
   const t = (text) => tr(language, text);
   return (
     <div className="overflow-hidden rounded-xl border border-slate-300 bg-white">
@@ -4120,7 +4150,12 @@ function SavedWorkOrdersTable({ rows, selectedId, setSelectedId, language }) {
               const reference = meta.wo_reference || `${row.customer_name || ""} ${row.equipment_name || ""}`.trim();
               const savedDate = getWorkOrderSavedDate(row);
               return (
-                <tr key={row.id} className={Number(row.id) === Number(selectedId) ? "bg-blue-50" : "odd:bg-white even:bg-slate-50"}>
+                <tr
+                  key={row.id}
+                  onClick={() => setSelectedId(row.id)}
+                  onDoubleClick={() => onOpen?.(row.id)}
+                  className={`cursor-pointer ${Number(row.id) === Number(selectedId) ? "bg-blue-50" : "odd:bg-white even:bg-slate-50"} hover:bg-cyan-50`}
+                >
                   <td className="border border-slate-300 px-2 py-2 text-center">
                     <input type="radio" checked={Number(row.id) === Number(selectedId)} onChange={() => setSelectedId(row.id)} />
                   </td>
