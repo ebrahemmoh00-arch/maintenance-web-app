@@ -1,5 +1,5 @@
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-const API_BASE =
+export const API_BASE =
   import.meta.env.VITE_API_BASE ||
   (isLocalHost ? "http://127.0.0.1:8000/api" : "https://cmms-system.onrender.com/api");
 
@@ -23,6 +23,7 @@ export const api = {
   create: (resource, data) => request(`/${resource}`, { method: "POST", body: JSON.stringify(data) }),
   update: (resource, id, data) => request(`/${resource}/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (resource, id) => request(`/${resource}/${id}`, { method: "DELETE" }),
+  dashboard: () => request("/dashboard/stats"),
   stats: () => request("/dashboard/stats"),
   schedule: () => request("/schedule"),
   alerts: () => request("/maintenance-alerts"),
