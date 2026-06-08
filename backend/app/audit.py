@@ -239,6 +239,37 @@ class AuditService:
         raise HTTPException(status_code=404, detail="Audit log not found")
 
     @staticmethod
+    def delete_logs(log_ids: list[int], current_user: Any) -> dict[str, Any]:
+        ids = sorted({int(log_id) for log_id in log_ids if int(log_id) > 0})
+        if not ids:
+            return {"deleted": 0, "ids": []}
+
+        placeholders = ", ".join(["?"] * len(ids))
+        with get_connection() as db:
+            rows = db.execute(f"SELECT * FROM audit_logs WHERE id IN ({placeholders})", ids).fetchall()
+            snapshots = [dict(row) for row in rows]
+            existing_ids = [int(row["id"]) for row in snapshots]
+            if existing_ids:
+                delete_placeholders = ", ".join(["?"] * len(existing_ids))
+                db.execute(f"DELETE FROM audit_logs WHERE id IN ({delete_placeholders})", existing_ids)
+                db.commit()
+
+        AuditService.log_event(
+            action="DELETE",
+            module="Audit Logs",
+            record_id=", ".join(str(item) for item in existing_ids),
+            description=f"Deleted {len(existing_ids)} selected audit log entries",
+            old_values={"deleted_ids": existing_ids, "deleted_count": len(existing_ids), "deleted_logs": snapshots},
+            new_values={},
+            context={
+                "user_id": getattr(current_user, "id", ""),
+                "user_name": getattr(current_user, "name", "") or getattr(current_user, "username", ""),
+                "role": getattr(current_user, "role", ""),
+            },
+        )
+        return {"deleted": len(existing_ids), "ids": existing_ids}
+
+    @staticmethod
     def _branch_user_ids(work_location: str) -> list[int]:
         with get_connection() as db:
             rows = db.execute("SELECT id FROM engineers WHERE work_location = ?", (work_location,)).fetchall()

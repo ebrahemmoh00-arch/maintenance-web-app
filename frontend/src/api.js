@@ -161,6 +161,7 @@ export const api = {
     }
   },
   auditExport: (format) => request("/audit-logs/export", { method: "POST", body: JSON.stringify({ format }) }),
+  auditDelete: (ids) => request("/audit-logs", { method: "DELETE", body: JSON.stringify({ ids }) }),
   list: (resource) => request(`/${resource}`),
   create: (resource, data) => request(`/${resource}`, { method: "POST", body: JSON.stringify(data) }),
   update: (resource, id, data) => request(`/${resource}/${id}`, { method: "PUT", body: JSON.stringify(data) }),

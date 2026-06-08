@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..audit import AuditService
 from ..auth import CurrentUser, get_current_user, require_permission
-from ..schemas import AuditExportRequest, AuditLog
+from ..schemas import AuditDeleteRequest, AuditExportRequest, AuditLog
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
@@ -51,6 +51,13 @@ def export_audit_logs(payload: AuditExportRequest, current_user: CurrentUser = D
         },
     )
     return {"ok": True}
+
+
+@router.delete("")
+def delete_audit_logs(payload: AuditDeleteRequest, current_user: CurrentUser = Depends(require_permission("audit_logs:delete"))):
+    if current_user.role not in {"admin", "super_admin"}:
+        raise HTTPException(status_code=403, detail="Access Denied")
+    return AuditService.delete_logs(payload.ids, current_user)
 
 
 @router.get("/{log_id}", response_model=AuditLog)

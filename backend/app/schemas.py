@@ -124,6 +124,10 @@ class AuditExportRequest(BaseModel):
     format: str = "CSV"
 
 
+class AuditDeleteRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list)
+
+
 class JobTitleBase(BaseModel):
     name: str = Field(min_length=1)
 

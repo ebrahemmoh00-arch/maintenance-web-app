@@ -839,6 +839,18 @@ export default function LegacyApp({ initialPage = "" }) {
     }
   }
 
+  async function deleteAuditLogs(ids) {
+    if (!isAdmin || !ids.length) return false;
+    try {
+      await api.auditDelete(ids);
+      await loadAuditLogs();
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }
+
   useEffect(() => {
     if (authenticated) {
       loadAll();
@@ -1270,7 +1282,7 @@ export default function LegacyApp({ initialPage = "" }) {
               language={language}
             />
           )}
-          {!loading && page === "reports" && <Reports data={data} alerts={alerts} stats={stats} language={language} canViewAuditLogs={hasPermission(currentUser, "audit-logs", "view")} />}
+          {!loading && page === "reports" && <Reports data={data} alerts={alerts} stats={stats} language={language} canViewAuditLogs={hasPermission(currentUser, "audit-logs", "view")} canDeleteAuditLogs={isAdmin} onDeleteAuditLogs={deleteAuditLogs} />}
           {!loading && page === "settings" && <SettingsSummary data={data} language={language} onAccessControl={() => setActive("access-control")} isAdmin={isAdmin} />}
           {!loading && page === "access-control" && isAdmin && (
             <AccessControlPage
@@ -4397,7 +4409,7 @@ function CrudPage({ resourceKey, rows, onCreate, onEdit, onDelete, canManage = t
   );
 }
 
-function Reports({ data, alerts, stats, language, canViewAuditLogs = false }) {
+function Reports({ data, alerts, stats, language, canViewAuditLogs = false, canDeleteAuditLogs = false, onDeleteAuditLogs }) {
   const t = (text) => tr(language, text);
   return (
     <>
@@ -4407,24 +4419,60 @@ function Reports({ data, alerts, stats, language, canViewAuditLogs = false }) {
         <MetricCard label={t("Assets Monitored")} value={data.equipment.length} icon={Wrench} tone="cyan" />
       </div>
       <AnalyticsSection data={data} alerts={alerts} language={language} />
-      {canViewAuditLogs ? <AuditLogsPanel logs={data["audit-logs"] || []} language={language} /> : null}
+      {canViewAuditLogs ? <AuditLogsPanel logs={data["audit-logs"] || []} language={language} canDelete={canDeleteAuditLogs} onDeleteSelected={onDeleteAuditLogs} /> : null}
     </>
   );
 }
 
-function AuditLogsPanel({ logs = [], language }) {
+function AuditLogsPanel({ logs = [], language, canDelete = false, onDeleteSelected }) {
   const t = (text) => tr(language, text);
   const [filters, setFilters] = useState({ search: "", role: "", module: "", action: "", status: "", from: "", to: "" });
   const [selectedLog, setSelectedLog] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [deleting, setDeleting] = useState(false);
   const modules = uniqueValues(logs, "module");
   const actions = uniqueValues(logs, "action");
   const roles = uniqueValues(logs, "role");
   const statuses = uniqueValues(logs, "status");
   const filteredLogs = logs.filter((log) => auditLogMatches(log, filters));
+  const filteredIds = filteredLogs.map((log) => Number(log.id));
+  const selectedInFiltered = selectedIds.filter((id) => filteredIds.includes(Number(id)));
+  const allFilteredSelected = Boolean(filteredIds.length) && selectedInFiltered.length === filteredIds.length;
   const failedLogins = logs.filter((log) => log.action === "LOGIN" && log.status === "FAILED").length;
   const assetChanges = logs.filter((log) => log.module === "Assets").length;
   const workOrderUpdates = logs.filter((log) => log.module === "Work Orders").length;
   const activeUsers = Object.keys(groupCount(logs, "user_name")).length;
+
+  useEffect(() => {
+    setSelectedIds((current) => current.filter((id) => logs.some((log) => Number(log.id) === Number(id))));
+  }, [logs]);
+
+  function toggleLogSelection(logId) {
+    const id = Number(logId);
+    setSelectedIds((current) => (
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    ));
+  }
+
+  function toggleFilteredSelection() {
+    setSelectedIds((current) => {
+      if (allFilteredSelected) return current.filter((id) => !filteredIds.includes(Number(id)));
+      return [...new Set([...current, ...filteredIds])];
+    });
+  }
+
+  async function deleteSelectedLogs() {
+    if (!canDelete || !selectedIds.length || !onDeleteSelected) return;
+    const confirmed = window.confirm(`Delete ${selectedIds.length} selected audit log entries?`);
+    if (!confirmed) return;
+    setDeleting(true);
+    const ok = await onDeleteSelected(selectedIds);
+    setDeleting(false);
+    if (ok) {
+      setSelectedIds([]);
+      setSelectedLog(null);
+    }
+  }
 
   async function exportLogs(format) {
     await api.auditExport(format).catch(() => null);
@@ -4439,6 +4487,17 @@ function AuditLogsPanel({ logs = [], language }) {
       subtitle="Security audit trail for login, logout, create, update, delete, role changes, and critical operational actions."
       actions={
         <div className="flex flex-wrap gap-2">
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={deleteSelectedLogs}
+              disabled={!selectedIds.length || deleting}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deleting ? "Deleting..." : `Delete Selected (${selectedIds.length})`}
+            </button>
+          ) : null}
           <button type="button" onClick={() => exportLogs("csv")} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300">CSV</button>
           <button type="button" onClick={() => exportLogs("excel")} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300">Excel</button>
           <button type="button" onClick={() => exportLogs("pdf")} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800">
@@ -4490,6 +4549,17 @@ function AuditLogsPanel({ logs = [], language }) {
             <table className="min-w-[1100px] w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500">
                 <tr>
+                  {canDelete ? (
+                    <th className="whitespace-nowrap px-4 py-3 text-left font-black">
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleFilteredSelection}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-700"
+                        title="Select visible logs"
+                      />
+                    </th>
+                  ) : null}
                   {["Date & Time", "User", "Role", "Module", "Action", "Record", "Description", "IP Address", "Details"].map((heading) => (
                     <th key={heading} className="whitespace-nowrap px-4 py-3 text-left font-black">{heading}</th>
                   ))}
@@ -4497,7 +4567,22 @@ function AuditLogsPanel({ logs = [], language }) {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-cyan-50/50">
+                  <tr
+                    key={log.id}
+                    onClick={canDelete ? () => toggleLogSelection(log.id) : undefined}
+                    className={`transition ${canDelete ? "cursor-pointer" : ""} ${selectedIds.includes(Number(log.id)) ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : "hover:bg-cyan-50/50"}`}
+                  >
+                    {canDelete ? (
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(Number(log.id))}
+                          onChange={() => toggleLogSelection(log.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-700"
+                        />
+                      </td>
+                    ) : null}
                     <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">{formatAuditTimestamp(log.timestamp)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-black text-slate-900">{log.user_name || "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.role || "-"}</td>
@@ -4507,7 +4592,7 @@ function AuditLogsPanel({ logs = [], language }) {
                     <td className="max-w-[320px] truncate px-4 py-3 text-slate-600">{log.description}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.ip_address || "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <button type="button" onClick={() => setSelectedLog(log)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                      <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedLog(log); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">
                         <Eye className="h-3.5 w-3.5" />
                         Open
                       </button>
@@ -4516,7 +4601,7 @@ function AuditLogsPanel({ logs = [], language }) {
                 ))}
                 {!filteredLogs.length ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-sm font-semibold text-slate-500">
+                    <td colSpan={canDelete ? 10 : 9} className="px-4 py-12 text-center text-sm font-semibold text-slate-500">
                       No audit logs match the current filters.
                     </td>
                   </tr>
