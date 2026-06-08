@@ -3013,10 +3013,7 @@ function createDashboardFilters() {
     dateTo: "",
     category: "all",
     equipment: "all",
-    location: "all",
-    maintenanceType: "all",
-    priority: "all",
-    status: "all"
+    location: "all"
   };
 }
 
@@ -3046,15 +3043,6 @@ function buildDashboardFilterOptions(data, alerts, language = "en") {
     label: asset.name || `Asset ${asset.id}`
   }));
 
-  const maintenanceTypes = uniqueSorted([
-    ...workOrders.map((order) => parseWorkOrderNotes(order.notes).maintenance_type),
-    ...pmTasks.map((task) => task.task_name),
-    "Service",
-    "Condition Based / Predictive",
-    "Periodic / Time based",
-    "Breakdown"
-  ]).map((value) => ({ value, label: valueLabel(value, language) }));
-
   const locations = uniqueSorted([
     ...(data.customers || []).map((customer) => customer.name),
     ...equipment.map((asset) => asset.customer_name || asset.location),
@@ -3063,27 +3051,7 @@ function buildDashboardFilterOptions(data, alerts, language = "en") {
     ...alerts.map((alert) => alert.location)
   ]).map((value) => ({ value, label: value }));
 
-  const priorities = uniqueSorted([
-    ...workOrders.map((order) => order.priority),
-    "low",
-    "medium",
-    "high",
-    "critical"
-  ]).map((value) => ({ value, label: valueLabel(value, language) }));
-
-  const statuses = uniqueSorted([
-    ...workOrders.map((order) => order.status),
-    ...equipment.map((asset) => asset.status),
-    "pending",
-    "in_progress",
-    "completed",
-    "cancelled",
-    "active",
-    "down",
-    "maintenance"
-  ]).map((value) => ({ value, label: valueLabel(value, language) }));
-
-  return { years, months, categories, equipment: equipmentOptions, locations, maintenanceTypes, priorities, statuses };
+  return { years, months, categories, equipment: equipmentOptions, locations };
 }
 
 function applyDashboardFilters(data, alerts, filters) {
@@ -3092,7 +3060,7 @@ function applyDashboardFilters(data, alerts, filters) {
   const equipmentById = new Map(equipment.map((asset) => [Number(asset.id), asset]));
   const workOrderFiltered = workOrders.filter((order) => dashboardWorkOrderMatches(order, equipmentById.get(Number(order.equipment_id)), filters));
   const filteredEquipmentIds = new Set(workOrderFiltered.map((order) => Number(order.equipment_id)).filter(Boolean));
-  const orderScoped = filters.year !== "all" || filters.month !== "all" || filters.dateFrom || filters.dateTo || filters.priority !== "all" || filters.equipment !== "all" || filters.maintenanceType !== "all";
+  const orderScoped = filters.year !== "all" || filters.month !== "all" || filters.dateFrom || filters.dateTo || filters.equipment !== "all";
   const equipmentFiltered = equipment.filter((asset) => {
     if (!dashboardEquipmentMatches(asset, filters)) return false;
     return orderScoped ? filteredEquipmentIds.has(Number(asset.id)) : true;
@@ -3112,8 +3080,6 @@ function applyDashboardFilters(data, alerts, filters) {
         const asset = equipmentById.get(Number(task.equipment_id));
         if (!asset || !equipmentScopeIds.has(Number(asset.id))) return false;
         if (!matchesDashboardDate(task.next_due_date || task.last_service_date, filters)) return false;
-        if (!matchesAnyFilterValue([task.task_name], filters.maintenanceType)) return false;
-        if (filters.status !== "all" && !matchesFilterValue(task.status, filters.status) && !matchesFilterValue(task.pm_alert, filters.status)) return false;
         return true;
       })
     },
@@ -3125,10 +3091,7 @@ function dashboardWorkOrderMatches(order, asset, filters) {
   const meta = parseWorkOrderNotes(order.notes);
   if (!matchesDashboardDate(getWorkOrderSavedDate(order) || order.scheduled_date || order.due_date, filters)) return false;
   if (filters.equipment !== "all" && String(order.equipment_id || "") !== String(filters.equipment)) return false;
-  if (!matchesFilterValue(order.priority, filters.priority)) return false;
-  if (!matchesFilterValue(order.status, filters.status)) return false;
   if (!matchesAnyFilterValue([asset?.asset_type, asset?.asset_level], filters.category)) return false;
-  if (!matchesAnyFilterValue([meta.maintenance_type], filters.maintenanceType)) return false;
   if (!matchesAnyFilterValue([order.customer_name, asset?.customer_name, asset?.location, meta.location], filters.location)) return false;
   return true;
 }
@@ -3137,18 +3100,12 @@ function dashboardEquipmentMatches(asset, filters) {
   if (filters.equipment !== "all" && String(asset.id || "") !== String(filters.equipment)) return false;
   if (!matchesAnyFilterValue([asset.asset_type, asset.asset_level], filters.category)) return false;
   if (!matchesAnyFilterValue([asset.customer_name, asset.location], filters.location)) return false;
-  if (!matchesAnyFilterValue([asset.status, equipmentIndustrialStatus(asset)], filters.status)) return false;
   return true;
 }
 
 function dashboardAlertMatches(alert, filteredEquipment, filters) {
   if (!matchesDashboardDate(alert.next_maintenance_date || alert.created_at, filters)) return false;
   if (!matchesAnyFilterValue([alert.location], filters.location)) return false;
-  if (filters.priority !== "all") {
-    const alertPriority = alert.alert_level === "DUE NOW" ? "critical" : "medium";
-    if (!matchesFilterValue(alertPriority, filters.priority)) return false;
-  }
-  if (filters.status !== "all" && !matchesFilterValue(alert.alert_level, filters.status)) return false;
   if (filters.equipment !== "all") {
     const selectedAsset = filteredEquipment.find((asset) => String(asset.id) === String(filters.equipment));
     return selectedAsset ? normalizeChoice(selectedAsset.name) === normalizeChoice(alert.equipment_name) : false;
