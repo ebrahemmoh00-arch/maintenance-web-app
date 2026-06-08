@@ -147,6 +147,28 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
     revoked_at TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+    user_id TEXT DEFAULT '',
+    user_name TEXT DEFAULT '',
+    role TEXT DEFAULT '',
+    action TEXT DEFAULT '',
+    module TEXT DEFAULT '',
+    record_id TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    old_values TEXT DEFAULT '',
+    new_values TEXT DEFAULT '',
+    ip_address TEXT DEFAULT '',
+    device_info TEXT DEFAULT '',
+    status TEXT DEFAULT 'SUCCESS'
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 """
 
 
@@ -276,6 +298,28 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
     revoked_at TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text)
 );
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    timestamp TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    user_id TEXT DEFAULT '',
+    user_name TEXT DEFAULT '',
+    role TEXT DEFAULT '',
+    action TEXT DEFAULT '',
+    module TEXT DEFAULT '',
+    record_id TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    old_values TEXT DEFAULT '',
+    new_values TEXT DEFAULT '',
+    ip_address TEXT DEFAULT '',
+    device_info TEXT DEFAULT '',
+    status TEXT DEFAULT 'SUCCESS'
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 """
 
 
@@ -381,6 +425,25 @@ def init_db() -> None:
                 "token_type": "TEXT DEFAULT ''",
                 "expires_at": "TEXT DEFAULT ''",
                 "revoked_at": "TEXT DEFAULT ''",
+            },
+        )
+        ensure_columns(
+            db,
+            "audit_logs",
+            {
+                "timestamp": "TEXT DEFAULT ''",
+                "user_id": "TEXT DEFAULT ''",
+                "user_name": "TEXT DEFAULT ''",
+                "role": "TEXT DEFAULT ''",
+                "action": "TEXT DEFAULT ''",
+                "module": "TEXT DEFAULT ''",
+                "record_id": "TEXT DEFAULT ''",
+                "description": "TEXT DEFAULT ''",
+                "old_values": "TEXT DEFAULT ''",
+                "new_values": "TEXT DEFAULT ''",
+                "ip_address": "TEXT DEFAULT ''",
+                "device_info": "TEXT DEFAULT ''",
+                "status": "TEXT DEFAULT 'SUCCESS'",
             },
         )
         seed_data(db)

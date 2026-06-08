@@ -102,6 +102,28 @@ class TokenResponse(BaseModel):
     user: AuthUser
 
 
+class AuditLog(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    timestamp: str
+    user_id: str = ""
+    user_name: str = ""
+    role: str = ""
+    action: str = ""
+    module: str = ""
+    record_id: str = ""
+    description: str = ""
+    old_values: str = ""
+    new_values: str = ""
+    ip_address: str = ""
+    device_info: str = ""
+    status: str = "SUCCESS"
+
+
+class AuditExportRequest(BaseModel):
+    format: str = "CSV"
+
+
 class JobTitleBase(BaseModel):
     name: str = Field(min_length=1)
 

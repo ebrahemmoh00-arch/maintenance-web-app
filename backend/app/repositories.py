@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from .audit import AuditService
 from .database import get_connection, insert_row
 
 MAINTENANCE_ALERT_WINDOW_DAYS = 7
@@ -74,10 +75,12 @@ class Repository:
         with get_connection() as db:
             item_id = insert_row(db, self.table, data)
             db.commit()
-        return self.get(item_id)
+        created = self.get(item_id)
+        AuditService.log_repository_action(self.table, "CREATE", None, created, item_id)
+        return created
 
     def update(self, item_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-        self.get(item_id)
+        old_item = self.get(item_id)
         data = {field: payload[field] for field in self.fields if field in payload and payload[field] is not None}
         if not data:
             return self.get(item_id)
@@ -90,13 +93,16 @@ class Repository:
                 (*data.values(), item_id),
             )
             db.commit()
-        return self.get(item_id)
+        updated = self.get(item_id)
+        AuditService.log_repository_action(self.table, "UPDATE", old_item, {**updated, **({"password": payload["password"]} if "password" in payload else {})}, item_id)
+        return updated
 
     def delete(self, item_id: int) -> dict[str, bool]:
-        self.get(item_id)
+        old_item = self.get(item_id)
         with get_connection() as db:
             db.execute(f"DELETE FROM {self.table} WHERE id = ?", (item_id,))
             db.commit()
+        AuditService.log_repository_action(self.table, "DELETE", old_item, None, item_id)
         return {"ok": True}
 
 
@@ -144,7 +150,9 @@ class JobTitleRepository(Repository):
                 return dict(existing)
             item_id = insert_row(db, "job_titles", {"name": name})
             db.commit()
-        return self.get(item_id)
+        created = self.get(item_id)
+        AuditService.log_repository_action(self.table, "CREATE", None, created, item_id)
+        return created
 
 
 class EquipmentRepository(Repository):
@@ -475,7 +483,17 @@ class PreventiveMaintenanceRepository(Repository):
                     (*allowed.values(), record_id),
                 )
                 db.commit()
-            return self.get(record["pm_task_id"])
+            updated_task = self.get(record["pm_task_id"])
+            updated_record = next((item for item in updated_task.get("previous_records", []) if int(item["id"]) == int(record_id)), record)
+            AuditService.log_event(
+                action="UPDATE",
+                module="Preventive Maintenance",
+                record_id=record_id,
+                description=f"Updated previous maintenance record #{record_id}",
+                old_values=record,
+                new_values=updated_record,
+            )
+            return updated_task
 
     def _with_history(self, item: dict[str, Any]) -> dict[str, Any]:
         item["previous_records"] = self._history(item["id"])

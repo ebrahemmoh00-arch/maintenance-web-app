@@ -31,6 +31,7 @@ class CurrentUser:
     role: str
     permissions: str
     token_jti: str
+    work_location: str = ""
 
 
 ROLE_ALIASES = {
@@ -63,6 +64,8 @@ MODULE_ALIASES = {
     "inventory": "inventory",
     "reports": "reports",
     "settings": "settings",
+    "audit-logs": "audit_logs",
+    "audit_logs": "audit_logs",
 }
 
 READ_ALL = {
@@ -89,6 +92,7 @@ ROLE_PERMISSIONS = {
         "work_orders:create",
         "work_orders:update",
         "work_orders:delete",
+        "audit_logs:read",
     },
     "maintenance_manager": {
         *READ_ALL,
@@ -101,6 +105,7 @@ ROLE_PERMISSIONS = {
         "preventive_maintenance:delete",
         "inventory:write",
         "job_titles:write",
+        "audit_logs:read",
     },
     "engineer": {
         *READ_ALL,
@@ -303,6 +308,7 @@ def authenticate_access_header(authorization: str | None) -> CurrentUser:
         role=public_role(user.get("role")),
         permissions=user.get("permissions", ""),
         token_jti=payload["jti"],
+        work_location=user.get("work_location", ""),
     )
 
 
