@@ -320,7 +320,7 @@ const PERMISSION_MODULES = [
 
 function createDefaultPermissions() {
   return PERMISSION_MODULES.reduce((acc, module) => {
-    acc[module.key] = { view: true, add: false, edit: false, delete: false };
+    acc[module.key] = { view: module.key !== "audit-logs", add: false, edit: false, delete: false };
     return acc;
   }, {});
 }
@@ -802,7 +802,7 @@ export default function LegacyApp({ initialPage = "" }) {
         api.list("job-titles"),
         api.stats(),
         api.alerts(),
-        canViewAuditLogs ? api.list("audit-logs") : Promise.resolve([])
+        canViewAuditLogs ? api.list("audit-logs").catch(() => []) : Promise.resolve([])
       ]);
       setData({ customers, engineers, equipment, "work-orders": workOrders, inventory, "preventive-maintenance": preventiveMaintenance, "job-titles": jobTitles, "audit-logs": auditLogs });
       setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance));
@@ -1359,7 +1359,7 @@ function LoginScreen({ language, setLanguage, value, setValue, error, onSubmit }
 
             <div className="space-y-4">
               <label>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{t("Username")}</span>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{t("Email / Username")}</span>
                 <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
                   <UsersRound className="h-4 w-4 text-slate-400" />
                   <input

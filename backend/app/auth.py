@@ -179,10 +179,11 @@ def public_user(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def find_user_by_username(username: str) -> dict[str, Any] | None:
+    identifier = username.strip()
     with get_connection() as db:
         row = db.execute(
-            "SELECT * FROM engineers WHERE username = ? COLLATE NOCASE",
-            (username.strip(),),
+            "SELECT * FROM engineers WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE",
+            (identifier, identifier),
         ).fetchone()
         return dict(row) if row else None
 
