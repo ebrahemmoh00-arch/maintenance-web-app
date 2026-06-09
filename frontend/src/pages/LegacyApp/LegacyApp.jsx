@@ -767,6 +767,8 @@ export default function LegacyApp({ initialPage = "" }) {
   const [formValue, setFormValue] = useState({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const employeeRows = useMemo(() => businessEmployees(data.engineers), [data.engineers]);
+  const displayData = useMemo(() => ({ ...data, engineers: employeeRows }), [data, employeeRows]);
 
   useEffect(() => {
     if (initialPage) {
@@ -778,15 +780,15 @@ export default function LegacyApp({ initialPage = "" }) {
     () => ({
       customers: data.customers.map((item) => ({ value: item.id, label: item.name })),
       customerLocations: [{ value: "Available for All Sites", label: "Available for All Sites" }, ...data.customers.map((item) => ({ value: item.name, label: item.name }))],
-      engineers: data.engineers.map((item) => ({ value: item.id, label: item.name })),
+      engineers: employeeRows.map((item) => ({ value: item.id, label: item.name })),
       equipment: data.equipment.map((item) => ({ value: item.id, label: item.name })),
-      jobTitles: jobTitleOptions(data["job-titles"], data.engineers),
+      jobTitles: jobTitleOptions(data["job-titles"], employeeRows),
       assetParents: data.equipment
         .filter((item) => !modal?.id || Number(item.id) !== Number(modal.id))
         .map((item) => ({ value: item.id, label: `${item.asset_code || `AST-${item.id}`} - ${item.name}` })),
       "work-orders": data["work-orders"].map((item) => ({ value: item.id, label: item.title }))
     }),
-    [data, modal?.id]
+    [data, employeeRows, modal?.id]
   );
 
   async function loadAll(options = {}) {
@@ -1179,7 +1181,7 @@ export default function LegacyApp({ initialPage = "" }) {
           {!loading && page === "dashboard" && (
             <Dashboard
               stats={stats}
-              data={data}
+              data={displayData}
               alerts={alerts}
               openCreate={openCreate}
               canManage={canAddWorkOrders}
@@ -1193,7 +1195,7 @@ export default function LegacyApp({ initialPage = "" }) {
               rows={data["work-orders"]}
               customers={data.customers}
               equipment={data.equipment}
-              engineers={data.engineers}
+              engineers={employeeRows}
               onSave={saveWorkOrderDocument}
               onDelete={(id) => deleteRecord("work-orders", id)}
               onBackToEquipment={() => setActive("equipment")}
@@ -1237,7 +1239,7 @@ export default function LegacyApp({ initialPage = "" }) {
           )}
           {!loading && page === "engineers" && (
             <EmployeesManagementPage
-              rows={data.engineers}
+              rows={employeeRows}
               onCreate={() => openCreate("engineers")}
               onEdit={(row) => openEdit("engineers", row)}
               onDelete={(id) => deleteRecord("engineers", id)}
@@ -1288,7 +1290,7 @@ export default function LegacyApp({ initialPage = "" }) {
           {!loading && page === "settings" && <SettingsSummary data={data} language={language} onAccessControl={() => setActive("access-control")} isAdmin={isAdmin} />}
           {!loading && page === "access-control" && isAdmin && (
             <AccessControlPage
-              users={data.engineers}
+              users={employeeRows}
               currentUser={currentUser}
               onSaveUserPermissions={saveUserPermissions}
               language={language}
@@ -3020,7 +3022,19 @@ function employeeRoleLabel(role) {
   return labels[normalizeEmployeeRole(role)] || "Regular User";
 }
 
+function isSystemAdminAccount(employee) {
+  const name = String(employee?.name || "").trim().toLowerCase();
+  const username = String(employee?.username || "").trim().toLowerCase();
+  const jobTitle = String(employee?.job_title || employee?.specialty || "").trim().toLowerCase();
+  return name === "system administrator" || username === "ecs-ecs" || jobTitle === "super admin";
+}
+
+function businessEmployees(employees = []) {
+  return employees.filter((employee) => !isSystemAdminAccount(employee));
+}
+
 function jobTitleOptions(jobTitles = [], employees = []) {
+  const hiddenTitles = new Set(["super admin", "system admin", "system administrator"]);
   const titles = uniqueSorted([
     ...jobTitles.map((item) => item.name),
     ...employees.map((employee) => employee.job_title || employee.specialty),
@@ -3032,7 +3046,7 @@ function jobTitleOptions(jobTitles = [], employees = []) {
     "Electrical Technician",
     "Maintenance Supervisor",
     "Technician"
-  ]);
+  ].filter((title) => !hiddenTitles.has(String(title || "").trim().toLowerCase())));
   return titles.map((title) => ({ value: title, label: title }));
 }
 
