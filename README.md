@@ -7,6 +7,8 @@ Full-stack maintenance management system with a FastAPI REST backend, PostgreSQL
 ```text
 maintenance-web-app/
   backend/
+    Dockerfile
+    docker-entrypoint.sh
     app/
       api/
       core/
@@ -18,10 +20,12 @@ maintenance-web-app/
       main.py
     requirements.txt
   frontend/
+    Dockerfile
     public/
     src/
     package.json
     tailwind.config.js
+  docker-compose.yml
 ```
 
 ## Features
@@ -39,7 +43,75 @@ maintenance-web-app/
 - Professional dark SCADA/SAP-style UI with sidebar navigation
 - REST API with separated backend/frontend architecture
 
+## Docker Local Development
+
+Docker is the recommended daily development workflow.
+
+Copy the environment template:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` and replace all placeholder values.
+
+For Docker Compose, keep:
+
+```text
+DATABASE_URL=postgresql://cmms_user:replace-with-local-db-password@127.0.0.1:5432/cmms_dev
+DOCKER_DATABASE_URL=postgresql://cmms_user:replace-with-local-db-password@postgres:5432/cmms_dev
+VITE_API_BASE=http://127.0.0.1:8000/api
+```
+
+Start the complete platform:
+
+```powershell
+docker compose up --build
+```
+
+Frontend URL:
+
+```text
+http://127.0.0.1:5173
+```
+
+Backend health check:
+
+```text
+http://127.0.0.1:8000/health
+```
+
+API docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Stop containers without deleting the database:
+
+```powershell
+docker compose down
+```
+
+Stop containers and delete the PostgreSQL volume:
+
+```powershell
+docker compose down -v
+```
+
+PostgreSQL data is persisted in the Docker volume:
+
+```text
+postgres_data
+```
+
+The backend waits for PostgreSQL before starting.
+
+The backend and frontend run with hot reload through mounted source folders.
+
 ## Local PostgreSQL Setup
+
+Use this section only when running the backend directly on Windows instead of Docker.
 
 Install PostgreSQL locally, then create a development database and user.
 
@@ -59,7 +131,7 @@ Copy the environment template:
 Copy-Item .env.example .env
 ```
 
-Edit `.env` and keep the local database URL enabled:
+Edit `.env` and keep the local Windows database URL enabled:
 
 ```text
 APP_ENV=development
@@ -120,6 +192,10 @@ Required local and production variables:
 ```text
 APP_ENV
 DATABASE_URL
+DOCKER_DATABASE_URL
+POSTGRES_DB
+POSTGRES_USER
+POSTGRES_PASSWORD
 ADMIN_USERNAME
 ADMIN_PASSWORD
 JWT_SECRET_KEY
@@ -154,6 +230,10 @@ DATABASE_URL
 ```
 
 Use the Render Internal Database URL for the backend service.
+
+Render compatibility is preserved.
+
+The Docker files are for local and enterprise container deployment and do not replace `render.yaml`.
 
 Never place real secrets in:
 
