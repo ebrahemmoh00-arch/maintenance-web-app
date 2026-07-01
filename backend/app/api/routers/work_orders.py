@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import WorkOrder, WorkOrderCreate, WorkOrderUpdate
-from ..services import WorkOrderService
+from ...core.auth import require_permission
+from ...schemas import WorkOrder, WorkOrderCreate, WorkOrderUpdate
+from ...services import WorkOrderService
 
 router = APIRouter(prefix="/work-orders", tags=["Work Orders"])
 service = WorkOrderService()

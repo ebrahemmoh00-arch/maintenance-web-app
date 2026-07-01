@@ -4,8 +4,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .repositories import CustomerRepository, EngineerRepository, EquipmentRepository, InventoryRepository, JobTitleRepository, PreventiveMaintenanceRepository, WorkOrderRepository
-from .security import hash_password, is_password_hash
+from ..repositories import CustomerRepository, EngineerRepository, EquipmentRepository, InventoryRepository, JobTitleRepository, PreventiveMaintenanceRepository, WorkOrderRepository
+from ..core.security import hash_password, is_password_hash
 
 
 def payload(model: Any) -> dict[str, Any]:

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import Customer, CustomerCreate, CustomerUpdate
-from ..services import CustomerService
+from ...core.auth import require_permission
+from ...schemas import Customer, CustomerCreate, CustomerUpdate
+from ...services import CustomerService
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 service = CustomerService()

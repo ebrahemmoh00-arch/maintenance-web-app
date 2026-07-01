@@ -5,8 +5,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .audit import AuditService
-from .database import get_connection, insert_row
+from ..core.audit import AuditService
+from ..database import get_connection, insert_row
 
 MAINTENANCE_ALERT_WINDOW_DAYS = 7
 MAINTENANCE_ALERT_WINDOW_HOURS = 100

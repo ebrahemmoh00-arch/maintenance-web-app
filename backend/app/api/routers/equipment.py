@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import Equipment, EquipmentCreate, EquipmentUpdate
-from ..services import EquipmentService
+from ...core.auth import require_permission
+from ...schemas import Equipment, EquipmentCreate, EquipmentUpdate
+from ...services import EquipmentService
 
 router = APIRouter(prefix="/equipment", tags=["Equipment"])
 service = EquipmentService()

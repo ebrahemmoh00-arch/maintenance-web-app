@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import MaintenanceAlert
-from ..services import EquipmentService
+from ...core.auth import require_permission
+from ...schemas import MaintenanceAlert
+from ...services import EquipmentService
 
 router = APIRouter(prefix="/maintenance-alerts", tags=["Maintenance Alerts"])
 service = EquipmentService()

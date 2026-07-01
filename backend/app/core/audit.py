@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .database import get_connection, insert_row
+from ..database import get_connection, insert_row
 
 AUDIT_CONTEXT: ContextVar[dict[str, Any] | None] = ContextVar("audit_context", default=None)
 EGYPT_TIMEZONE = ZoneInfo("Africa/Cairo")

@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import (
+from ...core.auth import require_permission
+from ...schemas import (
     PreventiveMaintenance,
     PreventiveMaintenanceCreate,
     PreventiveMaintenanceHistoryUpdate,
     PreventiveMaintenanceUpdate,
 )
-from ..services import PreventiveMaintenanceService
+from ...services import PreventiveMaintenanceService
 
 router = APIRouter(prefix="/preventive-maintenance", tags=["Preventive Maintenance"])
 service = PreventiveMaintenanceService()

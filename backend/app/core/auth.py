@@ -12,7 +12,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError
 
-from .database import get_connection
+from ..database import get_connection
 from .security import hash_password, is_password_hash, verify_password
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-secret-in-render-environment")

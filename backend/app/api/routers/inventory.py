@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import InventoryItem, InventoryItemCreate, InventoryItemUpdate
-from ..services import InventoryService
+from ...core.auth import require_permission
+from ...schemas import InventoryItem, InventoryItemCreate, InventoryItemUpdate
+from ...services import InventoryService
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 service = InventoryService()

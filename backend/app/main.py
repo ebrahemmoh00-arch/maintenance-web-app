@@ -1,27 +1,19 @@
 from datetime import datetime
 import os
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .audit import client_ip, device_info, reset_audit_context, set_audit_context
-from .auth import authenticate_access_header, require_permission
+from .core.auth import require_permission
 from .database import init_db
-from .routers import audit_logs, auth, customers, dashboard, engineers, equipment, inventory, job_titles, maintenance_alerts, preventive_maintenance, schedule, work_orders
+from .middleware.authentication import protect_api_routes
+from .api.routers import audit_logs, auth, customers, dashboard, engineers, equipment, inventory, job_titles, maintenance_alerts, preventive_maintenance, schedule, work_orders
 
 app = FastAPI(
     title="Maintenance Management API",
     version="1.0.0",
     description="REST API for departments, assets, resources, work orders, inventory, preventive maintenance, schedule, and dashboard metrics.",
 )
-
-PUBLIC_API_PATHS = {
-    "/api/login",
-    "/api/refresh-token",
-    "/api/health",
-    "/health",
-}
 
 frontend_origins = [
     "http://localhost:5173",
@@ -43,21 +35,7 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def protect_api_routes(request: Request, call_next):
-    path = request.url.path.rstrip("/") or "/"
-    if request.method == "OPTIONS" or path in PUBLIC_API_PATHS or not path.startswith("/api"):
-        return await call_next(request)
-    try:
-        current_user = authenticate_access_header(request.headers.get("Authorization"))
-        request.state.current_user = current_user
-    except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": "Access Denied"})
-    token = set_audit_context(current_user, ip_address=client_ip(request), device_info=device_info(request))
-    try:
-        return await call_next(request)
-    finally:
-        reset_audit_context(token)
+app.middleware("http")(protect_api_routes)
 
 
 @app.on_event("startup")

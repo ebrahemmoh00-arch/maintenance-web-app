@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from .security import hash_password, is_password_hash
+from ..core.security import hash_password, is_password_hash
 
 try:
     import psycopg

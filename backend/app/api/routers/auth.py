@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..audit import AuditService, client_ip, device_info
-from ..auth import CurrentUser, get_current_user, authenticate_user, issue_token_pair, logout_user, refresh_token_pair
-from ..schemas import LoginRequest, LogoutRequest, TokenResponse, RefreshTokenRequest
+from ...core.audit import AuditService, client_ip, device_info
+from ...core.auth import CurrentUser, get_current_user, authenticate_user, issue_token_pair, logout_user, refresh_token_pair
+from ...schemas import LoginRequest, LogoutRequest, TokenResponse, RefreshTokenRequest
 
 router = APIRouter(tags=["Authentication"])
 

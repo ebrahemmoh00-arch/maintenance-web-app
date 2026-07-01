@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import Engineer, EngineerCreate, EngineerUpdate
-from ..services import EngineerService
+from ...core.auth import require_permission
+from ...schemas import Engineer, EngineerCreate, EngineerUpdate
+from ...services import EngineerService
 
 router = APIRouter(prefix="/engineers", tags=["Engineers"])
 service = EngineerService()

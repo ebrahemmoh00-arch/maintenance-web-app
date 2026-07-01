@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from ..auth import require_permission
-from ..schemas import JobTitle, JobTitleCreate, JobTitleUpdate
-from ..services import JobTitleService
+from ...core.auth import require_permission
+from ...schemas import JobTitle, JobTitleCreate, JobTitleUpdate
+from ...services import JobTitleService
 
 router = APIRouter(prefix="/job-titles", tags=["Job Titles"])
 service = JobTitleService()
