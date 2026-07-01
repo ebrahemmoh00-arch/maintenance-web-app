@@ -7,6 +7,8 @@ Full-stack maintenance management system with a FastAPI REST backend, PostgreSQL
 ```text
 maintenance-web-app/
   backend/
+    alembic/
+    alembic.ini
     Dockerfile
     docker-entrypoint.sh
     app/
@@ -261,3 +263,37 @@ backend/maintenance.db
 ```
 
 The backend seeds sample operational data on first startup. Login users are controlled by environment-driven admin configuration and user management.
+
+## Database Migrations
+
+Alembic is configured for future schema changes.
+
+Migration config:
+
+```text
+backend/alembic.ini
+```
+
+Initial schema baseline:
+
+```text
+backend/alembic/versions/0001_initial_schema.py
+```
+
+Run migrations from the backend folder:
+
+```powershell
+cd backend
+alembic upgrade head
+```
+
+Create future migrations with:
+
+```powershell
+cd backend
+alembic revision -m "describe schema change"
+```
+
+Apply future schema changes through Alembic migrations instead of editing the database manually.
+
+The existing startup schema creation remains in place for backward compatibility.
