@@ -1,6 +1,6 @@
 # Maintenance Management Web App
 
-Full-stack maintenance management system with a FastAPI REST backend, SQLite database, and React + Tailwind CSS frontend.
+Full-stack maintenance management system with a FastAPI REST backend, PostgreSQL or SQLite database, and React + Tailwind CSS frontend.
 
 ## Structure
 
@@ -38,6 +38,44 @@ maintenance-web-app/
   - Equipment interval alerts
 - Professional dark SCADA/SAP-style UI with sidebar navigation
 - REST API with separated backend/frontend architecture
+
+## Local PostgreSQL Setup
+
+Install PostgreSQL locally, then create a development database and user.
+
+```powershell
+psql -U postgres
+```
+
+```sql
+CREATE USER cmms_user WITH PASSWORD 'replace-with-local-db-password';
+CREATE DATABASE cmms_dev OWNER cmms_user;
+GRANT ALL PRIVILEGES ON DATABASE cmms_dev TO cmms_user;
+```
+
+Copy the environment template:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` and keep the local database URL enabled:
+
+```text
+APP_ENV=development
+DATABASE_URL=postgresql://cmms_user:replace-with-local-db-password@127.0.0.1:5432/cmms_dev
+ADMIN_USERNAME=replace-with-admin-username
+ADMIN_PASSWORD=replace-with-strong-admin-password
+JWT_SECRET_KEY=replace-with-a-long-random-secret-at-least-32-characters
+```
+
+Generate a local JWT secret with:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Never commit `.env`.
 
 ## Run Backend
 
@@ -77,13 +115,19 @@ http://127.0.0.1:5173
 
 Admin login credentials are read from environment variables and must not be committed to Git.
 
-Required admin variables:
+Required local and production variables:
 
 ```text
+APP_ENV
+DATABASE_URL
 ADMIN_USERNAME
 ADMIN_PASSWORD
 JWT_SECRET_KEY
 ```
+
+If `DATABASE_URL` is set, the backend uses PostgreSQL.
+
+If `DATABASE_URL` is not set, the backend falls back to SQLite for backward compatibility.
 
 ## Production Configuration
 
@@ -103,6 +147,14 @@ JWT_SECRET_KEY
 
 Set these values in the hosting provider dashboard, for example Render Environment Variables.
 
+For Render PostgreSQL, set:
+
+```text
+DATABASE_URL
+```
+
+Use the Render Internal Database URL for the backend service.
+
 Never place real secrets in:
 
 ```text
@@ -114,7 +166,15 @@ Git history
 
 ## Database
 
-SQLite database is created automatically at:
+Local development should use PostgreSQL through:
+
+```text
+DATABASE_URL
+```
+
+SQLite fallback is still available when `DATABASE_URL` is not set.
+
+The SQLite file is created automatically at:
 
 ```text
 backend/maintenance.db

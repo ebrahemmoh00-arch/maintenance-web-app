@@ -85,3 +85,7 @@ def admin_password() -> str:
 
 def admin_email() -> str:
     return os.getenv("ADMIN_EMAIL", "admin@ecs.local").strip() or "admin@ecs.local"
+
+
+def database_url() -> str:
+    return os.getenv("DATABASE_URL", "").strip()

@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from ..core.config import admin_credentials_configured, admin_email, admin_password, admin_username
+from ..core.config import admin_credentials_configured, admin_email, admin_password, admin_username, database_url
 from ..core.security import hash_password, is_password_hash
 
 try:
@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover - SQLite-only local installs can still r
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "maintenance.db"
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+DATABASE_URL = database_url()
 DB_BACKEND = "postgres" if DATABASE_URL else "sqlite"
 
 
