@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from ..core.config import admin_credentials_configured, admin_email, admin_password, admin_username
 from ..core.security import hash_password, is_password_hash
 
 try:
@@ -497,8 +498,8 @@ def seed_data(db: DatabaseConnection) -> None:
             "Maintenance",
             "Gabal Elasfar Power Plant",
             "Maintenance Manager",
-            "ebrahim",
-            hash_password("123456"),
+            "",
+            "",
             "engineer",
             "active",
         ),
@@ -537,17 +538,16 @@ def seed_data(db: DatabaseConnection) -> None:
 
 
 def ensure_super_admin(db: DatabaseConnection) -> None:
-    username = os.getenv("ADMIN_USERNAME", "ECS-ECS").strip() or "ECS-ECS"
-    password = os.getenv("ADMIN_PASSWORD", "E5C9S2@rom")
-    email = os.getenv("ADMIN_EMAIL", "admin@ecs.local")
+    if not admin_credentials_configured():
+        return
+    username = admin_username()
+    password = admin_password()
+    email = admin_email()
     existing = db.execute("SELECT * FROM engineers WHERE username = ? COLLATE NOCASE", (username,)).fetchone()
     if existing:
         row = dict(existing)
         stored_password = row.get("password") or password
-        if os.getenv("ADMIN_PASSWORD"):
-            next_password = hash_password(password)
-        else:
-            next_password = stored_password if is_password_hash(stored_password) else hash_password(stored_password)
+        next_password = hash_password(password) if password else (stored_password if is_password_hash(stored_password) else hash_password(stored_password))
         db.execute(
             """
             UPDATE engineers

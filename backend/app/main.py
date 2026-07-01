@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.auth import require_permission
+from .core.config import validate_startup_configuration
 from .database import init_db
 from .middleware.authentication import protect_api_routes
 from .api.routers import audit_logs, auth, customers, dashboard, engineers, equipment, inventory, job_titles, maintenance_alerts, preventive_maintenance, schedule, work_orders
@@ -40,6 +41,7 @@ app.middleware("http")(protect_api_routes)
 
 @app.on_event("startup")
 def on_startup() -> None:
+    validate_startup_configuration()
     init_db()
 
 

@@ -13,9 +13,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError
 
 from ..database import get_connection
+from .config import jwt_secret_key
 from .security import hash_password, is_password_hash, verify_password
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-secret-in-render-environment")
+JWT_SECRET_KEY = jwt_secret_key()
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))

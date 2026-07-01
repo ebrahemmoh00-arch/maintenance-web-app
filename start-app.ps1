@@ -88,5 +88,4 @@ Start-Process $appUrl
 
 Write-Host ""
 Write-Host "App URL: $appUrl"
-Write-Host "Login username: ECS-ECS"
-Write-Host "Login password: E5C9S2@rom"
+Write-Host "Login credentials are read from ADMIN_USERNAME and ADMIN_PASSWORD."

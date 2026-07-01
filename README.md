@@ -8,14 +8,17 @@ Full-stack maintenance management system with a FastAPI REST backend, SQLite dat
 maintenance-web-app/
   backend/
     app/
-      database.py
-      repositories.py
-      schemas.py
-      services.py
+      api/
+      core/
+      database/
+      middleware/
+      repositories/
+      schemas/
+      services/
       main.py
-      routers/
     requirements.txt
   frontend/
+    public/
     src/
     package.json
     tailwind.config.js
@@ -37,6 +40,14 @@ maintenance-web-app/
 - REST API with separated backend/frontend architecture
 
 ## Run Backend
+
+Create a local development environment file first:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` and replace all placeholder values before starting the backend.
 
 ```powershell
 cd backend
@@ -64,16 +75,42 @@ Frontend URL:
 http://127.0.0.1:5173
 ```
 
-The frontend script uses a local portable Node.js runtime under `.tools/` if global `npm` is not available.
+Admin login credentials are read from environment variables and must not be committed to Git.
 
-## Admin Login
+Required admin variables:
 
 ```text
-Username: ECS-ECS
-Password: E5C9S2@rom
+ADMIN_USERNAME
+ADMIN_PASSWORD
+JWT_SECRET_KEY
 ```
 
-This login gate is handled in the frontend with full admin access for the local app. For production team access, connect it to backend authentication with user accounts and roles.
+## Production Configuration
+
+Production mode is enabled with:
+
+```text
+APP_ENV=production
+```
+
+In production, the backend refuses to start unless all required variables are set:
+
+```text
+ADMIN_USERNAME
+ADMIN_PASSWORD
+JWT_SECRET_KEY
+```
+
+Set these values in the hosting provider dashboard, for example Render Environment Variables.
+
+Never place real secrets in:
+
+```text
+README.md
+render.yaml
+start-app.ps1
+Git history
+```
 
 ## Database
 
@@ -83,4 +120,4 @@ SQLite database is created automatically at:
 backend/maintenance.db
 ```
 
-The backend seeds one customer, one engineer, one equipment item, and one work order on first startup.
+The backend seeds sample operational data on first startup. Login users are controlled by environment-driven admin configuration and user management.
