@@ -4,7 +4,23 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-Status = Literal["pending", "in_progress", "completed", "cancelled"]
+Status = Literal[
+    "draft",
+    "new",
+    "pending",
+    "assigned",
+    "accepted",
+    "in_progress",
+    "waiting_for_parts",
+    "completed",
+    "pending_supervisor_review",
+    "approved",
+    "closed",
+    "rejected",
+    "cancelled",
+    "on_hold",
+    "overdue",
+]
 Priority = Literal["low", "medium", "high", "critical"]
 
 
@@ -209,6 +225,27 @@ class WorkOrderBase(BaseModel):
     priority: Priority = "medium"
     service_hours: int = Field(default=0, ge=0)
     notes: str = ""
+    assigned_by_id: int | None = None
+    assigned_at: str = ""
+    accepted_at: str = ""
+    started_at: str = ""
+    paused_at: str = ""
+    resumed_at: str = ""
+    completed_at: str = ""
+    approved_by_id: int | None = None
+    approved_at: str = ""
+    closed_at: str = ""
+    cancelled_at: str = ""
+    rejected_at: str = ""
+    hold_reason: str = ""
+    waiting_parts_reason: str = ""
+    runtime_reading_start: int = Field(default=0, ge=0)
+    runtime_reading_end: int = Field(default=0, ge=0)
+    technician_notes: str = ""
+    completion_notes: str = ""
+    supervisor_notes: str = ""
+    checklist_completed: bool = False
+    work_duration_minutes: int = Field(default=0, ge=0)
 
 
 class WorkOrderCreate(WorkOrderBase):
@@ -227,6 +264,63 @@ class WorkOrderUpdate(BaseModel):
     priority: Priority | None = None
     service_hours: int | None = None
     notes: str | None = None
+    assigned_by_id: int | None = None
+    assigned_at: str | None = None
+    accepted_at: str | None = None
+    started_at: str | None = None
+    paused_at: str | None = None
+    resumed_at: str | None = None
+    completed_at: str | None = None
+    approved_by_id: int | None = None
+    approved_at: str | None = None
+    closed_at: str | None = None
+    cancelled_at: str | None = None
+    rejected_at: str | None = None
+    hold_reason: str | None = None
+    waiting_parts_reason: str | None = None
+    runtime_reading_start: int | None = None
+    runtime_reading_end: int | None = None
+    technician_notes: str | None = None
+    completion_notes: str | None = None
+    supervisor_notes: str | None = None
+    checklist_completed: bool | None = None
+    work_duration_minutes: int | None = None
+
+
+class WorkOrderLifecycleAction(BaseModel):
+    actor_id: int | None = None
+    engineer_id: int | None = None
+    notes: str = ""
+    reason: str = ""
+    runtime_reading: int | None = Field(default=None, ge=0)
+    technician_notes: str = ""
+    completion_notes: str = ""
+    supervisor_notes: str = ""
+    checklist_completed: bool | None = None
+
+
+class WorkOrderTimelineEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    work_order_id: int
+    event_type: str
+    from_status: str = ""
+    to_status: str = ""
+    actor_id: int | None = None
+    actor_name: str = ""
+    description: str = ""
+    metadata: str = ""
+    created_at: str
+
+
+class WorkOrderApproval(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    work_order_id: int
+    supervisor_id: int | None = None
+    action: str
+    notes: str = ""
+    created_at: str
 
 
 class WorkOrder(WorkOrderBase):
@@ -237,12 +331,24 @@ class WorkOrder(WorkOrderBase):
     customer_name: str | None = None
     equipment_name: str | None = None
     engineer_name: str | None = None
+    assigned_by_name: str | None = None
+    approved_by_name: str | None = None
+    timeline: list[WorkOrderTimelineEntry] = Field(default_factory=list)
+    approvals: list[WorkOrderApproval] = Field(default_factory=list)
 
 
 class DashboardStats(BaseModel):
     total_orders: int
     pending_orders: int
     completed_orders: int
+    new_orders: int = 0
+    assigned_orders: int = 0
+    in_progress_orders: int = 0
+    waiting_parts_orders: int = 0
+    pending_review_orders: int = 0
+    closed_today: int = 0
+    overdue_orders: int = 0
+    average_completion_time_minutes: int = 0
 
 
 class MaintenanceAlert(BaseModel):
@@ -342,3 +448,94 @@ class PreventiveMaintenance(PreventiveMaintenanceBase):
     days_until_due: int | None = None
     pm_alert: Literal["OK", "UPCOMING", "DUE NOW"] = "OK"
     previous_records: list[PreventiveMaintenanceHistory] = []
+
+
+PMRecurrenceType = Literal["Daily", "Weekly", "Monthly", "Runtime Hours"]
+PMPlanStatus = Literal["active", "paused"]
+
+
+class PMPlanTaskBase(BaseModel):
+    task_name: str = Field(min_length=1)
+    task_description: str = ""
+    sequence: int = Field(default=1, ge=1)
+    is_required: bool = True
+
+
+class PMPlanTaskCreate(PMPlanTaskBase):
+    pass
+
+
+class PMPlanTaskUpdate(BaseModel):
+    task_name: str | None = None
+    task_description: str | None = None
+    sequence: int | None = Field(default=None, ge=1)
+    is_required: bool | None = None
+
+
+class PMPlanTask(PMPlanTaskBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    pm_plan_id: int
+    created_at: str
+
+
+class PMPlanBase(BaseModel):
+    equipment_id: int
+    name: str = Field(min_length=1)
+    description: str = ""
+    priority: Priority = "medium"
+    recurrence_type: PMRecurrenceType = "Runtime Hours"
+    interval_value: int = Field(default=1, ge=1)
+    start_date: str
+    next_due_date: str = ""
+    next_due_runtime: int = Field(default=0, ge=0)
+    last_service_date: str = ""
+    last_runtime: int = Field(default=0, ge=0)
+    estimated_duration_minutes: int = Field(default=0, ge=0)
+    required_skills: str = ""
+    checklist_template: str = ""
+    planned_spare_parts: str = ""
+    status: PMPlanStatus = "active"
+
+
+class PMPlanCreate(PMPlanBase):
+    tasks: list[PMPlanTaskCreate] = Field(default_factory=list)
+
+
+class PMPlanUpdate(BaseModel):
+    equipment_id: int | None = None
+    name: str | None = None
+    description: str | None = None
+    priority: Priority | None = None
+    recurrence_type: PMRecurrenceType | None = None
+    interval_value: int | None = Field(default=None, ge=1)
+    start_date: str | None = None
+    next_due_date: str | None = None
+    next_due_runtime: int | None = Field(default=None, ge=0)
+    last_service_date: str | None = None
+    last_runtime: int | None = Field(default=None, ge=0)
+    estimated_duration_minutes: int | None = Field(default=None, ge=0)
+    required_skills: str | None = None
+    checklist_template: str | None = None
+    planned_spare_parts: str | None = None
+    status: PMPlanStatus | None = None
+    tasks: list[PMPlanTaskCreate] | None = None
+
+
+class PMPlan(PMPlanBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: str
+    updated_at: str
+    equipment_name: str | None = None
+    customer_id: int | None = None
+    customer_name: str | None = None
+    current_hours: int | None = None
+    tasks: list[PMPlanTask] = Field(default_factory=list)
+
+
+class PMSchedulerRunResult(BaseModel):
+    generated: int = 0
+    skipped: int = 0
+    work_order_ids: list[int] = []
+    messages: list[str] = []

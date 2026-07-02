@@ -20,6 +20,9 @@ TABLE_MODULES = {
     "inventory_items": "Inventory",
     "engineers": "Users",
     "preventive_maintenance": "Preventive Maintenance",
+    "pm_plans": "PM Plans",
+    "pm_plan_tasks": "PM Plan Tasks",
+    "pm_plan_work_orders": "PM Plan Work Orders",
     "job_titles": "Settings",
 }
 
@@ -30,6 +33,9 @@ TABLE_LABELS = {
     "inventory_items": "Inventory Item",
     "engineers": "User",
     "preventive_maintenance": "Preventive Maintenance",
+    "pm_plans": "PM Plan",
+    "pm_plan_tasks": "PM Plan Task",
+    "pm_plan_work_orders": "PM Plan Work Order Link",
     "job_titles": "Job Title",
 }
 
@@ -91,7 +97,7 @@ def changed_subset(values: dict[str, Any] | None, fields: list[str]) -> dict[str
 def record_label(table: str, record: dict[str, Any] | None, record_id: Any = None) -> str:
     record = record or {}
     label = TABLE_LABELS.get(table, "Record")
-    name = record.get("title") or record.get("name") or record.get("part_number") or record.get("employee_code") or record.get("task_name")
+    name = record.get("title") or record.get("name") or record.get("part_number") or record.get("employee_code") or record.get("task_name") or record.get("cycle_key")
     identifier = record.get("id") or record_id or ""
     if name:
         return f"{label} #{identifier} - {name}"

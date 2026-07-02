@@ -235,7 +235,7 @@ const resources = {
       { key: "engineer_id", label: "Resource", type: "select", options: "engineers", number: true },
       { key: "scheduled_date", label: "Scheduled Date", type: "date" },
       { key: "due_date", label: "Due Date", type: "date" },
-      { key: "status", label: "Status", type: "select", options: ["pending", "in_progress", "completed", "cancelled"] },
+      { key: "status", label: "Status", type: "select", options: ["draft", "new", "pending", "assigned", "accepted", "in_progress", "waiting_for_parts", "completed", "pending_supervisor_review", "approved", "closed", "rejected", "cancelled", "on_hold", "overdue"] },
       { key: "priority", label: "Priority", type: "select", options: ["low", "medium", "high", "critical"] },
       { key: "service_hours", label: "Service Hours", type: "number" },
       { key: "description", label: "Description", type: "textarea" },
@@ -296,6 +296,54 @@ const resources = {
       { key: "pm_alert", label: "Alert", render: (row) => <MaintenanceBadge value={row.pm_alert} /> },
       { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> }
     ]
+  },
+  "pm-plans": {
+    title: "PM Plans",
+    endpoint: "pm-plans",
+    blank: {
+      equipment_id: "",
+      name: "",
+      description: "",
+      priority: "medium",
+      recurrence_type: "Runtime Hours",
+      interval_value: 1000,
+      start_date: todayIso(),
+      next_due_date: "",
+      next_due_runtime: 0,
+      last_service_date: "",
+      last_runtime: 0,
+      estimated_duration_minutes: 60,
+      required_skills: "",
+      checklist_template: "",
+      planned_spare_parts: "",
+      status: "active"
+    },
+    fields: [
+      { key: "equipment_id", label: "Asset", type: "select", options: "equipment", number: true },
+      { key: "name", label: "Plan Name" },
+      { key: "recurrence_type", label: "Recurrence Type", type: "select", options: ["Daily", "Weekly", "Monthly", "Runtime Hours"] },
+      { key: "interval_value", label: "Interval", type: "number" },
+      { key: "start_date", label: "Start Date", type: "date" },
+      { key: "next_due_date", label: "Next Due Date", type: "date" },
+      { key: "next_due_runtime", label: "Next Due Runtime", type: "number" },
+      { key: "priority", label: "Priority", type: "select", options: ["low", "medium", "high", "critical"] },
+      { key: "status", label: "Status", type: "select", options: ["active", "paused"] },
+      { key: "estimated_duration_minutes", label: "Estimated Duration (Minutes)", type: "number" },
+      { key: "required_skills", label: "Required Skills" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "checklist_template", label: "Checklist Template", type: "textarea" },
+      { key: "planned_spare_parts", label: "Planned Spare Parts", type: "textarea" }
+    ],
+    columns: [
+      { key: "name", label: "PM Plan" },
+      { key: "equipment_name", label: "Asset" },
+      { key: "recurrence_type", label: "Recurrence" },
+      { key: "interval_value", label: "Interval" },
+      { key: "next_due_date", label: "Next Due Date" },
+      { key: "next_due_runtime", label: "Next Due Runtime" },
+      { key: "priority", label: "Priority", render: (row) => <PriorityBadge value={row.priority} /> },
+      { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> }
+    ]
   }
 };
 
@@ -312,6 +360,7 @@ const PERMISSION_MODULES = [
   { key: "engineers", label: "Resources / Users", resourceKey: "engineers" },
   { key: "work-orders", label: "Work Orders", resourceKey: "work-orders" },
   { key: "preventive-maintenance", label: "Preventive Maintenance", resourceKey: "preventive-maintenance" },
+  { key: "pm-plans", label: "PM Plans", resourceKey: "pm-plans" },
   { key: "inventory", label: "Inventory / Spare Parts", resourceKey: "inventory" },
   { key: "reports", label: "Reports & Analytics" },
   { key: "audit-logs", label: "Audit Logs" },
@@ -349,6 +398,7 @@ function createRolePermissions(role = "viewer") {
     permissions.equipment = { view: true, add: false, edit: true, delete: false };
     permissions["work-orders"] = { view: true, add: true, edit: true, delete: false };
     permissions["preventive-maintenance"] = { view: true, add: false, edit: true, delete: false };
+    permissions["pm-plans"] = { view: true, add: false, edit: false, delete: false };
     permissions.inventory = { view: true, add: false, edit: false, delete: false };
   }
   if (normalized === "store_keeper") {
@@ -393,6 +443,7 @@ function isVisiblePageForUser(user, page) {
   if (page === "equipment") return hasPermission(user, "equipment", "view");
   if (page === "engineers") return hasPermission(user, "engineers", "view");
   if (page === "work-orders") return hasPermission(user, "work-orders", "view");
+  if (page === "pm-plans") return hasPermission(user, "pm-plans", "view");
   if (page === "inventory") return hasPermission(user, "inventory", "view");
   if (page === "reports") return hasPermission(user, "reports", "view");
   if (page === "settings") return hasPermission(user, "settings", "view");
@@ -733,7 +784,7 @@ function tableLabels(language) {
 export default function LegacyApp({ initialPage = "" }) {
   const [active, setActive] = useState(() => {
     const page = initialPage || new URLSearchParams(window.location.search).get("page");
-    return ["dashboard", "customers", "equipment", "engineers", "work-orders", "schedule", "inventory", "reports", "settings", "access-control"].includes(page) ? page : "dashboard";
+    return ["dashboard", "customers", "equipment", "engineers", "work-orders", "pm-plans", "schedule", "inventory", "reports", "settings", "access-control"].includes(page) ? page : "dashboard";
   });
   const [collapsed, setCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -759,7 +810,7 @@ export default function LegacyApp({ initialPage = "" }) {
   });
   const [loginValue, setLoginValue] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
-  const [data, setData] = useState({ customers: [], engineers: [], equipment: [], "work-orders": [], inventory: [], "preventive-maintenance": [], "job-titles": [], "audit-logs": [] });
+  const [data, setData] = useState({ customers: [], engineers: [], equipment: [], "work-orders": [], inventory: [], "preventive-maintenance": [], "pm-plans": [], "job-titles": [], "audit-logs": [] });
   const [alerts, setAlerts] = useState([]);
   const [stats, setStats] = useState({ total_orders: 0, pending_orders: 0, completed_orders: 0 });
   const [auditLogsLoaded, setAuditLogsLoaded] = useState(false);
@@ -796,18 +847,19 @@ export default function LegacyApp({ initialPage = "" }) {
     if (!silent) setLoading(true);
     setError("");
     try {
-      const [customers, engineers, equipment, workOrders, inventory, preventiveMaintenance, jobTitles, dashboard, maintenanceAlerts] = await Promise.all([
+      const [customers, engineers, equipment, workOrders, inventory, preventiveMaintenance, pmPlans, jobTitles, dashboard, maintenanceAlerts] = await Promise.all([
         api.list("customers"),
         api.list("engineers"),
         api.list("equipment"),
         api.list("work-orders"),
         api.list("inventory"),
         api.list("preventive-maintenance"),
+        api.list("pm-plans"),
         api.list("job-titles"),
         api.stats(),
         api.alerts()
       ]);
-      setData((current) => ({ ...current, customers, engineers, equipment, "work-orders": workOrders, inventory, "preventive-maintenance": preventiveMaintenance, "job-titles": jobTitles }));
+      setData((current) => ({ ...current, customers, engineers, equipment, "work-orders": workOrders, inventory, "preventive-maintenance": preventiveMaintenance, "pm-plans": pmPlans, "job-titles": jobTitles }));
       setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance));
       setStats(dashboard);
       const storedUsername = sessionStorage.getItem("maintenance-auth-user") || "";
@@ -935,6 +987,8 @@ export default function LegacyApp({ initialPage = "" }) {
         ? normalizeAssetForm(formValue)
         : modal.resourceKey === "preventive-maintenance"
           ? normalizePreventiveMaintenanceForm(formValue)
+          : modal.resourceKey === "pm-plans"
+            ? normalizePMPlanForm(formValue)
           : modal.resourceKey === "engineers"
             ? normalizeEngineerForm(formValue)
             : formValue;
@@ -1005,8 +1059,21 @@ export default function LegacyApp({ initialPage = "" }) {
         ? normalizeAssetForm(nextValue)
         : modal?.resourceKey === "preventive-maintenance"
           ? normalizePreventiveMaintenanceForm(nextValue)
+          : modal?.resourceKey === "pm-plans"
+            ? normalizePMPlanForm(nextValue)
           : nextValue
     );
+  }
+
+  async function runPMScheduler() {
+    if (!hasPermission(currentUser, "pm-plans", "edit")) return;
+    try {
+      const result = await api.create("pm-plans/scheduler/run", {});
+      await loadAll({ silent: true });
+      window.alert(`PM Scheduler completed. Generated: ${result.generated || 0}. Skipped: ${result.skipped || 0}.`);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function saveWorkOrderDocument(payload, id) {
@@ -1024,6 +1091,18 @@ export default function LegacyApp({ initialPage = "" }) {
       } else {
         await api.create("work-orders", payload);
       }
+      await loadAll({ silent: true });
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }
+
+  async function runWorkOrderLifecycleAction(id, action, payload = {}) {
+    if (!id || !hasPermission(currentUser, "work-orders", "edit")) return false;
+    try {
+      await api.create(`work-orders/${id}/${action}`, payload);
       await loadAll({ silent: true });
       return true;
     } catch (err) {
@@ -1198,6 +1277,7 @@ export default function LegacyApp({ initialPage = "" }) {
               engineers={employeeRows}
               onSave={saveWorkOrderDocument}
               onDelete={(id) => deleteRecord("work-orders", id)}
+              onLifecycleAction={runWorkOrderLifecycleAction}
               onBackToEquipment={() => setActive("equipment")}
               canManage={canModifyWorkOrders}
               canCreate={canAddWorkOrders}
@@ -1263,6 +1343,25 @@ export default function LegacyApp({ initialPage = "" }) {
               canEdit={hasPermission(currentUser, page, "edit")}
               canDelete={hasPermission(currentUser, page, "delete")}
               language={language}
+            />
+          )}
+          {!loading && page === "pm-plans" && (
+            <CrudPage
+              resourceKey="pm-plans"
+              rows={data["pm-plans"]}
+              onCreate={() => openCreate("pm-plans")}
+              onEdit={(row) => openEdit("pm-plans", row)}
+              onDelete={(id) => deleteRecord("pm-plans", id)}
+              canAdd={hasPermission(currentUser, "pm-plans", "add")}
+              canEdit={hasPermission(currentUser, "pm-plans", "edit")}
+              canDelete={hasPermission(currentUser, "pm-plans", "delete")}
+              language={language}
+              extraActions={hasPermission(currentUser, "pm-plans", "edit") ? (
+                <button type="button" onClick={runPMScheduler} className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100">
+                  <TimerReset className="h-4 w-4" />
+                  Run Scheduler
+                </button>
+              ) : null}
             />
           )}
           {!loading && page === "schedule" && (
@@ -1447,6 +1546,7 @@ function pageTitle(active, language = "en") {
     equipment: "Assets",
     engineers: "Resources",
     "work-orders": "Work Orders",
+    "pm-plans": "PM Plans",
     schedule: "Maintenance Schedule",
     inventory: "Inventory",
     reports: "Reports & Analytics",
@@ -1478,6 +1578,17 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
         <MetricCard label="Overdue PM Tasks" value={metrics.overduePmTasks.length} icon={AlertTriangle} tone={metrics.overduePmTasks.length ? "red" : "green"} helper="Preventive tasks past due" />
         <MetricCard label="Breakdown Count" value={metrics.breakdownCount} icon={Activity} tone={metrics.breakdownCount ? "red" : "green"} helper="Breakdown incidents in scope" />
         <MetricCard label="Asset Health Index" value={`${metrics.assetHealthAverage}%`} icon={CheckCircle2} tone={metrics.assetHealthAverage < 60 ? "red" : metrics.assetHealthAverage < 75 ? "orange" : "green"} helper="Overall calculated asset health" />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <MiniKpi label="New" value={stats.new_orders || 0} tone="cyan" />
+        <MiniKpi label="Assigned" value={stats.assigned_orders || 0} tone="blue" />
+        <MiniKpi label="In Progress" value={stats.in_progress_orders || 0} tone="blue" />
+        <MiniKpi label="Waiting Parts" value={stats.waiting_parts_orders || 0} tone="orange" />
+        <MiniKpi label="Pending Review" value={stats.pending_review_orders || 0} tone="purple" />
+        <MiniKpi label="Closed Today" value={stats.closed_today || 0} tone="green" />
+        <MiniKpi label="Overdue" value={stats.overdue_orders || 0} tone="red" />
+        <MiniKpi label="Avg Completion" value={`${stats.average_completion_time_minutes || 0}m`} tone="slate" />
       </div>
 
       <DashboardAlertControls
@@ -2930,6 +3041,23 @@ function normalizePreventiveMaintenanceForm(value) {
   };
 }
 
+function normalizePMPlanForm(value) {
+  const recurrenceType = value.recurrence_type || "Runtime Hours";
+  return {
+    ...value,
+    equipment_id: Number(value.equipment_id || 0),
+    interval_value: Math.max(Number(value.interval_value || 1), 1),
+    recurrence_type: recurrenceType,
+    start_date: value.start_date || todayIso(),
+    next_due_date: recurrenceType === "Runtime Hours" ? "" : value.next_due_date || value.start_date || todayIso(),
+    next_due_runtime: recurrenceType === "Runtime Hours" ? Number(value.next_due_runtime || 0) : Number(value.next_due_runtime || 0),
+    last_runtime: Number(value.last_runtime || 0),
+    estimated_duration_minutes: Number(value.estimated_duration_minutes || 0),
+    status: value.status || "active",
+    priority: value.priority || "medium"
+  };
+}
+
 function normalizeEngineerForm(value) {
   const role = normalizeEmployeeRole(value.role);
   const jobTitle = value.job_title || value.specialty || "";
@@ -3315,7 +3443,7 @@ const DOCUMENT_CODE = "ECS-EN-OP-01-F-12";
 const ISSUE_NO = "1";
 const ISSUE_DATE = "1-Mar-21";
 
-function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelete, onBackToEquipment, canManage, canCreate = canManage, canEdit = canManage, canDelete = canManage, language }) {
+function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelete, onLifecycleAction, onBackToEquipment, canManage, canCreate = canManage, canEdit = canManage, canDelete = canManage, language }) {
   const t = (text) => tr(language, text);
   const [selectedSavedId, setSelectedSavedId] = useState(rows[0]?.id || "");
   const [savedFilter, setSavedFilter] = useState({ equipmentId: "", date: "" });
@@ -3324,6 +3452,15 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
   const [form, setForm] = useState(() => createWorkOrderForm({ equipment, customers, engineers, rows }));
   const [qrOpen, setQrOpen] = useState(false);
   const [qrMessage, setQrMessage] = useState("");
+  const [lifecycleDraft, setLifecycleDraft] = useState({
+    engineer_id: "",
+    runtime_reading: "",
+    notes: "",
+    reason: "",
+    completion_notes: "",
+    supervisor_notes: "",
+    checklist_completed: false
+  });
   const workOrderSectionRef = useRef(null);
   const videoRef = useRef(null);
   const qrStreamRef = useRef(null);
@@ -3547,6 +3684,31 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
     setEditingId(null);
     setViewingSavedId(null);
     setSelectedSavedId("");
+  }
+
+  async function runLifecycle(action) {
+    if (!selectedSavedOrder || !onLifecycleAction) return;
+    const payload = {
+      ...lifecycleDraft,
+      engineer_id: lifecycleDraft.engineer_id ? Number(lifecycleDraft.engineer_id) : Number(selectedSavedOrder.engineer_id || form.engineer_id || 0),
+      runtime_reading: lifecycleDraft.runtime_reading === "" ? Number(selectedSavedOrder.service_hours || form.service_hours || 0) : Number(lifecycleDraft.runtime_reading),
+      notes: lifecycleDraft.notes,
+      reason: lifecycleDraft.reason,
+      completion_notes: lifecycleDraft.completion_notes || lifecycleDraft.notes,
+      supervisor_notes: lifecycleDraft.supervisor_notes || lifecycleDraft.notes,
+      checklist_completed: Boolean(lifecycleDraft.checklist_completed)
+    };
+    const ok = await onLifecycleAction(selectedSavedOrder.id, action, payload);
+    if (ok) {
+      setLifecycleDraft((current) => ({
+        ...current,
+        notes: "",
+        reason: "",
+        completion_notes: "",
+        supervisor_notes: "",
+        checklist_completed: false
+      }));
+    }
   }
 
   async function saveWorkOrder() {
@@ -3843,8 +4005,209 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
         />
         <SavedWorkOrdersTable rows={filteredSavedRows} selectedId={selectedSavedId} setSelectedId={setSelectedSavedId} onOpen={openSelected} language={language} />
       </Panel>
+
+      {selectedSavedOrder ? (
+        <WorkOrderLifecyclePanel
+          order={selectedSavedOrder}
+          engineers={engineers}
+          draft={lifecycleDraft}
+          setDraft={setLifecycleDraft}
+          onAction={runLifecycle}
+          canEdit={canEdit}
+          language={language}
+        />
+      ) : null}
     </div>
   );
+}
+
+function WorkOrderLifecyclePanel({ order, engineers, draft, setDraft, onAction, canEdit, language }) {
+  const t = (text) => tr(language, text);
+  const status = normalizeWorkOrderStatus(order.status);
+  const actions = lifecycleActionsForStatus(status);
+  const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
+
+  return (
+    <Panel title="Work Order Lifecycle Engine" subtitle="Production workflow, assignment, review, timeline, and execution control.">
+      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Current Status</p>
+                <div className="mt-2"><WorkOrderStatus value={status} priority={order.priority} language={language} /></div>
+              </div>
+              <PriorityBadge value={order.priority} language={language} />
+            </div>
+            <div className="mt-4 grid gap-2 text-sm">
+              <LifecycleInfo label="Assigned At" value={formatLifecycleDate(order.assigned_at)} />
+              <LifecycleInfo label="Accepted At" value={formatLifecycleDate(order.accepted_at)} />
+              <LifecycleInfo label="Started At" value={formatLifecycleDate(order.started_at)} />
+              <LifecycleInfo label="Completed At" value={formatLifecycleDate(order.completed_at)} />
+              <LifecycleInfo label="Approved At" value={formatLifecycleDate(order.approved_at)} />
+              <LifecycleInfo label="Closed At" value={formatLifecycleDate(order.closed_at)} />
+              <LifecycleInfo label="Duration" value={order.work_duration_minutes ? `${order.work_duration_minutes} min` : "-"} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="text-sm font-black text-slate-950">Assignment Card</h3>
+            <label className="mt-3 block">
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Technician / Resource</span>
+              <select className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" value={draft.engineer_id || order.engineer_id || ""} onChange={(event) => update("engineer_id", event.target.value)}>
+                <option value=""></option>
+                {engineers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="text-sm font-black text-slate-950">Execution Details</h3>
+            <div className="mt-3 grid gap-3">
+              <label>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Runtime Reading</span>
+                <input type="number" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" value={draft.runtime_reading} onChange={(event) => update("runtime_reading", event.target.value)} placeholder={String(order.service_hours || 0)} />
+              </label>
+              <label>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Technician Notes</span>
+                <textarea rows={3} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" value={draft.notes} onChange={(event) => update("notes", event.target.value)} />
+              </label>
+              <label>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Reason</span>
+                <textarea rows={2} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" value={draft.reason} onChange={(event) => update("reason", event.target.value)} />
+              </label>
+              <label>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Completion Notes</span>
+                <textarea rows={3} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" value={draft.completion_notes} onChange={(event) => update("completion_notes", event.target.value)} />
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700">
+                <input type="checkbox" checked={draft.checklist_completed} onChange={(event) => update("checklist_completed", event.target.checked)} />
+                Checklist completed
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-950">Lifecycle Actions</h3>
+                <p className="mt-1 text-xs font-semibold text-slate-500">Only valid state transitions are enabled.</p>
+              </div>
+              <StatusBadge value={status} language={language} />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {actions.map((action) => (
+                <button
+                  key={action.key}
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => onAction(action.key)}
+                  className={`rounded-lg px-3 py-2 text-xs font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-40 ${action.tone}`}
+                >
+                  {action.label}
+                </button>
+              ))}
+              {!actions.length ? <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">No available actions</span> : null}
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <LifecycleCard title="Approval Card" rows={[
+              ["Approved By", order.approved_by_name || "-"],
+              ["Supervisor Notes", order.supervisor_notes || "-"],
+              ["Review Status", status === "pending_supervisor_review" ? "Awaiting review" : status]
+            ]} />
+            <LifecycleCard title="Parts Panel" rows={[
+              ["Waiting Reason", order.waiting_parts_reason || "-"],
+              ["Linked Parts", "Inventory-linked records"],
+              ["Reservation", status === "waiting_for_parts" ? "Required" : "Not active"]
+            ]} />
+            <LifecycleCard title="Checklist Panel" rows={[
+              ["Checklist", order.checklist_completed ? "Completed" : "Not completed"],
+              ["Completion Notes", order.completion_notes || "-"],
+              ["Runtime End", order.runtime_reading_end || order.service_hours || "-"]
+            ]} />
+            <LifecycleCard title="History Panel" rows={[
+              ["Created", formatLifecycleDate(order.created_at)],
+              ["Updated", formatLifecycleDate(order.updated_at)],
+              ["Timeline Events", String(order.timeline?.length || 0)]
+            ]} />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="text-sm font-black text-slate-950">Status Timeline</h3>
+            <div className="mt-4 space-y-3">
+              {(order.timeline || []).map((event) => (
+                <div key={event.id} className="grid grid-cols-[14px_1fr] gap-3">
+                  <span className="mt-1.5 h-3 w-3 rounded-full bg-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.12)]" />
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-black text-slate-950">{event.event_type}</p>
+                      <span className="text-xs font-bold text-slate-500">{formatLifecycleDate(event.created_at)}</span>
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-slate-600">{event.description}</p>
+                    {event.from_status || event.to_status ? <p className="mt-1 text-[11px] font-black uppercase tracking-[0.12em] text-blue-700">{event.from_status || "-"} {"->"} {event.to_status || "-"}</p> : null}
+                  </div>
+                </div>
+              ))}
+              {!order.timeline?.length ? <EmptyState title="No lifecycle events" message="Timeline entries will appear after lifecycle actions." /> : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function LifecycleInfo({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+      <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className="text-right text-xs font-bold text-slate-800">{value || "-"}</span>
+    </div>
+  );
+}
+
+function LifecycleCard({ title, rows }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 className="text-sm font-black text-slate-950">{title}</h3>
+      <div className="mt-3 space-y-2">
+        {rows.map(([label, value]) => <LifecycleInfo key={label} label={label} value={value} />)}
+      </div>
+    </div>
+  );
+}
+
+function lifecycleActionsForStatus(status) {
+  const actions = {
+    draft: [{ key: "cancel", label: "Cancel", tone: "bg-red-600 hover:bg-red-700" }],
+    new: [{ key: "assign", label: "Assign", tone: "bg-blue-700 hover:bg-blue-800" }, { key: "cancel", label: "Cancel", tone: "bg-red-600 hover:bg-red-700" }],
+    pending: [{ key: "assign", label: "Assign", tone: "bg-blue-700 hover:bg-blue-800" }, { key: "cancel", label: "Cancel", tone: "bg-red-600 hover:bg-red-700" }],
+    assigned: [{ key: "accept", label: "Accept", tone: "bg-emerald-600 hover:bg-emerald-700" }, { key: "pause", label: "On Hold", tone: "bg-orange-600 hover:bg-orange-700" }],
+    accepted: [{ key: "start", label: "Start", tone: "bg-blue-700 hover:bg-blue-800" }, { key: "pause", label: "On Hold", tone: "bg-orange-600 hover:bg-orange-700" }],
+    in_progress: [
+      { key: "waiting-parts", label: "Waiting Parts", tone: "bg-orange-600 hover:bg-orange-700" },
+      { key: "pause", label: "On Hold", tone: "bg-slate-700 hover:bg-slate-800" },
+      { key: "complete", label: "Complete", tone: "bg-emerald-600 hover:bg-emerald-700" }
+    ],
+    waiting_for_parts: [{ key: "resume", label: "Resume", tone: "bg-blue-700 hover:bg-blue-800" }],
+    on_hold: [{ key: "resume", label: "Resume", tone: "bg-blue-700 hover:bg-blue-800" }, { key: "cancel", label: "Cancel", tone: "bg-red-600 hover:bg-red-700" }],
+    pending_supervisor_review: [{ key: "approve", label: "Approve", tone: "bg-emerald-600 hover:bg-emerald-700" }, { key: "reject", label: "Reject", tone: "bg-red-600 hover:bg-red-700" }],
+    approved: [{ key: "close", label: "Close", tone: "bg-slate-950 hover:bg-slate-800" }]
+  };
+  return actions[status] || [];
+}
+
+function normalizeWorkOrderStatus(value) {
+  return String(value || "new").toLowerCase().replaceAll(" ", "_").replaceAll("-", "_");
+}
+
+function formatLifecycleDate(value) {
+  if (!value) return "-";
+  return String(value).replace("T", " ").slice(0, 19);
 }
 
 function DocLabel({ children }) {
@@ -4439,19 +4802,24 @@ function RoleBadge({ value }) {
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${tone}`}>{employeeRoleLabel(role)}</span>;
 }
 
-function CrudPage({ resourceKey, rows, onCreate, onEdit, onDelete, canManage = true, canAdd = canManage, canEdit = canManage, canDelete = canManage, language }) {
+function CrudPage({ resourceKey, rows, onCreate, onEdit, onDelete, canManage = true, canAdd = canManage, canEdit = canManage, canDelete = canManage, language, extraActions = null }) {
   const config = localizedConfig(resourceKey, language);
   const t = (text) => tr(language, text);
   return (
     <Panel
       title={config.title}
       subtitle={t("Create, update, and control operational records through the existing REST API.")}
-      actions={canAdd ? (
-        <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
-          <Plus className="h-4 w-4" />
-          {t("New Record")}
-        </button>
-      ) : null}
+      actions={(
+        <div className="flex flex-wrap gap-2">
+          {extraActions}
+          {canAdd ? (
+            <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
+              <Plus className="h-4 w-4" />
+              {t("New Record")}
+            </button>
+          ) : null}
+        </div>
+      )}
     >
       <DataTable columns={config.columns} rows={rows} onEdit={canEdit ? onEdit : null} onDelete={canDelete ? onDelete : null} emptyMessage={`${t("No records found.")}`} labels={tableLabels(language)} />
     </Panel>
@@ -6321,6 +6689,24 @@ function PmStat({ label, value, tone = "blue" }) {
   );
 }
 
+function MiniKpi({ label, value, tone = "blue" }) {
+  const colors = {
+    cyan: "border-cyan-200 bg-cyan-50 text-cyan-700",
+    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    orange: "border-orange-200 bg-orange-50 text-orange-700",
+    purple: "border-purple-200 bg-purple-50 text-purple-700",
+    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    red: "border-red-200 bg-red-50 text-red-700",
+    slate: "border-slate-200 bg-slate-50 text-slate-700"
+  };
+  return (
+    <div className={`rounded-xl border px-3 py-3 shadow-sm ${colors[tone] || colors.blue}`}>
+      <p className="text-xl font-black">{value}</p>
+      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em]">{label}</p>
+    </div>
+  );
+}
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -6551,8 +6937,20 @@ function valueLabel(value, language) {
 }
 
 function StatusBadge({ value, language = "en" }) {
+  const normalized = normalizeWorkOrderStatus(value);
   const tone = {
+    draft: "border-slate-200 bg-slate-100 text-slate-600",
+    new: "border-cyan-200 bg-cyan-50 text-cyan-700",
+    assigned: "border-blue-200 bg-blue-50 text-blue-700",
+    accepted: "border-indigo-200 bg-indigo-50 text-indigo-700",
     completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    pending_supervisor_review: "border-purple-200 bg-purple-50 text-purple-700",
+    approved: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    closed: "border-slate-300 bg-slate-200 text-slate-800",
+    rejected: "border-red-200 bg-red-50 text-red-700",
+    waiting_for_parts: "border-orange-200 bg-orange-50 text-orange-700",
+    on_hold: "border-orange-200 bg-orange-50 text-orange-700",
+    overdue: "border-red-200 bg-red-50 text-red-700",
     pending: "border-yellow-200 bg-yellow-50 text-yellow-700",
     in_progress: "border-blue-200 bg-blue-50 text-blue-700",
     breakdown: "border-red-200 bg-red-50 text-red-700",
@@ -6565,8 +6963,8 @@ function StatusBadge({ value, language = "en" }) {
     off_duty: "border-orange-200 bg-orange-50 text-orange-700",
     inactive: "border-slate-200 bg-slate-100 text-slate-600",
     paused: "border-orange-200 bg-orange-50 text-orange-700"
-  }[value] || "border-slate-200 bg-slate-100 text-slate-600";
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${tone}`}>{valueLabel(value || "unknown", language)}</span>;
+  }[normalized] || "border-slate-200 bg-slate-100 text-slate-600";
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${tone}`}>{valueLabel(normalized || "unknown", language)}</span>;
 }
 
 function WorkOrderStatus({ value, priority, language = "en" }) {

@@ -8,6 +8,7 @@ const routePages = [
   { path: "/assets", initialPage: "equipment" },
   { path: "/equipment", initialPage: "equipment" },
   { path: "/work-orders", initialPage: "work-orders" },
+  { path: "/pm-plans", initialPage: "pm-plans" },
   { path: "/preventive-maintenance", initialPage: "schedule" },
   { path: "/calendar", initialPage: "schedule" },
   { path: "/schedule", initialPage: "schedule" },

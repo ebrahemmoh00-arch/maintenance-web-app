@@ -15,6 +15,7 @@ const items = [
   ["dashboard", "Dashboard", "لوحة التحكم", LayoutDashboard],
   ["equipment", "Assets", "الأصول والمعدات", Wrench],
   ["work-orders", "Work Orders", "أوامر الشغل", ClipboardList],
+  ["pm-plans", "PM Plans", "خطط الصيانة", CalendarDays],
   ["schedule", "Schedule", "الجدول الزمني", CalendarDays],
   ["inventory", "Inventory", "المخزون", Boxes],
   ["engineers", "Resources", "الفريق", HardHat],

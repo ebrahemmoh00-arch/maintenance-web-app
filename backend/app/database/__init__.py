@@ -92,11 +92,84 @@ CREATE TABLE IF NOT EXISTS work_orders (
     priority TEXT DEFAULT 'medium',
     service_hours INTEGER DEFAULT 0,
     notes TEXT DEFAULT '',
+    assigned_by_id INTEGER,
+    assigned_at TEXT DEFAULT '',
+    accepted_at TEXT DEFAULT '',
+    started_at TEXT DEFAULT '',
+    paused_at TEXT DEFAULT '',
+    resumed_at TEXT DEFAULT '',
+    completed_at TEXT DEFAULT '',
+    approved_by_id INTEGER,
+    approved_at TEXT DEFAULT '',
+    closed_at TEXT DEFAULT '',
+    cancelled_at TEXT DEFAULT '',
+    rejected_at TEXT DEFAULT '',
+    hold_reason TEXT DEFAULT '',
+    waiting_parts_reason TEXT DEFAULT '',
+    runtime_reading_start INTEGER DEFAULT 0,
+    runtime_reading_end INTEGER DEFAULT 0,
+    technician_notes TEXT DEFAULT '',
+    completion_notes TEXT DEFAULT '',
+    supervisor_notes TEXT DEFAULT '',
+    checklist_completed INTEGER DEFAULT 0,
+    work_duration_minutes INTEGER DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
     FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT,
-    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT
+    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT,
+    FOREIGN KEY(assigned_by_id) REFERENCES engineers(id) ON DELETE SET NULL,
+    FOREIGN KEY(approved_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_timeline (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_order_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    from_status TEXT DEFAULT '',
+    to_status TEXT DEFAULT '',
+    actor_id INTEGER,
+    actor_name TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    metadata TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_order_id INTEGER NOT NULL,
+    from_status TEXT DEFAULT '',
+    to_status TEXT NOT NULL,
+    changed_by_id INTEGER,
+    reason TEXT DEFAULT '',
+    changed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(changed_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_assignment_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_order_id INTEGER NOT NULL,
+    engineer_id INTEGER NOT NULL,
+    assigned_by_id INTEGER,
+    assigned_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT DEFAULT '',
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT,
+    FOREIGN KEY(assigned_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_approvals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_order_id INTEGER NOT NULL,
+    supervisor_id INTEGER,
+    action TEXT NOT NULL,
+    notes TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(supervisor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS inventory_items (
@@ -139,6 +212,52 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
     FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS pm_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipment_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    priority TEXT DEFAULT 'medium',
+    recurrence_type TEXT DEFAULT 'Runtime Hours',
+    interval_value INTEGER DEFAULT 1,
+    start_date TEXT NOT NULL,
+    next_due_date TEXT DEFAULT '',
+    next_due_runtime INTEGER DEFAULT 0,
+    last_service_date TEXT DEFAULT '',
+    last_runtime INTEGER DEFAULT 0,
+    estimated_duration_minutes INTEGER DEFAULT 0,
+    required_skills TEXT DEFAULT '',
+    checklist_template TEXT DEFAULT '',
+    planned_spare_parts TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pm_plan_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pm_plan_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    task_description TEXT DEFAULT '',
+    sequence INTEGER DEFAULT 1,
+    is_required INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pm_plan_id INTEGER NOT NULL,
+    work_order_id INTEGER NOT NULL UNIQUE,
+    cycle_key TEXT NOT NULL,
+    generated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'generated',
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    UNIQUE(pm_plan_id, cycle_key)
+);
+
 CREATE TABLE IF NOT EXISTS auth_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     jti TEXT NOT NULL UNIQUE,
@@ -170,6 +289,19 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+CREATE INDEX IF NOT EXISTS idx_work_orders_due_date ON work_orders(due_date);
+CREATE INDEX IF NOT EXISTS idx_work_order_timeline_work_order_id ON work_order_timeline(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_status_history_work_order_id ON work_order_status_history(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_assignment_history_work_order_id ON work_order_assignment_history(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_approvals_work_order_id ON work_order_approvals(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_equipment_id ON pm_plans(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_status ON pm_plans(status);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_date ON pm_plans(next_due_date);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_runtime ON pm_plans(next_due_runtime);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_tasks_plan_id ON pm_plan_tasks(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_plan_id ON pm_plan_work_orders(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_work_order_id ON pm_plan_work_orders(work_order_id);
 """
 
 
@@ -243,11 +375,84 @@ CREATE TABLE IF NOT EXISTS work_orders (
     priority TEXT DEFAULT 'medium',
     service_hours INTEGER DEFAULT 0,
     notes TEXT DEFAULT '',
+    assigned_by_id INTEGER,
+    assigned_at TEXT DEFAULT '',
+    accepted_at TEXT DEFAULT '',
+    started_at TEXT DEFAULT '',
+    paused_at TEXT DEFAULT '',
+    resumed_at TEXT DEFAULT '',
+    completed_at TEXT DEFAULT '',
+    approved_by_id INTEGER,
+    approved_at TEXT DEFAULT '',
+    closed_at TEXT DEFAULT '',
+    cancelled_at TEXT DEFAULT '',
+    rejected_at TEXT DEFAULT '',
+    hold_reason TEXT DEFAULT '',
+    waiting_parts_reason TEXT DEFAULT '',
+    runtime_reading_start INTEGER DEFAULT 0,
+    runtime_reading_end INTEGER DEFAULT 0,
+    technician_notes TEXT DEFAULT '',
+    completion_notes TEXT DEFAULT '',
+    supervisor_notes TEXT DEFAULT '',
+    checklist_completed INTEGER DEFAULT 0,
+    work_duration_minutes INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
     FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT,
-    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT
+    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT,
+    FOREIGN KEY(assigned_by_id) REFERENCES engineers(id) ON DELETE SET NULL,
+    FOREIGN KEY(approved_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_timeline (
+    id SERIAL PRIMARY KEY,
+    work_order_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    from_status TEXT DEFAULT '',
+    to_status TEXT DEFAULT '',
+    actor_id INTEGER,
+    actor_name TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    metadata TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_status_history (
+    id SERIAL PRIMARY KEY,
+    work_order_id INTEGER NOT NULL,
+    from_status TEXT DEFAULT '',
+    to_status TEXT NOT NULL,
+    changed_by_id INTEGER,
+    reason TEXT DEFAULT '',
+    changed_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(changed_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_assignment_history (
+    id SERIAL PRIMARY KEY,
+    work_order_id INTEGER NOT NULL,
+    engineer_id INTEGER NOT NULL,
+    assigned_by_id INTEGER,
+    assigned_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    notes TEXT DEFAULT '',
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT,
+    FOREIGN KEY(assigned_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS work_order_approvals (
+    id SERIAL PRIMARY KEY,
+    work_order_id INTEGER NOT NULL,
+    supervisor_id INTEGER,
+    action TEXT NOT NULL,
+    notes TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(supervisor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS inventory_items (
@@ -290,6 +495,52 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
     FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS pm_plans (
+    id SERIAL PRIMARY KEY,
+    equipment_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    priority TEXT DEFAULT 'medium',
+    recurrence_type TEXT DEFAULT 'Runtime Hours',
+    interval_value INTEGER DEFAULT 1,
+    start_date TEXT NOT NULL,
+    next_due_date TEXT DEFAULT '',
+    next_due_runtime INTEGER DEFAULT 0,
+    last_service_date TEXT DEFAULT '',
+    last_runtime INTEGER DEFAULT 0,
+    estimated_duration_minutes INTEGER DEFAULT 0,
+    required_skills TEXT DEFAULT '',
+    checklist_template TEXT DEFAULT '',
+    planned_spare_parts TEXT DEFAULT '',
+    status TEXT DEFAULT 'active',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pm_plan_tasks (
+    id SERIAL PRIMARY KEY,
+    pm_plan_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    task_description TEXT DEFAULT '',
+    sequence INTEGER DEFAULT 1,
+    is_required INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
+    id SERIAL PRIMARY KEY,
+    pm_plan_id INTEGER NOT NULL,
+    work_order_id INTEGER NOT NULL UNIQUE,
+    cycle_key TEXT NOT NULL,
+    generated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    status TEXT DEFAULT 'generated',
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    UNIQUE(pm_plan_id, cycle_key)
+);
+
 CREATE TABLE IF NOT EXISTS auth_tokens (
     id SERIAL PRIMARY KEY,
     jti TEXT NOT NULL UNIQUE,
@@ -321,6 +572,19 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+CREATE INDEX IF NOT EXISTS idx_work_orders_due_date ON work_orders(due_date);
+CREATE INDEX IF NOT EXISTS idx_work_order_timeline_work_order_id ON work_order_timeline(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_status_history_work_order_id ON work_order_status_history(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_assignment_history_work_order_id ON work_order_assignment_history(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_approvals_work_order_id ON work_order_approvals(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_equipment_id ON pm_plans(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_status ON pm_plans(status);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_date ON pm_plans(next_due_date);
+CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_runtime ON pm_plans(next_due_runtime);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_tasks_plan_id ON pm_plan_tasks(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_plan_id ON pm_plan_work_orders(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_work_order_id ON pm_plan_work_orders(work_order_id);
 """
 
 
@@ -415,6 +679,33 @@ def init_db() -> None:
                 "asset_level": "TEXT DEFAULT 'Equipment'",
                 "asset_code": "TEXT DEFAULT ''",
                 "criticality": "TEXT DEFAULT 'Medium'",
+            },
+        )
+        ensure_columns(
+            db,
+            "work_orders",
+            {
+                "assigned_by_id": "INTEGER",
+                "assigned_at": "TEXT DEFAULT ''",
+                "accepted_at": "TEXT DEFAULT ''",
+                "started_at": "TEXT DEFAULT ''",
+                "paused_at": "TEXT DEFAULT ''",
+                "resumed_at": "TEXT DEFAULT ''",
+                "completed_at": "TEXT DEFAULT ''",
+                "approved_by_id": "INTEGER",
+                "approved_at": "TEXT DEFAULT ''",
+                "closed_at": "TEXT DEFAULT ''",
+                "cancelled_at": "TEXT DEFAULT ''",
+                "rejected_at": "TEXT DEFAULT ''",
+                "hold_reason": "TEXT DEFAULT ''",
+                "waiting_parts_reason": "TEXT DEFAULT ''",
+                "runtime_reading_start": "INTEGER DEFAULT 0",
+                "runtime_reading_end": "INTEGER DEFAULT 0",
+                "technician_notes": "TEXT DEFAULT ''",
+                "completion_notes": "TEXT DEFAULT ''",
+                "supervisor_notes": "TEXT DEFAULT ''",
+                "checklist_completed": "INTEGER DEFAULT 0",
+                "work_duration_minutes": "INTEGER DEFAULT 0",
             },
         )
         ensure_columns(
