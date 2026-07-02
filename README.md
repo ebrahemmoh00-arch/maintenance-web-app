@@ -27,6 +27,16 @@ maintenance-web-app/
     src/
     package.json
     tailwind.config.js
+  tools/
+    Start-CMMS.bat
+    Stop-CMMS.bat
+    Restart-CMMS.bat
+    Rebuild-CMMS.bat
+    Backup-Database.bat
+    Restore-Database.bat
+    Update-Project.bat
+    HealthCheck.bat
+  backups/
   docker-compose.yml
 ```
 
@@ -110,6 +120,43 @@ postgres_data
 The backend waits for PostgreSQL before starting.
 
 The backend and frontend run with hot reload through mounted source folders.
+
+## Local Development Toolkit
+
+Windows launchers are available in:
+
+```text
+tools/
+```
+
+Use these files on Windows 10 or Windows 11 after Docker Desktop is installed and running.
+
+| Tool | Purpose |
+| --- | --- |
+| `Start-CMMS.bat` | Checks Docker Desktop, starts Docker Compose in detached mode, waits for healthy services, opens the frontend and Swagger. |
+| `Stop-CMMS.bat` | Stops all local CMMS Docker services with `docker compose down`. |
+| `Restart-CMMS.bat` | Stops and starts all services, then waits for health checks. |
+| `Rebuild-CMMS.bat` | Rebuilds containers and starts services after code or Dockerfile changes. |
+| `Backup-Database.bat` | Creates a timestamped PostgreSQL `.sql` backup inside `backups/`. |
+| `Restore-Database.bat` | Lists available `.sql` backups and restores the selected one after confirmation. |
+| `Update-Project.bat` | Runs `git pull`, rebuilds containers, and starts the platform. |
+| `HealthCheck.bat` | Shows the health status of Docker, PostgreSQL, Backend, and Frontend. |
+
+Backup files are intentionally ignored by Git.
+
+The backup folder is:
+
+```text
+backups/
+```
+
+Example backup file:
+
+```text
+backup_2026-07-02_15-30.sql
+```
+
+If Docker Desktop is not running, the tools show a clear failure message instead of changing the project.
 
 ## Local PostgreSQL Setup
 

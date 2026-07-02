@@ -26,6 +26,10 @@ backend/maintenance.db
 # Logs
 *.log
 
+# Local database backups
+backups/*.sql
+!backups/.gitkeep
+
 # Browser debug artifacts
 chrome-dom.txt
 chrome-dump-live.txt

@@ -27,6 +27,7 @@ __pycache__
 coverage
 
 *.log
+backups
 chrome-dom.txt
 chrome-dump-live.txt
 chrome-err.txt
