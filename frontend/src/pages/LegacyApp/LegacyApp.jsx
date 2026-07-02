@@ -173,15 +173,40 @@ const resources = {
       name: "",
       serial_number: "",
       model: "",
+      description: "",
+      category: "",
+      manufacturer: "",
       location: "",
       parent_id: null,
       asset_type: "Equipment",
       asset_level: "Equipment",
       asset_code: "",
+      qr_code: "",
+      barcode: "",
       criticality: "Medium",
+      site: "",
+      department: "",
+      commission_date: "",
+      installation_date: "",
+      warranty_start: "",
+      warranty_end: "",
+      expected_life_years: 0,
+      replacement_cost: 0,
+      current_condition: "",
       maintenance_interval_hours: 1000,
       maintenance_interval_days: 90,
       current_hours: 0,
+      last_reading: 0,
+      current_reading: 0,
+      last_pm_date: "",
+      next_pm_date: "",
+      last_breakdown_date: "",
+      last_repair_date: "",
+      purchase_cost: 0,
+      total_maintenance_cost: 0,
+      spare_parts_cost: 0,
+      labor_cost: 0,
+      contractor_cost: 0,
       last_maintenance_date: "",
       status: "Active"
     },
@@ -193,9 +218,31 @@ const resources = {
       { key: "asset_level", label: "Hierarchy Level", type: "select", options: ["Site", "Area / Department", "System", "Equipment", "Component"] },
       { key: "asset_code", label: "Asset Code" },
       { key: "serial_number", label: "Serial Number" },
+      { key: "model", label: "Model" },
+      { key: "manufacturer", label: "Manufacturer" },
+      { key: "category", label: "Category" },
+      { key: "description", label: "Description" },
       { key: "location", label: "Asset Location" },
+      { key: "site", label: "Site" },
+      { key: "department", label: "Department" },
+      { key: "qr_code", label: "QR Code" },
+      { key: "barcode", label: "Barcode" },
       { key: "current_hours", label: "Current Hours / Running Hours", type: "number" },
+      { key: "current_reading", label: "Current Reading", type: "number" },
+      { key: "last_reading", label: "Last Reading", type: "number" },
       { key: "criticality", label: "Criticality", type: "select", options: ["Low", "Medium", "High", "Critical"] },
+      { key: "current_condition", label: "Current Condition", type: "select", options: ["Excellent", "Good", "Warning", "Critical", "Needs Inspection"] },
+      { key: "commission_date", label: "Commission Date", type: "date" },
+      { key: "installation_date", label: "Installation Date", type: "date" },
+      { key: "warranty_start", label: "Warranty Start", type: "date" },
+      { key: "warranty_end", label: "Warranty End", type: "date" },
+      { key: "expected_life_years", label: "Expected Life (Years)", type: "number" },
+      { key: "purchase_cost", label: "Purchase Cost", type: "number" },
+      { key: "replacement_cost", label: "Replacement Cost", type: "number" },
+      { key: "total_maintenance_cost", label: "Total Maintenance Cost", type: "number" },
+      { key: "spare_parts_cost", label: "Spare Parts Cost", type: "number" },
+      { key: "labor_cost", label: "Labor Cost", type: "number" },
+      { key: "contractor_cost", label: "Contractor Cost", type: "number" },
       { key: "status", label: "Status", type: "select", options: ["Active", "Down", "Maintenance", "operational", "warning", "down"] }
     ],
     columns: [
@@ -2679,6 +2726,9 @@ function AssetsPage({ rows, departments, onCreate, onEdit, onDelete, onCreateDep
   const [expanded, setExpanded] = useState({});
   const [assetSearch, setAssetSearch] = useState("");
   const [assetFilters, setAssetFilters] = useState({ status: "", level: "", criticality: "" });
+  const [assetLifecycle, setAssetLifecycle] = useState({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [] });
+  const [assetLifecycleLoading, setAssetLifecycleLoading] = useState(false);
+  const [assetLifecycleError, setAssetLifecycleError] = useState("");
   const customerConfig = localizedConfig("customers", language);
   const assetConfig = localizedConfig("equipment", language);
   const assetTree = useMemo(() => buildAssetTree(rows, assetSearch, assetFilters), [rows, assetSearch, assetFilters]);
@@ -2698,6 +2748,72 @@ function AssetsPage({ rows, departments, onCreate, onEdit, onDelete, onCreateDep
       setSelectedAssetId(rows[0].id);
     }
   }, [rows, selectedAssetId]);
+
+  useEffect(() => {
+    if (!selectedAsset?.id) {
+      setAssetLifecycle({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [] });
+      return;
+    }
+    let cancelled = false;
+    async function loadLifecycle() {
+      setAssetLifecycleLoading(true);
+      setAssetLifecycleError("");
+      try {
+        const [history, timeline, health, measurements, events, documents, photos] = await Promise.all([
+          api.list(`assets/${selectedAsset.id}/history`),
+          api.list(`assets/${selectedAsset.id}/timeline`),
+          api.list(`assets/${selectedAsset.id}/health`),
+          api.list(`assets/${selectedAsset.id}/measurements`),
+          api.list(`assets/${selectedAsset.id}/events`),
+          api.list(`assets/${selectedAsset.id}/documents`),
+          api.list(`assets/${selectedAsset.id}/photos`)
+        ]);
+        if (!cancelled) setAssetLifecycle({ history, timeline, health, measurements, events, documents, photos });
+      } catch (error) {
+        if (!cancelled) {
+          setAssetLifecycle({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [] });
+          setAssetLifecycleError(error.message || "Failed to load asset lifecycle");
+        }
+      } finally {
+        if (!cancelled) setAssetLifecycleLoading(false);
+      }
+    }
+    loadLifecycle();
+    return () => { cancelled = true; };
+  }, [selectedAsset?.id]);
+
+  async function reloadAssetLifecycle(assetId = selectedAsset?.id) {
+    if (!assetId) return;
+    setAssetLifecycleLoading(true);
+    setAssetLifecycleError("");
+    try {
+      const [history, timeline, health, measurements, events, documents, photos] = await Promise.all([
+        api.list(`assets/${assetId}/history`),
+        api.list(`assets/${assetId}/timeline`),
+        api.list(`assets/${assetId}/health`),
+        api.list(`assets/${assetId}/measurements`),
+        api.list(`assets/${assetId}/events`),
+        api.list(`assets/${assetId}/documents`),
+        api.list(`assets/${assetId}/photos`)
+      ]);
+      setAssetLifecycle({ history, timeline, health, measurements, events, documents, photos });
+    } catch (error) {
+      setAssetLifecycleError(error.message || "Failed to load asset lifecycle");
+    } finally {
+      setAssetLifecycleLoading(false);
+    }
+  }
+
+  async function handleAssetLifecycleCreate(kind, payload) {
+    if (!selectedAsset?.id) return;
+    const resource = kind === "document" ? "documents" : kind === "photo" ? "photos" : "measurements";
+    try {
+      await api.create(`assets/${selectedAsset.id}/${resource}`, payload);
+      await reloadAssetLifecycle(selectedAsset.id);
+    } catch (error) {
+      window.alert(error.message || "Failed to save asset lifecycle item");
+    }
+  }
 
   function toggleExpanded(id) {
     setExpanded((current) => ({ ...current, [id]: !current[id] }));
@@ -2814,6 +2930,10 @@ function AssetsPage({ rows, departments, onCreate, onEdit, onDelete, onCreateDep
             canManage={canEditAsset || canDeleteAsset}
             canEdit={canEditAsset}
             canDelete={canDeleteAsset}
+            lifecycle={assetLifecycle}
+            lifecycleLoading={assetLifecycleLoading}
+            lifecycleError={assetLifecycleError}
+            onAddLifecycleItem={handleAssetLifecycleCreate}
             language={language}
           />
         </div>
@@ -2927,7 +3047,7 @@ function AssetTreeNode({ node, rows, selectedId, expanded, onToggle, onSelect, o
   );
 }
 
-function AssetDetailsPanel({ asset, rows, departments, workOrders, pmTasks, inventory, onEdit, onDelete, canManage, canEdit = canManage, canDelete = canManage, language }) {
+function AssetDetailsPanel({ asset, rows, departments, workOrders, pmTasks, inventory, onEdit, onDelete, canManage, canEdit = canManage, canDelete = canManage, lifecycle = {}, lifecycleLoading = false, lifecycleError = "", onAddLifecycleItem, language }) {
   const t = (text) => tr(language, text);
   if (!asset) {
     return <Panel title="Asset Details"><EmptyState title={t("No equipment")} message="Select an asset from the tree." /></Panel>;
@@ -2939,6 +3059,11 @@ function AssetDetailsPanel({ asset, rows, departments, workOrders, pmTasks, inve
   const linkedPm = pmTasks.filter((item) => Number(item.equipment_id) === Number(asset.id));
   const linkedParts = inventory.filter((item) => String(item.location || "").toLowerCase().includes(String(asset.name || "").toLowerCase()) || Number(item.linked_work_order_id) && linkedOrders.some((order) => Number(order.id) === Number(item.linked_work_order_id)));
   const breadcrumb = buildAssetBreadcrumb(asset, rows);
+  const health = lifecycle.health || {};
+  const healthScore = Number(health.health_score ?? 100);
+  const costTotal = Number(health.maintenance_cost ?? (Number(asset.total_maintenance_cost || 0) + Number(asset.spare_parts_cost || 0) + Number(asset.labor_cost || 0) + Number(asset.contractor_cost || 0)));
+  const timelineRows = lifecycle.timeline?.length ? lifecycle.timeline : lifecycle.history || [];
+  const statusText = health.health_status || asset.current_condition || "Excellent";
   return (
     <Panel
       title="Asset Details"
@@ -2959,12 +3084,97 @@ function AssetDetailsPanel({ asset, rows, departments, workOrders, pmTasks, inve
         <AssetInfoTile label="Criticality" value={asset.criticality || "Medium"} />
       </div>
 
+      {lifecycleError ? (
+        <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
+          {lifecycleError}
+        </div>
+      ) : null}
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Asset Health Score</p>
+              <div className="mt-2 flex items-end gap-2">
+                <span className="text-5xl font-black text-slate-950">{healthScore}</span>
+                <span className="pb-2 text-sm font-black uppercase text-slate-500">/ 100</span>
+              </div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-black ${healthScore >= 80 ? "bg-emerald-50 text-emerald-700" : healthScore >= 60 ? "bg-orange-50 text-orange-700" : "bg-red-50 text-red-700"}`}>
+              {statusText}
+            </span>
+          </div>
+          <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100">
+            <div className={`h-full rounded-full ${healthScore >= 80 ? "bg-emerald-500" : healthScore >= 60 ? "bg-orange-500" : "bg-red-500"}`} style={{ width: `${Math.max(Math.min(healthScore, 100), 0)}%` }} />
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <AssetMiniMetric label="Availability" value={`${Number(health.availability ?? 100).toFixed(1)}%`} />
+            <AssetMiniMetric label="MTBF" value={`${Number(health.mtbf ?? 0).toLocaleString()}h`} />
+            <AssetMiniMetric label="MTTR" value={`${Number(health.mttr ?? 0).toLocaleString()}h`} />
+            <AssetMiniMetric label="Downtime" value={`${Number(health.total_downtime_hours ?? 0).toLocaleString()}h`} />
+            <AssetMiniMetric label="PM Compliance" value={`${Number(health.pm_compliance ?? 100).toFixed(0)}%`} />
+            <AssetMiniMetric label="Open W.O." value={Number(health.open_work_orders ?? linkedOrders.length).toLocaleString()} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Lifecycle Profile</p>
+          <div className="mt-4 grid gap-3">
+            <AssetDetailLine label="Manufacturer" value={asset.manufacturer} />
+            <AssetDetailLine label="Model" value={asset.model} />
+            <AssetDetailLine label="Serial Number" value={asset.serial_number} />
+            <AssetDetailLine label="Category" value={asset.category || asset.asset_type} />
+            <AssetDetailLine label="Site / Department" value={[asset.site || customer?.name, asset.department].filter(Boolean).join(" / ")} />
+            <AssetDetailLine label="QR / Barcode" value={[asset.qr_code, asset.barcode].filter(Boolean).join(" / ")} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-3">
+        <AssetRelationList title="Lifecycle Dates" rows={[
+          `Installed: ${asset.installation_date || "-"}`,
+          `Commissioned: ${asset.commission_date || "-"}`,
+          `Warranty: ${asset.warranty_start || "-"} to ${asset.warranty_end || "-"}`,
+          `Expected Life: ${asset.expected_life_years || 0} years`
+        ]} empty="No lifecycle dates" />
+        <AssetRelationList title="Operational Readings" rows={[
+          `Runtime Hours: ${Number(asset.current_hours || 0).toLocaleString()} hrs`,
+          `Last Reading: ${Number(asset.last_reading || 0).toLocaleString()}`,
+          `Current Reading: ${Number(asset.current_reading || 0).toLocaleString()}`,
+          `Last PM: ${asset.last_pm_date || asset.last_maintenance_date || "-"}`
+        ]} empty="No readings" />
+        <AssetRelationList title="Cost Summary" rows={[
+          `Purchase Cost: ${Number(asset.purchase_cost || 0).toLocaleString()} EGP`,
+          `Replacement Cost: ${Number(asset.replacement_cost || 0).toLocaleString()} EGP`,
+          `Maintenance Cost: ${costTotal.toLocaleString()} EGP`,
+          `Parts / Labor / Contractors: ${Number(asset.spare_parts_cost || 0).toLocaleString()} / ${Number(asset.labor_cost || 0).toLocaleString()} / ${Number(asset.contractor_cost || 0).toLocaleString()} EGP`
+        ]} empty="No cost data" />
+      </div>
+
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
         <AssetRelationList title="Children" rows={children.map((item) => `${item.asset_code || `AST-${item.id}`} - ${item.name}`)} empty="No child assets" />
         <AssetRelationList title="Linked Work Orders" rows={linkedOrders.map((item) => `${item.title} (${item.status})`)} empty="No linked work orders" />
         <AssetRelationList title="Preventive Maintenance" rows={linkedPm.map((item) => `${item.task_name} - ${item.pm_alert || item.status}`)} empty="No PM tasks" />
         <AssetRelationList title="Spare Parts" rows={linkedParts.map((item) => `${item.part_number || "PART"} - ${item.name} (${item.stock_quantity} ${item.unit || "pcs"})`)} empty="No linked spare parts" />
       </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <AssetTimeline rows={timelineRows} loading={lifecycleLoading} />
+        <div className="space-y-4">
+          <AssetRelationList title="Asset Events" rows={(lifecycle.events || []).map((item) => `${item.event_type} - ${item.severity} - ${item.status}`)} empty="No asset events" />
+          <AssetRelationList title="Measurements" rows={(lifecycle.measurements || []).map((item) => `${item.reading_date || item.created_at}: ${item.measurement_type} = ${item.value} ${item.unit || ""}`)} empty="No measurements" />
+          <AssetRelationList title="Documents" rows={(lifecycle.documents || []).map((item) => `${item.document_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No documents" />
+          <AssetRelationList title="Photos" rows={(lifecycle.photos || []).map((item) => `${item.photo_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No photos" />
+        </div>
+      </div>
+
+      {canEdit && onAddLifecycleItem ? (
+        <div className="mt-5 grid gap-4 xl:grid-cols-3">
+          <AssetLifecycleForm type="measurement" title="Add Measurement" onSubmit={(payload) => onAddLifecycleItem("measurement", payload)} />
+          <AssetLifecycleForm type="document" title="Add Document" onSubmit={(payload) => onAddLifecycleItem("document", payload)} />
+          <AssetLifecycleForm type="photo" title="Add Photo" onSubmit={(payload) => onAddLifecycleItem("photo", payload)} />
+        </div>
+      ) : null}
 
       <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
@@ -3008,6 +3218,117 @@ function AssetRelationList({ title, rows, empty }) {
         {!rows.length ? <p className="text-sm font-semibold text-slate-400">{empty}</p> : null}
       </div>
     </div>
+  );
+}
+
+function AssetMiniMetric({ label, value }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function AssetDetailLine({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg bg-white px-3 py-2">
+      <span className="text-xs font-black uppercase tracking-[0.1em] text-slate-500">{label}</span>
+      <span className="max-w-[58%] text-right text-sm font-bold text-slate-800">{value || "-"}</span>
+    </div>
+  );
+}
+
+function AssetTimeline({ rows = [], loading = false }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-black text-slate-950">Asset Timeline</h3>
+        {loading ? <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700">Loading</span> : null}
+      </div>
+      <div className="mt-4 max-h-[420px] space-y-3 overflow-auto pr-1">
+        {rows.map((item) => (
+          <div key={`${item.id}-${item.created_at}`} className="relative rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-black text-slate-950">{item.title || item.event_type}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">{item.description || item.source_module || "Asset lifecycle event"}</p>
+              </div>
+              <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-slate-500">{item.event_type || "Event"}</span>
+            </div>
+            <p className="mt-2 text-xs font-bold text-blue-700">{item.created_at}</p>
+          </div>
+        ))}
+        {!rows.length ? <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-400">No timeline entries recorded yet.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function AssetLifecycleForm({ type, title, onSubmit }) {
+  const initial = type === "measurement"
+    ? { measurement_type: "Runtime Hours", value: "", unit: "hrs", reading_date: todayIso(), notes: "" }
+    : type === "document"
+      ? { document_type: "Manual", title: "", file_name: "", file_url: "", description: "" }
+      : { photo_type: "Current Photo", title: "", file_name: "", file_url: "", description: "" };
+  const [form, setForm] = useState(initial);
+  const [saving, setSaving] = useState(false);
+
+  function update(key, value) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    if (type === "measurement" && (form.value === "" || Number(form.value) < 0)) return;
+    if (type !== "measurement" && !String(form.title || "").trim()) return;
+    setSaving(true);
+    try {
+      await onSubmit({
+        ...form,
+        value: type === "measurement" ? Number(form.value) : form.value
+      });
+      setForm(initial);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 className="text-sm font-black text-slate-950">{title}</h3>
+      <div className="mt-3 space-y-2">
+        {type === "measurement" ? (
+          <>
+            <AssetFormInput label="Type" value={form.measurement_type} onChange={(value) => update("measurement_type", value)} />
+            <AssetFormInput label="Value" type="number" value={form.value} onChange={(value) => update("value", value)} />
+            <AssetFormInput label="Unit" value={form.unit} onChange={(value) => update("unit", value)} />
+            <AssetFormInput label="Reading Date" type="date" value={form.reading_date} onChange={(value) => update("reading_date", value)} />
+            <AssetFormInput label="Notes" value={form.notes} onChange={(value) => update("notes", value)} />
+          </>
+        ) : (
+          <>
+            <AssetFormInput label={type === "document" ? "Document Type" : "Photo Type"} value={type === "document" ? form.document_type : form.photo_type} onChange={(value) => update(type === "document" ? "document_type" : "photo_type", value)} />
+            <AssetFormInput label="Title" value={form.title} onChange={(value) => update("title", value)} />
+            <AssetFormInput label="File Name" value={form.file_name} onChange={(value) => update("file_name", value)} />
+            <AssetFormInput label="File URL" value={form.file_url} onChange={(value) => update("file_url", value)} />
+            <AssetFormInput label="Description" value={form.description} onChange={(value) => update("description", value)} />
+          </>
+        )}
+      </div>
+      <button type="submit" disabled={saving} className="mt-3 w-full rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800 disabled:opacity-60">
+        {saving ? "Saving..." : "Save"}
+      </button>
+    </form>
+  );
+}
+
+function AssetFormInput({ label, value, onChange, type = "text" }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">{label}</span>
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white" />
+    </label>
   );
 }
 

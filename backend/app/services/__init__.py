@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..core.audit import AuditService
-from ..repositories import CustomerRepository, EngineerRepository, EquipmentRepository, InventoryRepository, JobTitleRepository, PMPlanRepository, PMPlanTaskRepository, PMPlanWorkOrderRepository, PreventiveMaintenanceRepository, WorkOrderRepository, parse_date
+from ..repositories import AssetLifecycleRepository, CustomerRepository, EngineerRepository, EquipmentRepository, InventoryRepository, JobTitleRepository, PMPlanRepository, PMPlanTaskRepository, PMPlanWorkOrderRepository, PreventiveMaintenanceRepository, WorkOrderRepository, parse_date
 from ..core.security import hash_password, is_password_hash
 
 
@@ -111,6 +111,7 @@ class EquipmentService:
     def __init__(self) -> None:
         self.repo = EquipmentRepository()
         self.customers = CustomerRepository()
+        self.lifecycle = AssetLifecycleRepository()
 
     def list(self): return self.repo.list()
     def get(self, item_id: int): return self.repo.get(item_id)
@@ -119,21 +120,49 @@ class EquipmentService:
         item = payload(data)
         self.customers.get(item["customer_id"])
         self._prepare_hierarchy_payload(item)
-        return self.repo.create(item)
+        self._validate_asset_payload(item)
+        self._validate_unique_asset_code(item.get("asset_code", ""))
+        created = self.repo.create(item)
+        self.lifecycle.add_history(
+            created["id"],
+            "Asset Created",
+            "Asset profile created",
+            f"Asset {created['name']} was registered in the CMMS",
+            "Assets",
+            created["id"],
+        )
+        AssetLifecycleService().refresh_health(created["id"])
+        return created
 
     def update(self, item_id: int, data):
         item = payload(data)
+        current = self.repo.get(item_id)
         if "customer_id" in item:
             self.customers.get(item["customer_id"])
         hierarchy_keys = {"parent_id", "asset_type", "asset_level", "asset_code", "criticality"}
         if hierarchy_keys.intersection(item):
-            current = self.repo.get(item_id)
             merged = {**current, **item}
             self._prepare_hierarchy_payload(merged, item_id)
             for key in ("parent_id", "asset_type", "asset_level", "asset_code", "criticality", "customer_id"):
                 if key in merged and key not in item:
                     item[key] = merged[key]
-        return self.repo.update(item_id, item)
+        merged = {**current, **item}
+        self._validate_asset_payload(merged)
+        self._validate_unique_asset_code(merged.get("asset_code", ""), item_id)
+        updated = self.repo.update(item_id, item)
+        changed = {key: {"old": current.get(key), "new": updated.get(key)} for key in item if current.get(key) != updated.get(key)}
+        if changed:
+            self.lifecycle.add_history(
+                item_id,
+                "Asset Updated",
+                "Asset profile updated",
+                ", ".join(sorted(changed)) or "Asset data changed",
+                "Assets",
+                item_id,
+                metadata={"changed_fields": changed},
+            )
+        AssetLifecycleService().refresh_health(item_id)
+        return updated
 
     def delete(self, item_id: int):
         if self.repo.children(item_id):
@@ -165,6 +194,52 @@ class EquipmentService:
 
         if not item.get("asset_code"):
             item["asset_code"] = self._generate_asset_code(item)
+
+    def _validate_unique_asset_code(self, asset_code: str, item_id: int | None = None) -> None:
+        code = str(asset_code or "").strip().lower()
+        if not code:
+            return
+        for asset in self.repo.list():
+            if int(asset["id"]) == int(item_id or 0):
+                continue
+            if str(asset.get("asset_code") or "").strip().lower() == code:
+                raise HTTPException(status_code=400, detail="Asset code already exists")
+
+    def _validate_asset_payload(self, item: dict[str, Any]) -> None:
+        for field in (
+            "current_hours",
+            "last_reading",
+            "current_reading",
+            "expected_life_years",
+            "replacement_cost",
+            "purchase_cost",
+            "total_maintenance_cost",
+            "spare_parts_cost",
+            "labor_cost",
+            "contractor_cost",
+        ):
+            if field in item and item.get(field) not in (None, "") and float(item.get(field) or 0) < 0:
+                raise HTTPException(status_code=400, detail=f"{field} cannot be negative")
+
+        date_fields = (
+            "commission_date",
+            "installation_date",
+            "warranty_start",
+            "warranty_end",
+            "last_pm_date",
+            "next_pm_date",
+            "last_breakdown_date",
+            "last_repair_date",
+            "last_maintenance_date",
+        )
+        for field in date_fields:
+            value = item.get(field)
+            if value and not parse_date(str(value)):
+                raise HTTPException(status_code=400, detail=f"{field} must be a valid date")
+        start = parse_date(item.get("warranty_start"))
+        end = parse_date(item.get("warranty_end"))
+        if start and end and end < start:
+            raise HTTPException(status_code=400, detail="Warranty end date cannot be before warranty start date")
 
     def _validate_parent_child(self, parent_level: str, child_level: str) -> None:
         levels = ["Site", "Area / Department", "System", "Equipment", "Component"]
@@ -245,6 +320,171 @@ def asset_prefix(level: str, asset_type: str, name: str = "") -> str:
         "Component": "CMP",
     }
     return mapping.get(level, "AST")
+
+
+class AssetLifecycleService:
+    def __init__(self) -> None:
+        self.assets = EquipmentRepository()
+        self.lifecycle = AssetLifecycleRepository()
+        self.work_orders = WorkOrderRepository()
+        self.pm = PreventiveMaintenanceRepository()
+
+    def history(self, asset_id: int):
+        self.assets.get(asset_id)
+        return self.lifecycle.history(asset_id)
+
+    def timeline(self, asset_id: int):
+        self.assets.get(asset_id)
+        return self.lifecycle.timeline(asset_id)
+
+    def events(self, asset_id: int):
+        self.assets.get(asset_id)
+        return self.lifecycle.events(asset_id)
+
+    def measurements(self, asset_id: int):
+        self.assets.get(asset_id)
+        return self.lifecycle.measurements(asset_id)
+
+    def documents(self, asset_id: int):
+        self.assets.get(asset_id)
+        return self.lifecycle.documents(asset_id)
+
+    def photos(self, asset_id: int):
+        self.assets.get(asset_id)
+        return self.lifecycle.photos(asset_id)
+
+    def health(self, asset_id: int):
+        self.assets.get(asset_id)
+        return self.refresh_health(asset_id)
+
+    def add_measurement(self, asset_id: int, data):
+        self.assets.get(asset_id)
+        item = payload(data)
+        if float(item.get("value") or 0) < 0:
+            raise HTTPException(status_code=400, detail="Measurement value cannot be negative")
+        created = self.lifecycle.add_measurement(asset_id, item)
+        measurement_type = str(created.get("measurement_type") or "").lower()
+        if measurement_type in {"hours", "runtime hours", "meter reading", "running hours"}:
+            self.assets.update(asset_id, {"current_hours": int(float(created.get("value") or 0)), "current_reading": float(created.get("value") or 0)})
+        else:
+            self.assets.update(asset_id, {"current_reading": float(created.get("value") or 0)})
+        self.refresh_health(asset_id)
+        return created
+
+    def add_document(self, asset_id: int, data):
+        self.assets.get(asset_id)
+        return self.lifecycle.add_document(asset_id, payload(data))
+
+    def add_photo(self, asset_id: int, data):
+        self.assets.get(asset_id)
+        return self.lifecycle.add_photo(asset_id, payload(data))
+
+    def record_work_order_closed(self, order: dict[str, Any], deducted_parts: list[dict[str, Any]]) -> None:
+        asset_id = int(order["equipment_id"])
+        runtime = int(order.get("service_hours") or order.get("runtime_reading_end") or 0)
+        title = "PM Completed" if str(order.get("title", "")).upper().startswith("PM:") else "Work Order Closed"
+        self.lifecycle.add_history(
+            asset_id,
+            title,
+            title,
+            f"Work Order #{order['id']} closed successfully",
+            "Work Orders",
+            order["id"],
+            metadata={"status": order.get("status"), "runtime": runtime, "deducted_parts": deducted_parts},
+        )
+        if runtime > 0:
+            self.lifecycle.add_measurement(
+                asset_id,
+                {
+                    "measurement_type": "Runtime Hours",
+                    "value": runtime,
+                    "unit": "hrs",
+                    "source_module": "Work Orders",
+                    "source_record_id": order["id"],
+                    "notes": f"Runtime captured during Work Order #{order['id']}",
+                },
+            )
+        if self._is_breakdown(order):
+            self.lifecycle.add_event(
+                asset_id,
+                "Breakdown",
+                "critical" if str(order.get("priority", "")).lower() == "critical" else "warning",
+                "resolved",
+                "",
+                f"Breakdown repaired through Work Order #{order['id']}",
+                "Work Orders",
+                order["id"],
+            )
+        self.refresh_health(asset_id)
+
+    def refresh_health(self, asset_id: int) -> dict[str, Any]:
+        asset = self.assets.get(asset_id)
+        orders = [order for order in self.work_orders.list() if int(order.get("equipment_id") or 0) == asset_id]
+        pm_rows = [task for task in self.pm.list() if int(task.get("equipment_id") or 0) == asset_id]
+        terminal = {"closed", "cancelled", "rejected"}
+        closed_like = {"closed", "completed", "approved", "pending_supervisor_review"}
+        open_orders = [order for order in orders if status_value(order.get("status")) not in terminal]
+        completed_orders = [order for order in orders if status_value(order.get("status")) in closed_like]
+        failures = [order for order in orders if self._is_breakdown(order)]
+        total_downtime = round(sum(float(order.get("work_duration_minutes") or 0) for order in failures) / 60, 2)
+        repairs = [order for order in completed_orders if int(order.get("work_duration_minutes") or 0) > 0]
+        mttr = round(total_downtime / len(repairs), 2) if repairs else 0
+        current_hours = int(asset.get("current_hours") or 0)
+        mtbf = round(current_hours / len(failures), 2) if failures and current_hours else float(current_hours or 0)
+        availability = 100.0
+        if current_hours > 0:
+            availability = round(max(((current_hours - total_downtime) / current_hours) * 100, 0), 2)
+        completed_pm = len([order for order in completed_orders if str(order.get("title", "")).upper().startswith("PM:")])
+        overdue_pm = len([task for task in pm_rows if str(task.get("pm_alert", "")).upper() == "DUE NOW"])
+        upcoming_pm = len([task for task in pm_rows if str(task.get("pm_alert", "")).upper() == "UPCOMING"])
+        pm_compliance = round((completed_pm / max(completed_pm + overdue_pm, 1)) * 100, 2)
+        maintenance_cost = round(
+            float(asset.get("total_maintenance_cost") or 0)
+            + float(asset.get("spare_parts_cost") or 0)
+            + float(asset.get("labor_cost") or 0)
+            + float(asset.get("contractor_cost") or 0),
+            2,
+        )
+        score = 100
+        score -= min(len(failures) * 7, 35)
+        score -= min(total_downtime * 2, 25)
+        score -= min(len(open_orders) * 4, 16)
+        score -= min(overdue_pm * 8, 24)
+        score -= max(0, int((100 - availability) / 2))
+        score = max(min(int(round(score)), 100), 0)
+        health = {
+            "health_score": score,
+            "health_status": self._health_status(score),
+            "availability": availability,
+            "mtbf": mtbf,
+            "mttr": mttr,
+            "total_downtime_hours": total_downtime,
+            "maintenance_cost": maintenance_cost,
+            "pm_compliance": pm_compliance,
+            "failure_frequency": len(failures),
+            "open_work_orders": len(open_orders),
+            "completed_pm": completed_pm,
+            "upcoming_pm": upcoming_pm,
+            "metadata": {
+                "asset_code": asset.get("asset_code", ""),
+                "last_pm": asset.get("last_pm_date") or asset.get("last_maintenance_date") or "",
+                "next_pm": asset.get("next_pm_date") or asset.get("next_maintenance_date") or "",
+            },
+        }
+        return self.lifecycle.upsert_health(asset_id, health)
+
+    def _is_breakdown(self, order: dict[str, Any]) -> bool:
+        text = f"{order.get('title', '')} {order.get('description', '')} {order.get('priority', '')}".lower()
+        return "breakdown" in text or "failure" in text or "fault" in text or str(order.get("priority", "")).lower() == "critical"
+
+    def _health_status(self, score: int) -> str:
+        if score >= 95:
+            return "Excellent"
+        if score >= 80:
+            return "Good"
+        if score >= 60:
+            return "Warning"
+        return "Critical"
 
 
 class WorkOrderService:
@@ -577,10 +817,16 @@ class WorkOrderService:
             "last_maintenance_date": date.today().isoformat(),
             "status": "Active",
         }
+        if str(order.get("title", "")).upper().startswith("PM:"):
+            updates["last_pm_date"] = date.today().isoformat()
+        elif AssetLifecycleService()._is_breakdown(order):
+            updates["last_breakdown_date"] = date.today().isoformat()
+            updates["last_repair_date"] = date.today().isoformat()
         if runtime > int(equipment.get("current_hours") or 0):
             updates["current_hours"] = runtime
         self.equipment.update(order["equipment_id"], updates)
         deducted_parts = self._deduct_inventory_parts(order)
+        AssetLifecycleService().record_work_order_closed(order, deducted_parts)
         AuditService.log_event(
             action="CLOSE",
             module="Work Orders",

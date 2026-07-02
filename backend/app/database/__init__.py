@@ -64,19 +64,136 @@ CREATE TABLE IF NOT EXISTS equipment (
     name TEXT NOT NULL,
     serial_number TEXT DEFAULT '',
     model TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    category TEXT DEFAULT '',
+    manufacturer TEXT DEFAULT '',
     location TEXT DEFAULT '',
     parent_id INTEGER,
     asset_type TEXT DEFAULT 'Equipment',
     asset_level TEXT DEFAULT 'Equipment',
     asset_code TEXT DEFAULT '',
+    qr_code TEXT DEFAULT '',
+    barcode TEXT DEFAULT '',
     criticality TEXT DEFAULT 'Medium',
+    site TEXT DEFAULT '',
+    department TEXT DEFAULT '',
+    commission_date TEXT DEFAULT '',
+    installation_date TEXT DEFAULT '',
+    warranty_start TEXT DEFAULT '',
+    warranty_end TEXT DEFAULT '',
+    expected_life_years INTEGER DEFAULT 0,
+    replacement_cost REAL DEFAULT 0,
+    current_condition TEXT DEFAULT '',
     maintenance_interval_hours INTEGER DEFAULT 1000,
     maintenance_interval_days INTEGER DEFAULT 90,
     current_hours INTEGER DEFAULT 0,
+    last_reading REAL DEFAULT 0,
+    current_reading REAL DEFAULT 0,
+    last_pm_date TEXT DEFAULT '',
+    next_pm_date TEXT DEFAULT '',
+    last_breakdown_date TEXT DEFAULT '',
+    last_repair_date TEXT DEFAULT '',
+    purchase_cost REAL DEFAULT 0,
+    total_maintenance_cost REAL DEFAULT 0,
+    spare_parts_cost REAL DEFAULT 0,
+    labor_cost REAL DEFAULT 0,
+    contractor_cost REAL DEFAULT 0,
     last_maintenance_date TEXT DEFAULT '',
     status TEXT DEFAULT 'operational',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS asset_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    source_module TEXT DEFAULT '',
+    source_record_id TEXT DEFAULT '',
+    actor_id INTEGER,
+    metadata TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS asset_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    severity TEXT DEFAULT 'info',
+    status TEXT DEFAULT 'open',
+    due_date TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    source_module TEXT DEFAULT '',
+    source_record_id TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TEXT DEFAULT '',
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS asset_measurements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL,
+    measurement_type TEXT NOT NULL,
+    value REAL NOT NULL,
+    unit TEXT DEFAULT '',
+    reading_date TEXT DEFAULT CURRENT_TIMESTAMP,
+    source_module TEXT DEFAULT '',
+    source_record_id TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS asset_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL,
+    document_type TEXT DEFAULT 'Manual',
+    title TEXT NOT NULL,
+    file_name TEXT DEFAULT '',
+    file_url TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    uploaded_by_id INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS asset_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL,
+    photo_type TEXT DEFAULT 'Current Photo',
+    title TEXT NOT NULL,
+    file_name TEXT DEFAULT '',
+    file_url TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    uploaded_by_id INTEGER,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS asset_health (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL UNIQUE,
+    health_score INTEGER DEFAULT 100,
+    health_status TEXT DEFAULT 'Excellent',
+    availability REAL DEFAULT 100,
+    mtbf REAL DEFAULT 0,
+    mttr REAL DEFAULT 0,
+    total_downtime_hours REAL DEFAULT 0,
+    maintenance_cost REAL DEFAULT 0,
+    pm_compliance REAL DEFAULT 100,
+    failure_frequency INTEGER DEFAULT 0,
+    open_work_orders INTEGER DEFAULT 0,
+    completed_pm INTEGER DEFAULT 0,
+    upcoming_pm INTEGER DEFAULT 0,
+    calculated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    metadata TEXT DEFAULT '',
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS work_orders (
@@ -289,6 +406,14 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_asset_history_asset_id ON asset_history(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_history_created_at ON asset_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_asset_events_asset_id ON asset_events(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_events_status ON asset_events(status);
+CREATE INDEX IF NOT EXISTS idx_asset_measurements_asset_id ON asset_measurements(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_documents_asset_id ON asset_documents(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_photos_asset_id ON asset_photos(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_health_asset_id ON asset_health(asset_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_due_date ON work_orders(due_date);
 CREATE INDEX IF NOT EXISTS idx_work_order_timeline_work_order_id ON work_order_timeline(work_order_id);
@@ -347,19 +472,136 @@ CREATE TABLE IF NOT EXISTS equipment (
     name TEXT NOT NULL,
     serial_number TEXT DEFAULT '',
     model TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    category TEXT DEFAULT '',
+    manufacturer TEXT DEFAULT '',
     location TEXT DEFAULT '',
     parent_id INTEGER,
     asset_type TEXT DEFAULT 'Equipment',
     asset_level TEXT DEFAULT 'Equipment',
     asset_code TEXT DEFAULT '',
+    qr_code TEXT DEFAULT '',
+    barcode TEXT DEFAULT '',
     criticality TEXT DEFAULT 'Medium',
+    site TEXT DEFAULT '',
+    department TEXT DEFAULT '',
+    commission_date TEXT DEFAULT '',
+    installation_date TEXT DEFAULT '',
+    warranty_start TEXT DEFAULT '',
+    warranty_end TEXT DEFAULT '',
+    expected_life_years INTEGER DEFAULT 0,
+    replacement_cost REAL DEFAULT 0,
+    current_condition TEXT DEFAULT '',
     maintenance_interval_hours INTEGER DEFAULT 1000,
     maintenance_interval_days INTEGER DEFAULT 90,
     current_hours INTEGER DEFAULT 0,
+    last_reading REAL DEFAULT 0,
+    current_reading REAL DEFAULT 0,
+    last_pm_date TEXT DEFAULT '',
+    next_pm_date TEXT DEFAULT '',
+    last_breakdown_date TEXT DEFAULT '',
+    last_repair_date TEXT DEFAULT '',
+    purchase_cost REAL DEFAULT 0,
+    total_maintenance_cost REAL DEFAULT 0,
+    spare_parts_cost REAL DEFAULT 0,
+    labor_cost REAL DEFAULT 0,
+    contractor_cost REAL DEFAULT 0,
     last_maintenance_date TEXT DEFAULT '',
     status TEXT DEFAULT 'operational',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS asset_history (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    source_module TEXT DEFAULT '',
+    source_record_id TEXT DEFAULT '',
+    actor_id INTEGER,
+    metadata TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS asset_events (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    severity TEXT DEFAULT 'info',
+    status TEXT DEFAULT 'open',
+    due_date TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    source_module TEXT DEFAULT '',
+    source_record_id TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    resolved_at TEXT DEFAULT '',
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS asset_measurements (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL,
+    measurement_type TEXT NOT NULL,
+    value REAL NOT NULL,
+    unit TEXT DEFAULT '',
+    reading_date TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    source_module TEXT DEFAULT '',
+    source_record_id TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS asset_documents (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL,
+    document_type TEXT DEFAULT 'Manual',
+    title TEXT NOT NULL,
+    file_name TEXT DEFAULT '',
+    file_url TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    uploaded_by_id INTEGER,
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS asset_photos (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL,
+    photo_type TEXT DEFAULT 'Current Photo',
+    title TEXT NOT NULL,
+    file_name TEXT DEFAULT '',
+    file_url TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    uploaded_by_id INTEGER,
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS asset_health (
+    id SERIAL PRIMARY KEY,
+    asset_id INTEGER NOT NULL UNIQUE,
+    health_score INTEGER DEFAULT 100,
+    health_status TEXT DEFAULT 'Excellent',
+    availability REAL DEFAULT 100,
+    mtbf REAL DEFAULT 0,
+    mttr REAL DEFAULT 0,
+    total_downtime_hours REAL DEFAULT 0,
+    maintenance_cost REAL DEFAULT 0,
+    pm_compliance REAL DEFAULT 100,
+    failure_frequency INTEGER DEFAULT 0,
+    open_work_orders INTEGER DEFAULT 0,
+    completed_pm INTEGER DEFAULT 0,
+    upcoming_pm INTEGER DEFAULT 0,
+    calculated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    metadata TEXT DEFAULT '',
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS work_orders (
@@ -572,6 +814,14 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_asset_history_asset_id ON asset_history(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_history_created_at ON asset_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_asset_events_asset_id ON asset_events(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_events_status ON asset_events(status);
+CREATE INDEX IF NOT EXISTS idx_asset_measurements_asset_id ON asset_measurements(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_documents_asset_id ON asset_documents(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_photos_asset_id ON asset_photos(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_health_asset_id ON asset_health(asset_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_due_date ON work_orders(due_date);
 CREATE INDEX IF NOT EXISTS idx_work_order_timeline_work_order_id ON work_order_timeline(work_order_id);
@@ -679,8 +929,39 @@ def init_db() -> None:
                 "asset_level": "TEXT DEFAULT 'Equipment'",
                 "asset_code": "TEXT DEFAULT ''",
                 "criticality": "TEXT DEFAULT 'Medium'",
+                "description": "TEXT DEFAULT ''",
+                "category": "TEXT DEFAULT ''",
+                "manufacturer": "TEXT DEFAULT ''",
+                "qr_code": "TEXT DEFAULT ''",
+                "barcode": "TEXT DEFAULT ''",
+                "site": "TEXT DEFAULT ''",
+                "department": "TEXT DEFAULT ''",
+                "commission_date": "TEXT DEFAULT ''",
+                "installation_date": "TEXT DEFAULT ''",
+                "warranty_start": "TEXT DEFAULT ''",
+                "warranty_end": "TEXT DEFAULT ''",
+                "expected_life_years": "INTEGER DEFAULT 0",
+                "replacement_cost": "REAL DEFAULT 0",
+                "current_condition": "TEXT DEFAULT ''",
+                "last_reading": "REAL DEFAULT 0",
+                "current_reading": "REAL DEFAULT 0",
+                "last_pm_date": "TEXT DEFAULT ''",
+                "next_pm_date": "TEXT DEFAULT ''",
+                "last_breakdown_date": "TEXT DEFAULT ''",
+                "last_repair_date": "TEXT DEFAULT ''",
+                "purchase_cost": "REAL DEFAULT 0",
+                "total_maintenance_cost": "REAL DEFAULT 0",
+                "spare_parts_cost": "REAL DEFAULT 0",
+                "labor_cost": "REAL DEFAULT 0",
+                "contractor_cost": "REAL DEFAULT 0",
             },
         )
+        for statement in [
+            "CREATE INDEX IF NOT EXISTS idx_equipment_asset_code ON equipment(asset_code)",
+            "CREATE INDEX IF NOT EXISTS idx_equipment_site ON equipment(site)",
+            "CREATE INDEX IF NOT EXISTS idx_equipment_department ON equipment(department)",
+        ]:
+            db.execute(statement)
         ensure_columns(
             db,
             "work_orders",

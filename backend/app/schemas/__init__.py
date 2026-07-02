@@ -167,15 +167,40 @@ class EquipmentBase(BaseModel):
     name: str = Field(min_length=1)
     serial_number: str = ""
     model: str = ""
+    description: str = ""
+    category: str = ""
+    manufacturer: str = ""
     location: str = ""
     parent_id: int | None = None
     asset_type: str = "Equipment"
     asset_level: str = "Equipment"
     asset_code: str = ""
+    qr_code: str = ""
+    barcode: str = ""
     criticality: str = "Medium"
+    site: str = ""
+    department: str = ""
+    commission_date: str = ""
+    installation_date: str = ""
+    warranty_start: str = ""
+    warranty_end: str = ""
+    expected_life_years: int = Field(default=0, ge=0)
+    replacement_cost: float = Field(default=0, ge=0)
+    current_condition: str = ""
     maintenance_interval_hours: int = Field(default=1000, ge=0)
     maintenance_interval_days: int = Field(default=90, ge=0)
     current_hours: int = Field(default=0, ge=0)
+    last_reading: float = Field(default=0, ge=0)
+    current_reading: float = Field(default=0, ge=0)
+    last_pm_date: str = ""
+    next_pm_date: str = ""
+    last_breakdown_date: str = ""
+    last_repair_date: str = ""
+    purchase_cost: float = Field(default=0, ge=0)
+    total_maintenance_cost: float = Field(default=0, ge=0)
+    spare_parts_cost: float = Field(default=0, ge=0)
+    labor_cost: float = Field(default=0, ge=0)
+    contractor_cost: float = Field(default=0, ge=0)
     last_maintenance_date: str = ""
     status: str = "Active"
 
@@ -189,15 +214,40 @@ class EquipmentUpdate(BaseModel):
     name: str | None = None
     serial_number: str | None = None
     model: str | None = None
+    description: str | None = None
+    category: str | None = None
+    manufacturer: str | None = None
     location: str | None = None
     parent_id: int | None = None
     asset_type: str | None = None
     asset_level: str | None = None
     asset_code: str | None = None
+    qr_code: str | None = None
+    barcode: str | None = None
     criticality: str | None = None
+    site: str | None = None
+    department: str | None = None
+    commission_date: str | None = None
+    installation_date: str | None = None
+    warranty_start: str | None = None
+    warranty_end: str | None = None
+    expected_life_years: int | None = None
+    replacement_cost: float | None = None
+    current_condition: str | None = None
     maintenance_interval_hours: int | None = None
     maintenance_interval_days: int | None = None
     current_hours: int | None = None
+    last_reading: float | None = None
+    current_reading: float | None = None
+    last_pm_date: str | None = None
+    next_pm_date: str | None = None
+    last_breakdown_date: str | None = None
+    last_repair_date: str | None = None
+    purchase_cost: float | None = None
+    total_maintenance_cost: float | None = None
+    spare_parts_cost: float | None = None
+    labor_cost: float | None = None
+    contractor_cost: float | None = None
     last_maintenance_date: str | None = None
     status: str | None = None
 
@@ -211,6 +261,116 @@ class Equipment(EquipmentBase):
     hours_until_maintenance: int | None = None
     maintenance_due: bool = False
     maintenance_alert: Literal["OK", "UPCOMING", "DUE NOW"] = "OK"
+
+
+class AssetHistory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_id: int
+    event_type: str
+    title: str
+    description: str = ""
+    source_module: str = ""
+    source_record_id: str = ""
+    actor_id: int | None = None
+    metadata: str = ""
+    created_at: str
+
+
+class AssetEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_id: int
+    event_type: str
+    severity: str = "info"
+    status: str = "open"
+    due_date: str = ""
+    description: str = ""
+    source_module: str = ""
+    source_record_id: str = ""
+    created_at: str
+    resolved_at: str = ""
+
+
+class AssetMeasurementBase(BaseModel):
+    measurement_type: str = Field(min_length=1)
+    value: float = Field(ge=0)
+    unit: str = ""
+    reading_date: str = ""
+    source_module: str = ""
+    source_record_id: str = ""
+    notes: str = ""
+
+
+class AssetMeasurementCreate(AssetMeasurementBase):
+    pass
+
+
+class AssetMeasurement(AssetMeasurementBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_id: int
+    created_at: str
+
+
+class AssetDocumentBase(BaseModel):
+    document_type: str = "Manual"
+    title: str = Field(min_length=1)
+    file_name: str = ""
+    file_url: str = ""
+    description: str = ""
+    uploaded_by_id: int | None = None
+
+
+class AssetDocumentCreate(AssetDocumentBase):
+    pass
+
+
+class AssetDocument(AssetDocumentBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_id: int
+    created_at: str
+
+
+class AssetPhotoBase(BaseModel):
+    photo_type: str = "Current Photo"
+    title: str = Field(min_length=1)
+    file_name: str = ""
+    file_url: str = ""
+    description: str = ""
+    uploaded_by_id: int | None = None
+
+
+class AssetPhotoCreate(AssetPhotoBase):
+    pass
+
+
+class AssetPhoto(AssetPhotoBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_id: int
+    created_at: str
+
+
+class AssetHealth(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_id: int
+    health_score: int = 100
+    health_status: str = "Excellent"
+    availability: float = 100
+    mtbf: float = 0
+    mttr: float = 0
+    total_downtime_hours: float = 0
+    maintenance_cost: float = 0
+    pm_compliance: float = 100
+    failure_frequency: int = 0
+    open_work_orders: int = 0
+    completed_pm: int = 0
+    upcoming_pm: int = 0
+    calculated_at: str
+    metadata: str = ""
 
 
 class WorkOrderBase(BaseModel):
