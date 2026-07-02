@@ -860,6 +860,7 @@ export default function LegacyApp({ initialPage = "" }) {
   const [data, setData] = useState({ customers: [], engineers: [], equipment: [], "work-orders": [], inventory: [], "preventive-maintenance": [], "pm-plans": [], "job-titles": [], "audit-logs": [] });
   const [alerts, setAlerts] = useState([]);
   const [stats, setStats] = useState({ total_orders: 0, pending_orders: 0, completed_orders: 0 });
+  const [backendReliability, setBackendReliability] = useState(null);
   const [auditLogsLoaded, setAuditLogsLoaded] = useState(false);
   const [modal, setModal] = useState(null);
   const [formValue, setFormValue] = useState({});
@@ -894,7 +895,7 @@ export default function LegacyApp({ initialPage = "" }) {
     if (!silent) setLoading(true);
     setError("");
     try {
-      const [customers, engineers, equipment, workOrders, inventory, preventiveMaintenance, pmPlans, jobTitles, dashboard, maintenanceAlerts] = await Promise.all([
+      const [customers, engineers, equipment, workOrders, inventory, preventiveMaintenance, pmPlans, jobTitles, dashboard, maintenanceAlerts, reliability] = await Promise.all([
         api.list("customers"),
         api.list("engineers"),
         api.list("equipment"),
@@ -904,11 +905,13 @@ export default function LegacyApp({ initialPage = "" }) {
         api.list("pm-plans"),
         api.list("job-titles"),
         api.stats(),
-        api.alerts()
+        api.alerts(),
+        api.dashboardReliability().catch(() => null)
       ]);
       setData((current) => ({ ...current, customers, engineers, equipment, "work-orders": workOrders, inventory, "preventive-maintenance": preventiveMaintenance, "pm-plans": pmPlans, "job-titles": jobTitles }));
       setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance));
       setStats(dashboard);
+      setBackendReliability(reliability);
       const storedUsername = sessionStorage.getItem("maintenance-auth-user") || "";
       if (storedUsername) {
         const refreshedUser = engineers.find((user) => user.username === storedUsername);
@@ -1309,6 +1312,7 @@ export default function LegacyApp({ initialPage = "" }) {
               stats={stats}
               data={displayData}
               alerts={alerts}
+              backendReliability={backendReliability}
               openCreate={openCreate}
               canManage={canAddWorkOrders}
               language={language}
@@ -1603,7 +1607,7 @@ function pageTitle(active, language = "en") {
   return tr(language, titles[active] || active);
 }
 
-function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashboardAlertsOpen, setDashboardAlertsOpen }) {
+function Dashboard({ stats, data, alerts, backendReliability, openCreate, canManage, language, dashboardAlertsOpen, setDashboardAlertsOpen }) {
   const t = (text) => tr(language, text);
   const [filters, setFilters] = useState(createDashboardFilters);
   const filterOptions = useMemo(() => buildDashboardFilterOptions(data, alerts, language), [data, alerts, language]);
@@ -1611,7 +1615,8 @@ function Dashboard({ stats, data, alerts, openCreate, canManage, language, dashb
   const filteredData = filteredScope.data;
   const filteredAlerts = filteredScope.alerts;
   const workOrders = filteredData["work-orders"];
-  const reliability = useMemo(() => buildAssetReliability(workOrders, filteredData.equipment, language), [workOrders, filteredData.equipment, language]);
+  const fallbackReliability = useMemo(() => buildAssetReliability(workOrders, filteredData.equipment, language), [workOrders, filteredData.equipment, language]);
+  const reliability = backendReliability || fallbackReliability;
   const metrics = useMemo(() => buildMaintenanceDashboardMetrics(filteredData, filteredAlerts, reliability, language), [filteredData, filteredAlerts, reliability, language]);
 
   return (
@@ -2726,7 +2731,7 @@ function AssetsPage({ rows, departments, onCreate, onEdit, onDelete, onCreateDep
   const [expanded, setExpanded] = useState({});
   const [assetSearch, setAssetSearch] = useState("");
   const [assetFilters, setAssetFilters] = useState({ status: "", level: "", criticality: "" });
-  const [assetLifecycle, setAssetLifecycle] = useState({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [] });
+  const [assetLifecycle, setAssetLifecycle] = useState({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [], failures: [], downtime: [] });
   const [assetLifecycleLoading, setAssetLifecycleLoading] = useState(false);
   const [assetLifecycleError, setAssetLifecycleError] = useState("");
   const customerConfig = localizedConfig("customers", language);
@@ -2751,7 +2756,7 @@ function AssetsPage({ rows, departments, onCreate, onEdit, onDelete, onCreateDep
 
   useEffect(() => {
     if (!selectedAsset?.id) {
-      setAssetLifecycle({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [] });
+      setAssetLifecycle({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [], failures: [], downtime: [] });
       return;
     }
     let cancelled = false;
@@ -2759,19 +2764,21 @@ function AssetsPage({ rows, departments, onCreate, onEdit, onDelete, onCreateDep
       setAssetLifecycleLoading(true);
       setAssetLifecycleError("");
       try {
-        const [history, timeline, health, measurements, events, documents, photos] = await Promise.all([
+        const [history, timeline, health, measurements, events, documents, photos, failures, downtime] = await Promise.all([
           api.list(`assets/${selectedAsset.id}/history`),
           api.list(`assets/${selectedAsset.id}/timeline`),
           api.list(`assets/${selectedAsset.id}/health`),
           api.list(`assets/${selectedAsset.id}/measurements`),
           api.list(`assets/${selectedAsset.id}/events`),
           api.list(`assets/${selectedAsset.id}/documents`),
-          api.list(`assets/${selectedAsset.id}/photos`)
+          api.list(`assets/${selectedAsset.id}/photos`),
+          api.list(`assets/${selectedAsset.id}/failures`).catch(() => []),
+          api.list(`assets/${selectedAsset.id}/downtime`).catch(() => [])
         ]);
-        if (!cancelled) setAssetLifecycle({ history, timeline, health, measurements, events, documents, photos });
+        if (!cancelled) setAssetLifecycle({ history, timeline, health, measurements, events, documents, photos, failures, downtime });
       } catch (error) {
         if (!cancelled) {
-          setAssetLifecycle({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [] });
+          setAssetLifecycle({ history: [], timeline: [], health: null, measurements: [], events: [], documents: [], photos: [], failures: [], downtime: [] });
           setAssetLifecycleError(error.message || "Failed to load asset lifecycle");
         }
       } finally {
@@ -2787,16 +2794,18 @@ function AssetsPage({ rows, departments, onCreate, onEdit, onDelete, onCreateDep
     setAssetLifecycleLoading(true);
     setAssetLifecycleError("");
     try {
-      const [history, timeline, health, measurements, events, documents, photos] = await Promise.all([
+      const [history, timeline, health, measurements, events, documents, photos, failures, downtime] = await Promise.all([
         api.list(`assets/${assetId}/history`),
         api.list(`assets/${assetId}/timeline`),
         api.list(`assets/${assetId}/health`),
         api.list(`assets/${assetId}/measurements`),
         api.list(`assets/${assetId}/events`),
         api.list(`assets/${assetId}/documents`),
-        api.list(`assets/${assetId}/photos`)
+        api.list(`assets/${assetId}/photos`),
+        api.list(`assets/${assetId}/failures`).catch(() => []),
+        api.list(`assets/${assetId}/downtime`).catch(() => [])
       ]);
-      setAssetLifecycle({ history, timeline, health, measurements, events, documents, photos });
+      setAssetLifecycle({ history, timeline, health, measurements, events, documents, photos, failures, downtime });
     } catch (error) {
       setAssetLifecycleError(error.message || "Failed to load asset lifecycle");
     } finally {
@@ -3162,6 +3171,8 @@ function AssetDetailsPanel({ asset, rows, departments, workOrders, pmTasks, inve
         <AssetTimeline rows={timelineRows} loading={lifecycleLoading} />
         <div className="space-y-4">
           <AssetRelationList title="Asset Events" rows={(lifecycle.events || []).map((item) => `${item.event_type} - ${item.severity} - ${item.status}`)} empty="No asset events" />
+          <AssetRelationList title="Failure History" rows={(lifecycle.failures || []).map((item) => `${item.failure_id} - ${item.severity} - ${item.status}`)} empty="No failure events" />
+          <AssetRelationList title="Downtime History" rows={(lifecycle.downtime || []).map((item) => `${item.start_time} - ${Number(item.total_downtime_minutes || 0)} min - ${item.downtime_category || "Downtime"}`)} empty="No downtime events" />
           <AssetRelationList title="Measurements" rows={(lifecycle.measurements || []).map((item) => `${item.reading_date || item.created_at}: ${item.measurement_type} = ${item.value} ${item.unit || ""}`)} empty="No measurements" />
           <AssetRelationList title="Documents" rows={(lifecycle.documents || []).map((item) => `${item.document_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No documents" />
           <AssetRelationList title="Photos" rows={(lifecycle.photos || []).map((item) => `${item.photo_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No photos" />
@@ -3760,9 +3771,9 @@ function buildAssetBreadcrumb(asset, rows) {
   return path;
 }
 
-const DOCUMENT_CODE = "ECS-EN-OP-01-F-12";
+const DOCUMENT_CODE = "WO-GEN-F-001";
 const ISSUE_NO = "1";
-const ISSUE_DATE = "1-Mar-21";
+const ISSUE_DATE = "2-Jul-26";
 
 function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelete, onLifecycleAction, onBackToEquipment, canManage, canCreate = canManage, canEdit = canManage, canDelete = canManage, language }) {
   const t = (text) => tr(language, text);
@@ -4189,12 +4200,12 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
                 <DocLabel>{t("W.O No")}:</DocLabel><DocStatic>{form.wo_no}</DocStatic>
               </div>
               <div className="grid place-items-center border-r-2 border-slate-950 px-4 text-center text-xl font-black">
-                Energy - Power Plant Work Order
+                Maintenance Work Order
               </div>
               <div className="grid place-items-center p-4">
-                <div className="text-center">
-                  <div className="text-4xl font-black tracking-tight text-red-800">ECS</div>
-                  <div className="text-[11px] font-bold leading-tight">Energy &<br />Contracting<br />Solutions</div>
+                <div className="text-center text-slate-900">
+                  <div className="text-3xl font-black tracking-[0.18em]">CMMS</div>
+                  <div className="mt-1 text-[11px] font-bold leading-tight">Maintenance<br />Management<br />System</div>
                 </div>
               </div>
             </div>
@@ -6274,11 +6285,12 @@ function buildMaintenanceDashboardMetrics(data, alerts, reliability, language = 
   const availabilityPercent = plannedHours
     ? clampPercent(((plannedHours - totalDowntimeHours) / plannedHours) * 100)
     : 100;
-  const averageDowntimeHours = faultOrders.length ? totalDowntimeHours / faultOrders.length : 0;
+  const failureCount = Number(reliability?.failureCount ?? faultOrders.length);
+  const averageDowntimeHours = Number(reliability?.averageDowntimeHours ?? (failureCount ? totalDowntimeHours / failureCount : 0));
   const mttrHours = Number(reliability?.mttrHours || 0);
   const mtbfHours = Number(reliability?.mtbfHours || 0);
   const breakdownEquipment = equipment.filter((asset) => equipmentIndustrialStatus(asset) === "Breakdown").length;
-  const breakdownCount = faultOrders.length + breakdownEquipment + alerts.filter((alert) => alert.alert_level === "DUE NOW").length;
+  const breakdownCount = Number(reliability?.failureCount ?? (faultOrders.length + breakdownEquipment + alerts.filter((alert) => alert.alert_level === "DUE NOW").length));
   const overduePmTasks = buildOverduePmRows(pmTasks, equipmentById);
   const cost = buildMaintenanceCostMetrics(workOrders, equipmentById, language);
   const assetReliabilityRows = buildAssetReliabilityRows(workOrders, equipment, pmTasks);
@@ -6306,9 +6318,9 @@ function buildMaintenanceDashboardMetrics(data, alerts, reliability, language = 
     assetHealthAverage,
     criticalEquipment,
     siteSummary: buildSiteSummary(customers, equipment, alerts),
-    topDowntimeAssets: buildTopDowntimeAssets(workOrders, equipment).slice(0, 10),
+    topDowntimeAssets: (reliability?.topFailureAssets?.length ? reliability.topFailureAssets : buildTopDowntimeAssets(workOrders, equipment)).slice(0, 10),
     assetHealthRanking,
-    breakdownTrend: buildBreakdownTrend(workOrders, equipment),
+    breakdownTrend: reliability?.failureTrend?.length ? reliability.failureTrend : buildBreakdownTrend(workOrders, equipment),
     workOrderStatusPie: buildWorkOrderStatusPie(workOrders, language)
   };
 }

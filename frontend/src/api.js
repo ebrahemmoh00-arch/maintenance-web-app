@@ -168,6 +168,7 @@ export const api = {
   remove: (resource, id) => request(`/${resource}/${id}`, { method: "DELETE" }),
   dashboard: () => request("/dashboard/stats"),
   stats: () => request("/dashboard/stats"),
+  dashboardReliability: () => request("/dashboard/reliability"),
   schedule: () => request("/schedule"),
   alerts: () => request("/maintenance-alerts"),
   serverTime: () => request("/server-time")

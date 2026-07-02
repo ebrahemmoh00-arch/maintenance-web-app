@@ -10,7 +10,7 @@ from .core.auth import require_permission
 from .core.config import validate_startup_configuration
 from .database import init_db
 from .middleware.authentication import protect_api_routes
-from .api.routers import assets, audit_logs, auth, customers, dashboard, engineers, equipment, inventory, job_titles, maintenance_alerts, pm_plans, preventive_maintenance, schedule, work_orders
+from .api.routers import assets, audit_logs, auth, customers, dashboard, downtime_events, engineers, equipment, failure_events, inventory, job_titles, maintenance_alerts, pm_plans, preventive_maintenance, schedule, work_orders
 from .services import PMPlanEngineService
 
 logger = logging.getLogger("cmms.pm_scheduler")
@@ -116,6 +116,8 @@ app.include_router(equipment.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
 app.include_router(maintenance_alerts.router, prefix="/api")
+app.include_router(failure_events.router, prefix="/api")
+app.include_router(downtime_events.router, prefix="/api")
 app.include_router(preventive_maintenance.router, prefix="/api")
 app.include_router(pm_plans.router, prefix="/api")
 app.include_router(work_orders.router, prefix="/api")

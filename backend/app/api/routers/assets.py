@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends
 
 from ...core.auth import require_permission
-from ...schemas import AssetDocument, AssetDocumentCreate, AssetEvent, AssetHealth, AssetHistory, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate
-from ...services import AssetLifecycleService
+from ...schemas import AssetDocument, AssetDocumentCreate, AssetEvent, AssetHealth, AssetHistory, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, DowntimeEvent, FailureEvent
+from ...services import AssetLifecycleService, DowntimeService, FailureManagementService
 
 router = APIRouter(prefix="/assets", tags=["Asset Lifecycle"])
 service = AssetLifecycleService()
+failures = FailureManagementService()
+downtime = DowntimeService()
 
 
 @router.get("/{asset_id}/history", response_model=list[AssetHistory])
@@ -31,6 +33,16 @@ def asset_measurements(asset_id: int, _=Depends(require_permission("assets:read"
 @router.get("/{asset_id}/events", response_model=list[AssetEvent])
 def asset_events(asset_id: int, _=Depends(require_permission("assets:read"))):
     return service.events(asset_id)
+
+
+@router.get("/{asset_id}/failures", response_model=list[FailureEvent])
+def asset_failures(asset_id: int, _=Depends(require_permission("assets:read"))):
+    return failures.list_asset_failures(asset_id)
+
+
+@router.get("/{asset_id}/downtime", response_model=list[DowntimeEvent])
+def asset_downtime(asset_id: int, _=Depends(require_permission("assets:read"))):
+    return downtime.list_asset_downtime(asset_id)
 
 
 @router.get("/{asset_id}/documents", response_model=list[AssetDocument])

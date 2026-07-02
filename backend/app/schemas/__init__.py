@@ -373,6 +373,189 @@ class AssetHealth(BaseModel):
     metadata: str = ""
 
 
+class ReliabilityCodeBase(BaseModel):
+    code: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    description: str = ""
+    status: str = "active"
+
+
+class ReliabilityCodeCreate(ReliabilityCodeBase):
+    pass
+
+
+class ReliabilityCodeUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    description: str | None = None
+    status: str | None = None
+
+
+class ReliabilityCode(ReliabilityCodeBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: str
+
+
+class FailureEventBase(BaseModel):
+    asset_id: int
+    failure_id: str = ""
+    failure_datetime: str = ""
+    failure_start: str = ""
+    failure_end: str = ""
+    detection_method: str = ""
+    failure_type: str = ""
+    failure_category: str = ""
+    severity: str = "medium"
+    operational_impact: str = ""
+    breakdown_indicator: bool = False
+    emergency_indicator: bool = False
+    failure_description: str = ""
+    problem_code_id: int | None = None
+    failure_code_id: int | None = None
+    cause_code_id: int | None = None
+    remedy_code_id: int | None = None
+    reported_by_id: int | None = None
+    assigned_technician_id: int | None = None
+    linked_work_order_id: int | None = None
+    linked_pm_id: int | None = None
+    status: str = "open"
+    rca_status: str = "not_required"
+
+
+class FailureEventCreate(FailureEventBase):
+    pass
+
+
+class FailureEventUpdate(BaseModel):
+    asset_id: int | None = None
+    failure_id: str | None = None
+    failure_datetime: str | None = None
+    failure_start: str | None = None
+    failure_end: str | None = None
+    detection_method: str | None = None
+    failure_type: str | None = None
+    failure_category: str | None = None
+    severity: str | None = None
+    operational_impact: str | None = None
+    breakdown_indicator: bool | None = None
+    emergency_indicator: bool | None = None
+    failure_description: str | None = None
+    problem_code_id: int | None = None
+    failure_code_id: int | None = None
+    cause_code_id: int | None = None
+    remedy_code_id: int | None = None
+    reported_by_id: int | None = None
+    assigned_technician_id: int | None = None
+    linked_work_order_id: int | None = None
+    linked_pm_id: int | None = None
+    status: str | None = None
+    rca_status: str | None = None
+
+
+class FailureEvent(FailureEventBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: str
+    updated_at: str = ""
+    asset_name: str = ""
+    work_order_title: str = ""
+
+
+class DowntimeEventBase(BaseModel):
+    asset_id: int
+    start_time: str
+    end_time: str = ""
+    total_downtime_minutes: int = Field(default=0, ge=0)
+    planned: bool = False
+    production_lost: float = Field(default=0, ge=0)
+    downtime_category: str = ""
+    downtime_reason: str = ""
+    linked_failure_id: int | None = None
+    linked_work_order_id: int | None = None
+
+
+class DowntimeEventCreate(DowntimeEventBase):
+    pass
+
+
+class DowntimeEventUpdate(BaseModel):
+    asset_id: int | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    total_downtime_minutes: int | None = None
+    planned: bool | None = None
+    production_lost: float | None = None
+    downtime_category: str | None = None
+    downtime_reason: str | None = None
+    linked_failure_id: int | None = None
+    linked_work_order_id: int | None = None
+
+
+class DowntimeEvent(DowntimeEventBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: str
+    updated_at: str = ""
+    asset_name: str = ""
+
+
+class RootCauseAnalysisBase(BaseModel):
+    failure_event_id: int
+    problem: str = ""
+    cause: str = ""
+    root_cause: str = ""
+    corrective_action: str = ""
+    preventive_action: str = ""
+    lessons_learned: str = ""
+    verification_status: str = "pending"
+    approval_status: str = "pending"
+    approved_by_id: int | None = None
+    approved_at: str = ""
+
+
+class RootCauseAnalysisCreate(RootCauseAnalysisBase):
+    pass
+
+
+class RootCauseAnalysisUpdate(BaseModel):
+    problem: str | None = None
+    cause: str | None = None
+    root_cause: str | None = None
+    corrective_action: str | None = None
+    preventive_action: str | None = None
+    lessons_learned: str | None = None
+    verification_status: str | None = None
+    approval_status: str | None = None
+    approved_by_id: int | None = None
+    approved_at: str | None = None
+
+
+class RootCauseAnalysis(RootCauseAnalysisBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: str
+    updated_at: str = ""
+
+
+class FailureStatistics(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_id: int
+    mtbf_hours: float = 0
+    mttr_hours: float = 0
+    availability_percent: float = 100
+    reliability_percent: float = 100
+    failure_frequency: int = 0
+    total_downtime_hours: float = 0
+    downtime_percent: float = 0
+    average_repair_time_hours: float = 0
+    repair_cost: float = 0
+    downtime_cost: float = 0
+    calculated_at: str
+    metadata: str = ""
+
+
 class WorkOrderBase(BaseModel):
     title: str = Field(min_length=1)
     description: str = ""
