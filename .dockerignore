@@ -28,6 +28,7 @@ coverage
 
 *.log
 backups
+logs
 chrome-dom.txt
 chrome-dump-live.txt
 chrome-err.txt

@@ -144,6 +144,12 @@ Use these files on Windows 10 or Windows 11 after Docker Desktop is installed an
 
 Backup files are intentionally ignored by Git.
 
+Backup command output and PostgreSQL dump errors are written to:
+
+```text
+logs/backup.log
+```
+
 The backup folder is:
 
 ```text

@@ -11,6 +11,8 @@ $FrontendUrl = "http://localhost:5173"
 $BackendHealthUrl = "http://localhost:8000/health"
 $SwaggerUrl = "http://localhost:8000/docs"
 $BackupsDir = Join-Path $ProjectRoot "backups"
+$LogsDir = Join-Path $ProjectRoot "logs"
+$BackupLogPath = Join-Path $LogsDir "backup.log"
 
 $Containers = [ordered]@{
     "PostgreSQL" = "cmms-postgres"
@@ -43,6 +45,13 @@ function Write-Warn {
     Write-Host "[WARN] $Text" -ForegroundColor Yellow
 }
 
+function Write-BackupLog {
+    param([string]$Text)
+    New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
+    $line = "[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Text
+    Add-Content -Path $BackupLogPath -Value $line -Encoding UTF8
+}
+
 function Test-DockerCommand {
     return [bool](Get-Command docker -ErrorAction SilentlyContinue)
 }
@@ -69,6 +78,65 @@ function Assert-EnvFile {
     if (-not (Test-Path $envPath)) {
         throw ".env was not found. Copy .env.example to .env and update the values first."
     }
+}
+
+function Get-EnvFileValue {
+    param([string]$Name)
+    $envPath = Join-Path $ProjectRoot ".env"
+    if (-not (Test-Path $envPath)) {
+        return ""
+    }
+    foreach ($rawLine in Get-Content -Path $envPath) {
+        $line = $rawLine.Trim()
+        if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {
+            continue
+        }
+        $key, $value = $line.Split("=", 2)
+        if ($key.Trim() -eq $Name) {
+            $cleanValue = $value.Trim()
+            if ($cleanValue.Length -ge 2 -and (($cleanValue.StartsWith('"') -and $cleanValue.EndsWith('"')) -or ($cleanValue.StartsWith("'") -and $cleanValue.EndsWith("'")))) {
+                return $cleanValue.Substring(1, $cleanValue.Length - 2)
+            }
+            return $cleanValue
+        }
+    }
+    return ""
+}
+
+function ConvertTo-ShSingleQuoted {
+    param([string]$Value)
+    return "'" + ($Value -replace "'", "'\''") + "'"
+}
+
+function Get-PostgresComposeServiceName {
+    $composePath = Join-Path $ProjectRoot "docker-compose.yml"
+    if (-not (Test-Path $composePath)) {
+        throw "docker-compose.yml was not found."
+    }
+
+    $insideServices = $false
+    $currentService = ""
+    foreach ($rawLine in Get-Content -Path $composePath) {
+        if ($rawLine -match "^services:\s*$") {
+            $insideServices = $true
+            continue
+        }
+        if (-not $insideServices) {
+            continue
+        }
+        if ($rawLine -match "^\S") {
+            break
+        }
+        if ($rawLine -match "^  ([A-Za-z0-9_-]+):\s*$") {
+            $currentService = $Matches[1]
+            continue
+        }
+        if ($currentService -and $rawLine -match "^\s+image:\s*postgres(:|@|$)") {
+            return $currentService
+        }
+    }
+
+    throw "PostgreSQL service was not found in docker-compose.yml."
 }
 
 function Invoke-Compose {
@@ -102,7 +170,7 @@ function Wait-ContainerHealthy {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
         $status = Get-ContainerHealth $ContainerName
-        if ($status -eq "healthy" -or $status -eq "running") {
+        if ($status -eq "healthy") {
             Write-Ok "$Label is $status."
             return
         }
@@ -121,7 +189,7 @@ function Wait-AllServicesHealthy {
         foreach ($item in $Containers.GetEnumerator()) {
             $status = Get-ContainerHealth $item.Value
             $statuses += "$($item.Key): $status"
-            if ($status -ne "healthy" -and $status -ne "running") {
+            if ($status -ne "healthy") {
                 $allHealthy = $false
             }
         }
@@ -165,7 +233,7 @@ function Invoke-Restart {
     Write-Section "Restarting CMMS"
     Invoke-Compose @("down")
     Invoke-Compose @("up", "-d")
-    Wait-AllServicesHealthy
+    Wait-AllServicesHealthy -TimeoutSeconds 120
     Write-Ok "CMMS restarted successfully."
 }
 
@@ -183,18 +251,41 @@ function Invoke-Backup {
     Assert-DockerReady
     Assert-EnvFile
     Set-ProjectLocation
+    New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
+    Write-BackupLog "Backup started."
+    $postgresService = Get-PostgresComposeServiceName
+    $postgresUser = Get-EnvFileValue "POSTGRES_USER"
+    $postgresDb = Get-EnvFileValue "POSTGRES_DB"
+    if (-not $postgresUser) {
+        throw "POSTGRES_USER is missing in .env."
+    }
+    if (-not $postgresDb) {
+        throw "POSTGRES_DB is missing in .env."
+    }
+    Write-BackupLog "PostgreSQL compose service: $postgresService"
+    Write-BackupLog "Database user read from .env: $postgresUser"
+    Write-BackupLog "Database name read from .env: $postgresDb"
     Wait-ContainerHealthy -Label "PostgreSQL" -ContainerName $Containers["PostgreSQL"] -TimeoutSeconds 120
     New-Item -ItemType Directory -Path $BackupsDir -Force | Out-Null
     $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
     $backupPath = Join-Path $BackupsDir "backup_$timestamp.sql"
-    $dumpCommand = 'pg_dump --clean --if-exists -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+    $dumpCommand = "pg_dump --clean --if-exists -U $(ConvertTo-ShSingleQuoted $postgresUser) -d $(ConvertTo-ShSingleQuoted $postgresDb)"
     Write-Section "Creating PostgreSQL backup"
-    & docker compose exec -T postgres sh -c $dumpCommand > $backupPath
+    Write-BackupLog "Command: docker compose exec -T $postgresService sh -c `"$dumpCommand`""
+    & docker compose exec -T $postgresService sh -c $dumpCommand 1> $backupPath 2>> $BackupLogPath
     if ($LASTEXITCODE -ne 0) {
+        $exitCode = $LASTEXITCODE
         Remove-Item $backupPath -Force -ErrorAction SilentlyContinue
-        throw "Database backup failed."
+        Write-BackupLog "Backup failed with exit code $exitCode."
+        $tail = ""
+        if (Test-Path $BackupLogPath) {
+            $tail = (Get-Content -Path $BackupLogPath -Tail 20) -join [Environment]::NewLine
+        }
+        throw "Database backup failed with exit code $exitCode. Log file: $BackupLogPath`n$tail"
     }
+    Write-BackupLog "Backup created successfully: $backupPath"
     Write-Ok "Backup created: $backupPath"
+    Write-Host "Backup log: $BackupLogPath"
 }
 
 function Invoke-Restore {
@@ -312,6 +403,9 @@ try {
         "HealthCheck" { Invoke-HealthCheck }
     }
 } catch {
+    if ($Action -eq "Backup") {
+        Write-BackupLog "Backup failed: $($_.Exception.Message)"
+    }
     Write-Fail $_.Exception.Message
     exit 1
 }

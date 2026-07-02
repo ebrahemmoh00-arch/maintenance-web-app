@@ -25,6 +25,7 @@ backend/maintenance.db
 
 # Logs
 *.log
+!logs/.gitkeep
 
 # Local database backups
 backups/*.sql
