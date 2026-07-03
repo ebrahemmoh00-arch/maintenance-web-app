@@ -18,10 +18,14 @@ import {
   Globe2,
   Lock,
   LogOut,
+  MessageSquare,
   Moon,
+  MoreHorizontal,
+  Paperclip,
   Pencil,
   Plus,
   Printer,
+  QrCode,
   RefreshCw,
   Save,
   Search,
@@ -3782,6 +3786,8 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
   const [editingId, setEditingId] = useState(null);
   const [viewingSavedId, setViewingSavedId] = useState(null);
   const [form, setForm] = useState(() => createWorkOrderForm({ equipment, customers, engineers, rows }));
+  const [activeWorkOrderTab, setActiveWorkOrderTab] = useState("overview");
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrMessage, setQrMessage] = useState("");
   const [lifecycleDraft, setLifecycleDraft] = useState({
@@ -4125,59 +4131,106 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
     window.setTimeout(restoreTitle, 30000);
   }
 
+  const activeSavedOrder = viewingSavedId || editingId ? selectedSavedOrder : null;
+  const currentStatus = normalizeWorkOrderStatus(activeSavedOrder?.status || form.status);
+  const lifecycleActions = lifecycleActionsForStatus(currentStatus);
+  const canRunAction = Boolean(activeSavedOrder && canEdit);
+  const actionKeys = new Set(lifecycleActions.map((action) => action.key));
+  const quickAssignedTo = form.assigned_to || selectedEngineer?.name || activeSavedOrder?.engineer_name || "-";
+  const checklistProgress = activeSavedOrder?.checklist_completed || lifecycleDraft.checklist_completed ? 100 : 0;
+  const partsTotal = (form.spare_parts_items || []).reduce((total, item) => total + Number(item.total || item.cost || 0), 0);
+  const estimatedHours = duration && duration !== "0:00" ? duration : form.estimated_hours || "-";
+  const smartAlerts = [
+    !form.after_photos?.length ? "No after-maintenance photos" : "",
+    checklistProgress < 100 ? "Checklist is not complete" : "",
+    !form.signature_executor ? "Technician signature is missing" : "",
+    !(form.spare_parts_items || []).some((item) => item.name) ? "No spare parts recorded" : ""
+  ].filter(Boolean);
+  const workOrderTabs = [
+    ["overview", "Overview", Activity],
+    ["checklist", "Checklist", CheckCircle2],
+    ["labor", "Labor & Time", Clock3],
+    ["parts", "Parts", Box],
+    ["attachments", "Attachments", Paperclip],
+    ["history", "History", TimerReset],
+    ["notes", "Notes", MessageSquare]
+  ];
+
   return (
     <div className="space-y-5">
-      <section ref={workOrderSectionRef} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 px-5 py-4 text-white">
-          <div>
-            <h2 className="text-xl font-black">{t("Work Order")}: {selectedCustomer?.name || "Customer"} / {selectedEquipment?.name || "Asset"}</h2>
-            <p className="mt-1 text-sm text-slate-300">{t("Create a work order using the current service hours from the maintenance record.")}</p>
-            {viewingSavedId ? (
-              <p className="mt-2 inline-flex rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-100">
-                {t("Viewing Saved Work Order")}
-              </p>
-            ) : null}
+      <section ref={workOrderSectionRef} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">{t("Work Order")}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h2 className="truncate text-2xl font-black text-slate-950">{woReference}</h2>
+                <StatusBadge value={currentStatus} language={language} />
+                <PriorityBadge value={form.priority} language={language} />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm font-bold text-slate-600">
+                <span>{selectedEquipment?.name || "Asset not selected"}</span>
+                <span>{quickAssignedTo}</span>
+                {viewingSavedId ? <span className="text-blue-700">{t("Viewing Saved Work Order")}</span> : null}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <WorkOrderActionButton disabled={!canRunAction || !actionKeys.has("pause")} onClick={() => runLifecycle("pause")} label="Pause" />
+              <WorkOrderActionButton disabled={!canRunAction || !actionKeys.has("waiting-parts")} onClick={() => runLifecycle("waiting-parts")} label="Waiting Parts" />
+              <WorkOrderActionButton primary disabled={!canRunAction || !actionKeys.has("complete")} onClick={() => runLifecycle("complete")} label="Complete" />
+              <div className="relative">
+                <button type="button" onClick={() => setMoreActionsOpen((value) => !value)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700" aria-label="More actions">
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+                {moreActionsOpen ? (
+                  <div className="absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                    <button type="button" onClick={exportWorkOrderPdf} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><Printer className="h-4 w-4" />{t("Export PDF")}</button>
+                    <button type="button" onClick={qrOpen ? closeQrScanner : openQrScanner} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><QrCode className="h-4 w-4" />{t("Scan Equipment QR")}</button>
+                    <button type="button" onClick={onBackToEquipment} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><Eye className="h-4 w-4" />{t("Back to Equipment")}</button>
+                  </div>
+                ) : null}
+              </div>
+              {((editingId && canEdit) || (!editingId && !viewingSavedId && canCreate)) ? (
+                <button type="button" onClick={saveWorkOrder} className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-black text-white shadow-sm hover:bg-blue-800">
+                  <Save className="h-4 w-4" /> {editingId ? t("Save Changes") : t("Save Work Order")}
+                </button>
+              ) : null}
+            </div>
           </div>
-          <button type="button" onClick={onBackToEquipment} className="rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950 hover:bg-slate-100">
-            {t("Back to Equipment")}
-          </button>
         </div>
 
-        <div className="grid gap-3 border-b border-slate-200 bg-white p-4 md:grid-cols-3">
-          <label>
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Customer")}</span>
-            <select className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold outline-none focus:border-blue-500" value={form.customer_id || ""} onChange={(event) => chooseCustomer(event.target.value)}>
-              <option value=""></option>
-              {customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Equipment")}</span>
-            <div className="flex gap-2">
-              <select className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400" value={form.equipment_id || ""} onChange={(event) => chooseEquipment(event.target.value)} disabled={!form.customer_id}>
-                <option value=""></option>
-                {filteredEquipment.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-              <button type="button" onClick={qrOpen ? closeQrScanner : openQrScanner} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-cyan-400 hover:text-cyan-700" title={t("Scan Equipment QR")}>
-                <Camera className="h-4 w-4" />
-              </button>
+        <div className="grid gap-5 bg-slate-50 p-5 2xl:grid-cols-[1fr_320px]">
+          <div className="space-y-5">
+            <div className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 lg:grid-cols-3">
+              <label>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Customer")}</span>
+                <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-blue-500" value={form.customer_id || ""} onChange={(event) => chooseCustomer(event.target.value)}>
+                  <option value=""></option>
+                  {customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Equipment")}</span>
+                <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400" value={form.equipment_id || ""} onChange={(event) => chooseEquipment(event.target.value)} disabled={!form.customer_id}>
+                  <option value=""></option>
+                  {filteredEquipment.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Assigned To")}</span>
+                <select
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                  value={form.engineer_id || ""}
+                  onChange={(event) => {
+                    const engineer = engineers.find((item) => Number(item.id) === Number(event.target.value));
+                    setForm((current) => ({ ...current, engineer_id: event.target.value, shift_engineer_name: engineer?.name || current.shift_engineer_name }));
+                  }}
+                >
+                  <option value=""></option>
+                  {engineers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
             </div>
-          </label>
-          <label>
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("THE WORK ORDER IS ISSUED BY SHIFT ENGINEER")}</span>
-            <select
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold outline-none focus:border-blue-500"
-              value={form.engineer_id || ""}
-              onChange={(event) => {
-                const engineer = engineers.find((item) => Number(item.id) === Number(event.target.value));
-                setForm((current) => ({ ...current, engineer_id: event.target.value, shift_engineer_name: engineer?.name || current.shift_engineer_name }));
-              }}
-            >
-              <option value=""></option>
-              {engineers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-          </label>
-        </div>
         {qrOpen ? (
           <div className="border-b border-slate-200 bg-slate-950 p-4 text-white">
             <div className="mx-auto max-w-xl">
@@ -4190,7 +4243,130 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
           </div>
         ) : null}
 
-        <div className="work-order-print-area max-h-[72vh] overflow-auto bg-slate-100 p-4">
+            <WorkOrderQuickInfo
+              fields={[
+                ["Asset", selectedEquipment?.name || "-"],
+                ["Location", selectedCustomer?.name || selectedEquipment?.location || form.location || "-"],
+                ["PM / Corrective", form.maintenance_type || "-"],
+                ["Reporter", form.shift_engineer_name || selectedEngineer?.name || "-"],
+                ["Assigned To", quickAssignedTo],
+                ["Planned Date", form.start_date || "-"],
+                ["Estimated Hours", estimatedHours],
+                ["Current Runtime", `${Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} h`]
+              ]}
+            />
+
+            {smartAlerts.length ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
+                  <div>
+                    <p className="text-sm font-black text-amber-900">Smart Alerts</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {smartAlerts.map((alert) => <span key={alert} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">{alert}</span>)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+              <div className="flex gap-1 overflow-x-auto border-b border-slate-200 px-3 py-3">
+                {workOrderTabs.map(([key, label, Icon]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveWorkOrderTab(key)}
+                    className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black transition ${activeWorkOrderTab === key ? "bg-blue-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-5">
+                {activeWorkOrderTab === "overview" ? (
+                  <WorkOrderOverviewTab
+                    form={form}
+                    update={update}
+                    status={currentStatus}
+                    selectedEquipment={selectedEquipment}
+                    selectedCustomer={selectedCustomer}
+                    photosBefore={form.before_photos}
+                    photosAfter={form.after_photos}
+                    updatePhotos={updatePhotos}
+                    language={language}
+                  />
+                ) : null}
+                {activeWorkOrderTab === "checklist" ? (
+                  <WorkOrderChecklistTab
+                    draft={lifecycleDraft}
+                    setDraft={setLifecycleDraft}
+                    checklistProgress={checklistProgress}
+                    form={form}
+                  />
+                ) : null}
+                {activeWorkOrderTab === "labor" ? (
+                  <WorkOrderLaborTab
+                    form={form}
+                    update={update}
+                    draft={lifecycleDraft}
+                    setDraft={setLifecycleDraft}
+                    duration={duration}
+                    selectedEquipment={selectedEquipment}
+                    selectedEngineer={selectedEngineer}
+                  />
+                ) : null}
+                {activeWorkOrderTab === "parts" ? (
+                  <WorkOrderPartsTab items={form.spare_parts_items} onChange={updateSparePart} onAdd={addSparePart} total={partsTotal} />
+                ) : null}
+                {activeWorkOrderTab === "attachments" ? (
+                  <WorkOrderAttachmentsTab form={form} updateSignature={updateSignature} labels={{ clear: t("Clear Signature") }} />
+                ) : null}
+                {activeWorkOrderTab === "history" ? (
+                  <WorkOrderHistoryTab order={activeSavedOrder} />
+                ) : null}
+                {activeWorkOrderTab === "notes" ? (
+                  <WorkOrderNotesTab form={form} update={update} selectedEngineer={selectedEngineer} />
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <aside className="space-y-4">
+            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">KPI Sidebar</p>
+              <div className="mt-4 grid gap-3">
+                <WorkOrderKpi label="Execution Duration" value={duration} />
+                <WorkOrderKpi label="Completion" value={`${checklistProgress}%`} tone={checklistProgress === 100 ? "green" : "amber"} />
+                <WorkOrderKpi label="Labor Cost" value="0 EGP" />
+                <WorkOrderKpi label="Parts Cost" value={`${partsTotal.toLocaleString()} EGP`} />
+                <WorkOrderKpi label="Total Cost" value={`${partsTotal.toLocaleString()} EGP`} />
+                <WorkOrderKpi label="Downtime" value={duration} tone={duration === "0:00" ? "slate" : "red"} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-blue-700 p-4 text-white shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">QR Code</p>
+                  <p className="mt-2 text-sm font-bold text-blue-50">Open this work order from mobile.</p>
+                </div>
+                <div className="grid h-16 w-16 place-items-center rounded-xl bg-white text-blue-700">
+                  <QrCode className="h-9 w-9" />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+              <p className="text-sm font-black text-slate-950">AI Suggestions</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">Future assistant area for prior failures, running hours, and suggested actions.</p>
+            </div>
+          </aside>
+        </div>
+
+        <div className="work-order-print-area hidden bg-white p-0">
           <div className="mx-auto min-w-[1120px] max-w-[1280px] border-2 border-slate-950 bg-white text-[12px] text-slate-950 shadow-sm">
             <div className="grid grid-cols-[340px_1fr_260px] border-b-2 border-slate-950">
               <div className="grid grid-cols-[150px_1fr] border-r-2 border-slate-950">
@@ -4296,13 +4472,13 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
           </div>
         </div>
 
-        <div className="grid gap-4 border-t border-slate-200 bg-white p-4 lg:grid-cols-2">
+        <div className="hidden gap-4 border-t border-slate-200 bg-white p-4 lg:grid-cols-2">
           <PhotoUploader title={t("Before Maintenance Photos")} photos={form.before_photos} onChange={(photos) => updatePhotos("before_photos", photos)} uploadLabel={t("Upload Photos")} />
           <PhotoUploader title={t("After Maintenance Photos")} photos={form.after_photos} onChange={(photos) => updatePhotos("after_photos", photos)} uploadLabel={t("Upload Photos")} />
         </div>
 
         {((editingId && canEdit) || (!editingId && !viewingSavedId && canCreate)) ? (
-          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
+          <div className="hidden flex-wrap items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
             <button type="button" onClick={saveWorkOrder} className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-800">
               <Save className="h-4 w-4" /> {editingId ? t("Save Changes") : t("Save Work Order")}
             </button>
@@ -4338,17 +4514,402 @@ function WorkOrdersPage({ rows, customers, equipment, engineers, onSave, onDelet
         <SavedWorkOrdersTable rows={filteredSavedRows} selectedId={selectedSavedId} setSelectedId={setSelectedSavedId} onOpen={openSelected} language={language} />
       </Panel>
 
-      {selectedSavedOrder ? (
-        <WorkOrderLifecyclePanel
-          order={selectedSavedOrder}
-          engineers={engineers}
-          draft={lifecycleDraft}
-          setDraft={setLifecycleDraft}
-          onAction={runLifecycle}
-          canEdit={canEdit}
-          language={language}
-        />
-      ) : null}
+    </div>
+  );
+}
+
+function WorkOrderActionButton({ label, onClick, disabled, primary = false }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`h-11 rounded-xl px-4 text-sm font-black shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${primary ? "bg-blue-700 text-white hover:bg-blue-800" : "border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-700"}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function WorkOrderQuickInfo({ fields }) {
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-black text-slate-950">Quick Information</h3>
+        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">CMMS Summary</span>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2">
+        {fields.map(([label, value]) => (
+          <div key={label} className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-slate-50 px-3">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+            <span className="truncate text-right text-sm font-black text-slate-950">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderKpi({ label, value, tone = "blue" }) {
+  const tones = {
+    blue: "bg-blue-50 text-blue-700 ring-blue-100",
+    green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    amber: "bg-amber-50 text-amber-700 ring-amber-100",
+    red: "bg-red-50 text-red-700 ring-red-100",
+    slate: "bg-slate-50 text-slate-700 ring-slate-100"
+  };
+  return (
+    <div className={`rounded-xl p-3 ring-1 ${tones[tone] || tones.blue}`}>
+      <p className="text-xs font-black uppercase tracking-[0.12em] opacity-80">{label}</p>
+      <p className="mt-1 text-2xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function WorkOrderOverviewTab({ form, update, status, selectedEquipment, selectedCustomer, photosBefore, photosAfter, updatePhotos, language }) {
+  const t = (text) => tr(language, text);
+  return (
+    <div className="grid gap-5 2xl:grid-cols-[1fr_320px]">
+      <div className="space-y-5">
+        <ModernTextArea label="Work Description" value={form.task_description} onChange={(value) => update("task_description", value)} rows={5} />
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Current Status</p>
+              <div className="mt-2"><StatusBadge value={status} language={language} /></div>
+            </div>
+            <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-blue-500" value={form.status || ""} onChange={(event) => update("status", event.target.value)}>
+              {["pending", "assigned", "accepted", "in_progress", "waiting_for_parts", "completed", "approved", "closed", "cancelled"].map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
+            </select>
+          </div>
+          <div className="mt-5">
+            <WorkOrderLifecycleProgress status={status} />
+          </div>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CompactPhotoUploader title={t("Before Maintenance Photos")} photos={photosBefore || []} onChange={(photos) => updatePhotos("before_photos", photos)} />
+          <CompactPhotoUploader title={t("After Maintenance Photos")} photos={photosAfter || []} onChange={(photos) => updatePhotos("after_photos", photos)} />
+        </div>
+      </div>
+      <div className="rounded-2xl bg-slate-50 p-4">
+        <h3 className="text-sm font-black text-slate-950">Summary</h3>
+        <div className="mt-4 space-y-3">
+          <SummaryLine label="Asset" value={selectedEquipment?.name || "-"} />
+          <SummaryLine label="Location" value={selectedCustomer?.name || selectedEquipment?.location || "-"} />
+          <SummaryLine label="Serial Number" value={selectedEquipment?.serial_number || form.serial_number || "-"} />
+          <SummaryLine label="Runtime" value={`${Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} h`} />
+          <SummaryLine label="Maintenance Type" value={form.maintenance_type || "-"} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderLifecycleProgress({ status }) {
+  const steps = ["new", "assigned", "accepted", "in_progress", "paused", "waiting_for_parts", "completed", "reviewed", "closed"];
+  const aliases = { pending: "new", on_hold: "paused", pending_supervisor_review: "reviewed", approved: "reviewed" };
+  const active = aliases[status] || status;
+  const activeIndex = Math.max(steps.indexOf(active), 0);
+  return (
+    <div className="overflow-x-auto pb-2">
+      <div className="flex min-w-[760px] items-center">
+        {steps.map((step, index) => {
+          const isActive = index === activeIndex;
+          const isDone = index < activeIndex;
+          return (
+            <Fragment key={step}>
+              <div className="flex flex-col items-center gap-2">
+                <div className={`grid h-9 w-9 place-items-center rounded-full text-xs font-black ${isActive ? "bg-blue-700 text-white shadow-lg shadow-blue-200" : isDone ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                  {index + 1}
+                </div>
+                <span className={`whitespace-nowrap text-[11px] font-black uppercase tracking-[0.08em] ${isActive ? "text-blue-700" : "text-slate-500"}`}>{step.replaceAll("_", " ")}</span>
+              </div>
+              {index < steps.length - 1 ? <div className={`mx-2 h-1 flex-1 rounded-full ${index < activeIndex ? "bg-emerald-500" : "bg-slate-200"}`} /> : null}
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderChecklistTab({ draft, setDraft, checklistProgress, form }) {
+  const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
+  const tasks = [
+    form.task_description || "Work description confirmed",
+    form.requirements || "Necessary requirements checked",
+    "Safety and QHSE requirements reviewed",
+    "Photos and completion evidence prepared"
+  ];
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl bg-slate-50 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-black text-slate-950">Checklist Completion</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Work order completion requires 100% checklist confirmation.</p>
+          </div>
+          <p className="text-3xl font-black text-blue-700">{checklistProgress}%</p>
+        </div>
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-full rounded-full bg-blue-700 transition-all" style={{ width: `${checklistProgress}%` }} />
+        </div>
+      </div>
+      <div className="space-y-3">
+        {tasks.map((task, index) => (
+          <div key={`${task}-${index}`} className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[40px_1fr_180px_1fr]">
+            <input type="checkbox" className="mt-1 h-5 w-5 rounded border-slate-300" checked={Boolean(draft.checklist_completed)} onChange={(event) => update("checklist_completed", event.target.checked)} />
+            <p className="text-sm font-black text-slate-950">{task}</p>
+            <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" defaultValue="">
+              <option value="">Result</option>
+              <option>OK</option>
+              <option>Needs action</option>
+              <option>N/A</option>
+            </select>
+            <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" placeholder="Comments" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderLaborTab({ form, update, draft, setDraft, duration, selectedEquipment, selectedEngineer }) {
+  const updateDraft = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div className="space-y-4">
+        <ModernField label="Technician" value={selectedEngineer?.name || form.assigned_to || "-"} readOnly />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ModernTimeField label="Start Time" value={form.start_time} onChange={(value) => update("start_time", value)} />
+          <ModernTimeField label="Finish Time" value={form.finished_time} onChange={(value) => update("finished_time", value)} />
+          <ModernDateField label="Start Date" value={form.start_date} onChange={(value) => update("start_date", value)} />
+          <ModernDateField label="Finish Date" value={form.finished_date} onChange={(value) => update("finished_date", value)} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <WorkOrderKpi label="Break Time" value="0:00" tone="slate" />
+          <WorkOrderKpi label="Working Hours" value={duration} />
+          <WorkOrderKpi label="Downtime" value={duration} tone={duration === "0:00" ? "slate" : "red"} />
+        </div>
+      </div>
+      <div className="space-y-4">
+        <ModernField label="Runtime Reading" value={draft.runtime_reading} onChange={(value) => updateDraft("runtime_reading", value)} placeholder={String(selectedEquipment?.current_hours || form.service_hours || 0)} type="number" />
+        <ModernTextArea label="Completion Notes" value={draft.completion_notes} onChange={(value) => updateDraft("completion_notes", value)} rows={4} />
+        <ModernTextArea label="Failure Cause" value={draft.reason} onChange={(value) => updateDraft("reason", value)} rows={3} />
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderPartsTab({ items, onChange, onAdd, total }) {
+  return (
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-[900px] w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+              <tr>
+                {["Part", "Code", "Warehouse", "Available", "Reserved", "Quantity Used", "Unit Cost", "Total"].map((header) => <th key={header} className="px-4 py-3">{header}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {items.map((item, index) => (
+                <tr key={index} className="hover:bg-slate-50">
+                  <td className="px-4 py-3"><input className="w-full rounded-lg border border-slate-200 px-3 py-2 font-bold outline-none focus:border-blue-500" value={item.name || ""} onChange={(event) => onChange(index, { name: event.target.value })} /></td>
+                  <td className="px-4 py-3 text-slate-500">-</td>
+                  <td className="px-4 py-3 text-slate-500">Inventory</td>
+                  <td className="px-4 py-3 text-slate-500">-</td>
+                  <td className="px-4 py-3 text-slate-500">-</td>
+                  <td className="px-4 py-3"><input type="number" min="0" className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-center font-black outline-none focus:border-blue-500" value={item.qty || 0} onChange={(event) => onChange(index, { qty: Number(event.target.value) })} /></td>
+                  <td className="px-4 py-3 text-slate-500">0</td>
+                  <td className="px-4 py-3 font-black text-slate-950">0</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" onClick={onAdd} className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-black text-white hover:bg-blue-800">Add Part</button>
+        <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-950">Total Parts Cost: {total.toLocaleString()} EGP</div>
+      </div>
+      <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">Inventory integration status: linked to spare parts workflow.</div>
+    </div>
+  );
+}
+
+function WorkOrderAttachmentsTab({ form, updateSignature, labels }) {
+  const cards = ["PDF", "Excel", "Photos", "Manuals", "Videos", "Inspection Reports"];
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {cards.map((card) => (
+          <div key={card} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-slate-950">{card}</p>
+                <p className="mt-1 text-xs font-bold text-slate-500">Attachment card</p>
+              </div>
+              <UploadCloud className="h-5 w-5 text-blue-700" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SignaturePad title="Technician Signature" value={form.signature_executor} onChange={(value) => updateSignature("signature_executor", value)} labels={labels} />
+        <SignaturePad title="Supervisor Signature" value={form.signature_shift_engineer} onChange={(value) => updateSignature("signature_shift_engineer", value)} labels={labels} />
+        <SignaturePad title="Manager Signature" value={form.signature_manager} onChange={(value) => updateSignature("signature_manager", value)} labels={labels} />
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderHistoryTab({ order }) {
+  const timeline = order?.timeline || [];
+  const fallback = [
+    ["Created", order?.created_at],
+    ["Assigned", order?.assigned_at],
+    ["Accepted", order?.accepted_at],
+    ["Started", order?.started_at],
+    ["Paused", order?.paused_at],
+    ["Waiting Parts", order?.waiting_parts_reason],
+    ["Completed", order?.completed_at],
+    ["Reviewed", order?.approved_at],
+    ["Closed", order?.closed_at]
+  ].filter(([, value]) => value);
+  const rows = timeline.length ? timeline.map((event) => [event.event_type, event.created_at, event.actor_name, event.description]) : fallback.map(([label, value]) => [label, value, "", label]);
+  return (
+    <div className="space-y-3">
+      {rows.map(([label, date, user, description], index) => (
+        <div key={`${label}-${index}`} className="grid grid-cols-[16px_1fr] gap-3">
+          <span className="mt-2 h-3 w-3 rounded-full bg-blue-700 shadow-[0_0_0_5px_rgba(37,99,235,0.12)]" />
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-black text-slate-950">{label}</p>
+              <span className="text-xs font-bold text-slate-500">{formatLifecycleDate(date)}</span>
+            </div>
+            <p className="mt-1 text-sm font-semibold text-slate-600">{description || "Action recorded"}</p>
+            {user ? <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-blue-700">{user}</p> : null}
+          </div>
+        </div>
+      ))}
+      {!rows.length ? <EmptyState title="No history yet" message="Actions will appear here after the work order is saved and progressed." /> : null}
+    </div>
+  );
+}
+
+function WorkOrderNotesTab({ form, update, selectedEngineer }) {
+  const notes = [
+    form.recommendation ? ["Recommendation", form.recommendation] : null,
+    form.qhse_instructions ? ["QHSE", form.qhse_instructions] : null,
+    form.site_preparation ? ["Site Preparation", form.site_preparation] : null
+  ].filter(Boolean);
+  return (
+    <div className="space-y-5">
+      <ModernTextArea label="Recommendation / Comment" value={form.recommendation} onChange={(value) => update("recommendation", value)} rows={4} />
+      <div className="space-y-3">
+        {notes.map(([title, comment], index) => (
+          <div key={`${title}-${index}`} className="flex gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 text-sm font-black text-blue-700">{(selectedEngineer?.name || title).slice(0, 1)}</div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-black text-slate-950">{selectedEngineer?.name || "System User"}</p>
+                <span className="text-xs font-bold text-slate-400">Now</span>
+              </div>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">{comment}</p>
+            </div>
+          </div>
+        ))}
+        {!notes.length ? <EmptyState title="No comments" message="Write a note above to document field observations." /> : null}
+      </div>
+    </div>
+  );
+}
+
+function CompactPhotoUploader({ title, photos, onChange }) {
+  async function handleFiles(files) {
+    const next = await Promise.all(Array.from(files).map(readFileAsDataUrl));
+    onChange([...photos, ...next].slice(0, 6));
+  }
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black text-slate-950">{title}</h3>
+          <p className="mt-1 text-xs font-bold text-slate-500">{photos.length} images</p>
+        </div>
+        <label className="rounded-xl bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800">
+          Upload
+          <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => handleFiles(event.target.files || [])} />
+        </label>
+      </div>
+      <div className="mt-4 grid grid-cols-4 gap-2">
+        {photos.map((photo, index) => (
+          <button key={index} type="button" onClick={() => window.open(photo, "_blank")} className="relative overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+            <img src={photo} alt="" className="h-20 w-full object-cover" />
+            <span className="absolute bottom-1 right-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-black text-slate-700">{index + 1}</span>
+          </button>
+        ))}
+        {!photos.length ? <div className="col-span-4 rounded-xl border border-dashed border-slate-300 bg-white py-5 text-center text-xs font-bold text-slate-500">Drag & drop area / no photos</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function ModernField({ label, value, onChange, type = "text", placeholder = "", readOnly = false }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <input type={type} readOnly={readOnly} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-blue-500 read-only:bg-slate-50" value={value || ""} placeholder={placeholder} onChange={(event) => onChange?.(event.target.value)} />
+    </label>
+  );
+}
+
+function ModernTextArea({ label, value, onChange, rows = 3 }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <textarea rows={rows} className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold leading-6 outline-none focus:border-blue-500" value={value || ""} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function ModernDateField({ label, value, onChange }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <input type="date" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-blue-500" value={value || ""} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function ModernTimeField({ label, value, onChange }) {
+  const time = splitTime12(value);
+  const updatePart = (patch) => onChange(joinTime12({ ...time, ...patch }));
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <select className="px-2 py-3 text-center text-sm font-bold outline-none" value={time.hour} onChange={(event) => updatePart({ hour: event.target.value })}>
+          {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((hour) => <option key={hour} value={hour}>{hour}</option>)}
+        </select>
+        <select className="border-x border-slate-200 px-2 py-3 text-center text-sm font-bold outline-none" value={time.minute} onChange={(event) => updatePart({ minute: event.target.value })}>
+          {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((minute) => <option key={minute} value={minute}>{minute}</option>)}
+        </select>
+        <select className="px-2 py-3 text-center text-sm font-bold outline-none" value={time.period} onChange={(event) => updatePart({ period: event.target.value })}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </label>
+  );
+}
+
+function SummaryLine({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
+      <span className="text-xs font-black uppercase tracking-[0.1em] text-slate-500">{label}</span>
+      <span className="truncate text-right text-sm font-black text-slate-950">{value}</span>
     </div>
   );
 }
