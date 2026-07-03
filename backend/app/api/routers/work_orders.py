@@ -3,14 +3,30 @@ from fastapi import APIRouter, Depends
 from ...core.auth import CurrentUser, require_permission
 from ...schemas import WorkOrder, WorkOrderCreate, WorkOrderLifecycleAction, WorkOrderUpdate
 from ...services import WorkOrderService
+from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/work-orders", tags=["Work Orders"])
 service = WorkOrderService()
 
 
-@router.get("", response_model=list[WorkOrder])
-def list_work_orders(_=Depends(require_permission("work_orders:read"))):
-    return service.list()
+@router.get("", response_model=None)
+def list_work_orders(
+    query: ListQuery = Depends(get_list_query),
+    _=Depends(require_permission("work_orders:read")),
+):
+    return query.apply(
+        service.list(),
+        search_fields=["title", "description", "work_order_number", "wo_number", "asset_name", "technician_name"],
+        filter_aliases={
+            "asset": ["equipment_id", "asset_id", "asset_name", "equipment_name"],
+            "site": ["site", "location", "customer_name"],
+            "department": ["department"],
+            "engineer": ["engineer_id", "engineer_name", "technician_name", "assigned_to"],
+            "priority": ["priority"],
+            "status": ["status"],
+        },
+        date_fields=["created_at", "updated_at", "scheduled_date", "due_date", "start_time", "end_time"],
+    )
 
 
 @router.get("/{work_order_id}", response_model=WorkOrder)

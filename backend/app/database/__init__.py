@@ -554,6 +554,15 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_engineers_role ON engineers(role);
+CREATE INDEX IF NOT EXISTS idx_engineers_status ON engineers(status);
+CREATE INDEX IF NOT EXISTS idx_engineers_work_location ON engineers(work_location);
+CREATE INDEX IF NOT EXISTS idx_equipment_customer_id ON equipment(customer_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_parent_id ON equipment(parent_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status);
+CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category);
+CREATE INDEX IF NOT EXISTS idx_equipment_asset_level ON equipment(asset_level);
 CREATE INDEX IF NOT EXISTS idx_asset_history_asset_id ON asset_history(asset_id);
 CREATE INDEX IF NOT EXISTS idx_asset_history_created_at ON asset_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_asset_events_asset_id ON asset_events(asset_id);
@@ -574,6 +583,15 @@ CREATE INDEX IF NOT EXISTS idx_corrective_actions_failure_event_id ON corrective
 CREATE INDEX IF NOT EXISTS idx_failure_statistics_asset_id ON failure_statistics(asset_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_due_date ON work_orders(due_date);
+CREATE INDEX IF NOT EXISTS idx_work_orders_customer_id ON work_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_equipment_id ON work_orders(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_engineer_id ON work_orders(engineer_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_priority ON work_orders(priority);
+CREATE INDEX IF NOT EXISTS idx_work_orders_scheduled_date ON work_orders(scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_stock_quantity ON inventory_items(stock_quantity);
+CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_equipment_id ON preventive_maintenance(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_status ON preventive_maintenance(status);
 CREATE INDEX IF NOT EXISTS idx_work_order_timeline_work_order_id ON work_order_timeline(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_work_order_status_history_work_order_id ON work_order_status_history(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_work_order_assignment_history_work_order_id ON work_order_assignment_history(work_order_id);
@@ -1120,6 +1138,15 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_module ON audit_logs(module);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_engineers_role ON engineers(role);
+CREATE INDEX IF NOT EXISTS idx_engineers_status ON engineers(status);
+CREATE INDEX IF NOT EXISTS idx_engineers_work_location ON engineers(work_location);
+CREATE INDEX IF NOT EXISTS idx_equipment_customer_id ON equipment(customer_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_parent_id ON equipment(parent_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status);
+CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category);
+CREATE INDEX IF NOT EXISTS idx_equipment_asset_level ON equipment(asset_level);
 CREATE INDEX IF NOT EXISTS idx_asset_history_asset_id ON asset_history(asset_id);
 CREATE INDEX IF NOT EXISTS idx_asset_history_created_at ON asset_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_asset_events_asset_id ON asset_events(asset_id);
@@ -1140,6 +1167,15 @@ CREATE INDEX IF NOT EXISTS idx_corrective_actions_failure_event_id ON corrective
 CREATE INDEX IF NOT EXISTS idx_failure_statistics_asset_id ON failure_statistics(asset_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_due_date ON work_orders(due_date);
+CREATE INDEX IF NOT EXISTS idx_work_orders_customer_id ON work_orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_equipment_id ON work_orders(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_engineer_id ON work_orders(engineer_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_priority ON work_orders(priority);
+CREATE INDEX IF NOT EXISTS idx_work_orders_scheduled_date ON work_orders(scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_stock_quantity ON inventory_items(stock_quantity);
+CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_equipment_id ON preventive_maintenance(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_status ON preventive_maintenance(status);
 CREATE INDEX IF NOT EXISTS idx_work_order_timeline_work_order_id ON work_order_timeline(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_work_order_status_history_work_order_id ON work_order_status_history(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_work_order_assignment_history_work_order_id ON work_order_assignment_history(work_order_id);
@@ -1273,9 +1309,27 @@ def init_db() -> None:
             },
         )
         for statement in [
+            "CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name)",
+            "CREATE INDEX IF NOT EXISTS idx_engineers_role ON engineers(role)",
+            "CREATE INDEX IF NOT EXISTS idx_engineers_status ON engineers(status)",
+            "CREATE INDEX IF NOT EXISTS idx_engineers_work_location ON engineers(work_location)",
+            "CREATE INDEX IF NOT EXISTS idx_equipment_customer_id ON equipment(customer_id)",
             "CREATE INDEX IF NOT EXISTS idx_equipment_asset_code ON equipment(asset_code)",
+            "CREATE INDEX IF NOT EXISTS idx_equipment_parent_id ON equipment(parent_id)",
             "CREATE INDEX IF NOT EXISTS idx_equipment_site ON equipment(site)",
             "CREATE INDEX IF NOT EXISTS idx_equipment_department ON equipment(department)",
+            "CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status)",
+            "CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category)",
+            "CREATE INDEX IF NOT EXISTS idx_equipment_asset_level ON equipment(asset_level)",
+            "CREATE INDEX IF NOT EXISTS idx_work_orders_customer_id ON work_orders(customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_work_orders_equipment_id ON work_orders(equipment_id)",
+            "CREATE INDEX IF NOT EXISTS idx_work_orders_engineer_id ON work_orders(engineer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_work_orders_priority ON work_orders(priority)",
+            "CREATE INDEX IF NOT EXISTS idx_work_orders_scheduled_date ON work_orders(scheduled_date)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_items_stock_quantity ON inventory_items(stock_quantity)",
+            "CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_equipment_id ON preventive_maintenance(equipment_id)",
+            "CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_status ON preventive_maintenance(status)",
         ]:
             db.execute(statement)
         ensure_columns(

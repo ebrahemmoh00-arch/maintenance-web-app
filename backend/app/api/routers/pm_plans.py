@@ -3,14 +3,28 @@ from fastapi import APIRouter, Depends
 from ...core.auth import require_permission
 from ...schemas import PMPlan, PMPlanCreate, PMPlanTask, PMPlanTaskCreate, PMPlanTaskUpdate, PMPlanUpdate, PMSchedulerRunResult
 from ...services import PMPlanService
+from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/pm-plans", tags=["PM Plans"])
 service = PMPlanService()
 
 
-@router.get("", response_model=list[PMPlan])
-def list_pm_plans(_=Depends(require_permission("pm_plans:read"))):
-    return service.list()
+@router.get("", response_model=None)
+def list_pm_plans(
+    query: ListQuery = Depends(get_list_query),
+    _=Depends(require_permission("pm_plans:read")),
+):
+    return query.apply(
+        service.list(),
+        search_fields=["name", "description", "recurrence_type", "asset_name"],
+        filter_aliases={
+            "asset": ["asset_id", "equipment_id", "asset_name"],
+            "status": ["status", "state"],
+            "priority": ["priority"],
+            "site": ["site", "location"],
+        },
+        date_fields=["created_at", "updated_at", "start_date", "next_due_date", "last_service_date"],
+    )
 
 
 @router.post("/scheduler/run", response_model=PMSchedulerRunResult)

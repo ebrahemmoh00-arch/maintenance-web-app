@@ -3,14 +3,28 @@ from fastapi import APIRouter, Depends
 from ...core.auth import require_permission
 from ...schemas import Equipment, EquipmentCreate, EquipmentUpdate
 from ...services import EquipmentService
+from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/equipment", tags=["Equipment"])
 service = EquipmentService()
 
 
-@router.get("", response_model=list[Equipment])
-def list_equipment(_=Depends(require_permission("assets:read"))):
-    return service.list()
+@router.get("", response_model=None)
+def list_equipment(
+    query: ListQuery = Depends(get_list_query),
+    _=Depends(require_permission("assets:read")),
+):
+    return query.apply(
+        service.list(),
+        search_fields=["name", "asset_code", "serial_number", "category", "site", "department"],
+        filter_aliases={
+            "asset": ["id", "name", "asset_code"],
+            "site": ["site", "location"],
+            "department": ["department"],
+            "status": ["status"],
+        },
+        date_fields=["created_at", "updated_at", "commission_date", "installation_date"],
+    )
 
 
 @router.get("/{equipment_id}", response_model=Equipment)

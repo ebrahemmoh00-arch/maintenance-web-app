@@ -3,14 +3,18 @@ from fastapi import APIRouter, Depends
 from ...core.auth import require_permission
 from ...schemas import Customer, CustomerCreate, CustomerUpdate
 from ...services import CustomerService
+from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 service = CustomerService()
 
 
-@router.get("", response_model=list[Customer])
-def list_customers(_=Depends(require_permission("customers:read"))):
-    return service.list()
+@router.get("", response_model=None)
+def list_customers(
+    query: ListQuery = Depends(get_list_query),
+    _=Depends(require_permission("customers:read")),
+):
+    return query.apply(service.list(), search_fields=["name", "contact_person", "email", "location"])
 
 
 @router.get("/{customer_id}", response_model=Customer)

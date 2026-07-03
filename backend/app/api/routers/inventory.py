@@ -3,14 +3,23 @@ from fastapi import APIRouter, Depends
 from ...core.auth import require_permission
 from ...schemas import InventoryItem, InventoryItemCreate, InventoryItemUpdate
 from ...services import InventoryService
+from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 service = InventoryService()
 
 
-@router.get("", response_model=list[InventoryItem])
-def list_inventory(_=Depends(require_permission("inventory:read"))):
-    return service.list()
+@router.get("", response_model=None)
+def list_inventory(
+    query: ListQuery = Depends(get_list_query),
+    _=Depends(require_permission("inventory:read")),
+):
+    return query.apply(
+        service.list(),
+        search_fields=["name", "part_number", "category", "warehouse", "supplier"],
+        filter_aliases={"status": ["status"], "site": ["site", "warehouse"], "asset": ["asset_id", "asset_name"]},
+        date_fields=["created_at", "updated_at"],
+    )
 
 
 @router.get("/{item_id}", response_model=InventoryItem)

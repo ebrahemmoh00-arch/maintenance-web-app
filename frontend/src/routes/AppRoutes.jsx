@@ -1,25 +1,35 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-const LegacyApp = lazy(() => import("../pages/LegacyApp/LegacyApp.jsx"));
+const AuthEntryPage = lazy(() => import("../features/authentication/pages/AuthEntryPage.jsx"));
+const DashboardPage = lazy(() => import("../features/dashboard/pages/DashboardPage.jsx"));
+const AssetsPage = lazy(() => import("../features/assets/pages/AssetsPage.jsx"));
+const WorkOrdersPage = lazy(() => import("../features/work-orders/pages/WorkOrdersPage.jsx"));
+const PMPlansPage = lazy(() => import("../features/pm/pages/PMPlansPage.jsx"));
+const SchedulePage = lazy(() => import("../features/schedule/pages/SchedulePage.jsx"));
+const InventoryPage = lazy(() => import("../features/inventory/pages/InventoryPage.jsx"));
+const ResourcesPage = lazy(() => import("../features/resources/pages/ResourcesPage.jsx"));
+const ReportsPage = lazy(() => import("../features/reports/pages/ReportsPage.jsx"));
+const SettingsPage = lazy(() => import("../features/settings/pages/SettingsPage.jsx"));
+const AccessControlPage = lazy(() => import("../features/settings/pages/AccessControlPage.jsx"));
 
 const routePages = [
-  { path: "/dashboard", initialPage: "dashboard" },
-  { path: "/assets", initialPage: "equipment" },
-  { path: "/equipment", initialPage: "equipment" },
-  { path: "/work-orders", initialPage: "work-orders" },
-  { path: "/pm-plans", initialPage: "pm-plans" },
-  { path: "/preventive-maintenance", initialPage: "schedule" },
-  { path: "/calendar", initialPage: "schedule" },
-  { path: "/schedule", initialPage: "schedule" },
-  { path: "/inventory", initialPage: "inventory" },
-  { path: "/resources", initialPage: "engineers" },
-  { path: "/technicians", initialPage: "engineers" },
-  { path: "/reports", initialPage: "reports" },
-  { path: "/reports-analytics", initialPage: "reports" },
-  { path: "/users", initialPage: "access-control" },
-  { path: "/access-control", initialPage: "access-control" },
-  { path: "/settings", initialPage: "settings" }
+  { path: "/dashboard", element: <DashboardPage /> },
+  { path: "/assets", element: <AssetsPage /> },
+  { path: "/equipment", element: <AssetsPage /> },
+  { path: "/work-orders", element: <WorkOrdersPage /> },
+  { path: "/pm-plans", element: <PMPlansPage /> },
+  { path: "/preventive-maintenance", element: <SchedulePage /> },
+  { path: "/calendar", element: <SchedulePage /> },
+  { path: "/schedule", element: <SchedulePage /> },
+  { path: "/inventory", element: <InventoryPage /> },
+  { path: "/resources", element: <ResourcesPage /> },
+  { path: "/technicians", element: <ResourcesPage /> },
+  { path: "/reports", element: <ReportsPage /> },
+  { path: "/reports-analytics", element: <ReportsPage /> },
+  { path: "/users", element: <AccessControlPage /> },
+  { path: "/access-control", element: <AccessControlPage /> },
+  { path: "/settings", element: <SettingsPage /> }
 ];
 
 function RouteFallback() {
@@ -32,24 +42,18 @@ function RouteFallback() {
   );
 }
 
-function LegacyRoute({ initialPage = "" }) {
-  return (
-    <Suspense fallback={<RouteFallback />}>
-      <LegacyApp initialPage={initialPage} />
-    </Suspense>
-  );
-}
-
 export default function AppRoutes() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LegacyRoute />} />
-        {routePages.map((route) => (
-          <Route key={route.path} path={route.path} element={<LegacyRoute initialPage={route.initialPage} />} />
-        ))}
-        <Route path="*" element={<LegacyRoute initialPage="dashboard" />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<AuthEntryPage />} />
+          {routePages.map((route) => (
+            <Route key={route.path} path={route.path} element={route.element} />
+          ))}
+          <Route path="*" element={<DashboardPage />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

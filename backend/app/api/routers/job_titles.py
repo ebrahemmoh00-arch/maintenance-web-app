@@ -3,14 +3,18 @@ from fastapi import APIRouter, Depends
 from ...core.auth import require_permission
 from ...schemas import JobTitle, JobTitleCreate, JobTitleUpdate
 from ...services import JobTitleService
+from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/job-titles", tags=["Job Titles"])
 service = JobTitleService()
 
 
-@router.get("", response_model=list[JobTitle])
-def list_job_titles(_=Depends(require_permission("job_titles:read"))):
-    return service.list()
+@router.get("", response_model=None)
+def list_job_titles(
+    query: ListQuery = Depends(get_list_query),
+    _=Depends(require_permission("job_titles:read")),
+):
+    return query.apply(service.list(), search_fields=["title", "name", "department"])
 
 
 @router.get("/{job_title_id}", response_model=JobTitle)

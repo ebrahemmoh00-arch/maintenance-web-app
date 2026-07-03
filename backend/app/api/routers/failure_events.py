@@ -3,14 +3,28 @@ from fastapi import APIRouter, Depends
 from ...core.auth import require_permission
 from ...schemas import FailureEvent, FailureEventCreate, FailureEventUpdate, RootCauseAnalysis, RootCauseAnalysisCreate, ReliabilityCode, ReliabilityCodeCreate, ReliabilityCodeUpdate
 from ...services import FailureManagementService
+from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/failure-events", tags=["Failure Events"])
 service = FailureManagementService()
 
 
-@router.get("", response_model=list[FailureEvent])
-def list_failure_events(_=Depends(require_permission("assets:read"))):
-    return service.list()
+@router.get("", response_model=None)
+def list_failure_events(
+    query: ListQuery = Depends(get_list_query),
+    _=Depends(require_permission("assets:read")),
+):
+    return query.apply(
+        service.list(),
+        search_fields=["asset_name", "failure_code", "description", "root_cause"],
+        filter_aliases={
+            "asset": ["asset_id", "equipment_id", "asset_name"],
+            "status": ["status"],
+            "priority": ["priority", "severity"],
+            "site": ["site", "location"],
+        },
+        date_fields=["failure_date", "created_at", "updated_at"],
+    )
 
 
 @router.get("/codes")

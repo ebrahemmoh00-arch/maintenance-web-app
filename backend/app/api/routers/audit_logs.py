@@ -3,11 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ...core.audit import AuditService
 from ...core.auth import CurrentUser, get_current_user, require_permission
 from ...schemas import AuditDeleteRequest, AuditExportRequest, AuditLog
+from ...utils.pagination import paginate_items, sort_items
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
 
-@router.get("", response_model=list[AuditLog])
+@router.get("", response_model=None)
 def list_audit_logs(
     from_date: str = "",
     to_date: str = "",
@@ -18,9 +19,13 @@ def list_audit_logs(
     status: str = "",
     search: str = "",
     limit: int = Query(default=500, ge=1, le=2000),
+    page: int | None = Query(default=None, ge=1),
+    page_size: int = Query(default=25, ge=1, le=500),
+    sort_by: str | None = Query(default=None),
+    sort_order: str = Query(default="asc", pattern="^(asc|desc)$"),
     current_user: CurrentUser = Depends(require_permission("audit_logs:read")),
 ):
-    return AuditService.list_logs(
+    rows = AuditService.list_logs(
         {
             "from_date": from_date,
             "to_date": to_date,
@@ -34,6 +39,10 @@ def list_audit_logs(
         },
         current_user,
     )
+    rows = sort_items(rows, sort_by, sort_order)
+    if page is not None:
+        return paginate_items(rows, page, page_size)
+    return rows
 
 
 @router.post("/export")
