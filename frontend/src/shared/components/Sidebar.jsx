@@ -85,3 +85,5 @@ export default function Sidebar({ active, setActive, collapsed, setCollapsed, la
     </aside>
   );
 }
+
+export { Sidebar };

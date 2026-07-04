@@ -11,3 +11,5 @@ export default function EmptyState({ title = "No data available", message = "Rec
     </div>
   );
 }
+
+export { EmptyState };

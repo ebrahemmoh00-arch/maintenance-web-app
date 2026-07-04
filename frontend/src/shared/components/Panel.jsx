@@ -12,3 +12,5 @@ export default function Panel({ title, subtitle, actions, children, className = 
     </section>
   );
 }
+
+export { Panel };

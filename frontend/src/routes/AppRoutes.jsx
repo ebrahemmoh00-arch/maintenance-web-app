@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-const AuthEntryPage = lazy(() => import("../features/authentication/pages/AuthEntryPage.jsx"));
+const CMMSApp = lazy(() => import("../app/CMMSApp.jsx"));
 const DashboardPage = lazy(() => import("../features/dashboard/pages/DashboardPage.jsx"));
 const AssetsPage = lazy(() => import("../features/assets/pages/AssetsPage.jsx"));
 const WorkOrdersPage = lazy(() => import("../features/work-orders/pages/WorkOrdersPage.jsx"));
@@ -47,11 +47,13 @@ export default function AppRoutes() {
     <BrowserRouter>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<AuthEntryPage />} />
-          {routePages.map((route) => (
-            <Route key={route.path} path={route.path} element={route.element} />
-          ))}
-          <Route path="*" element={<DashboardPage />} />
+          <Route path="/" element={<CMMSApp />}>
+            <Route index element={<DashboardPage />} />
+            {routePages.map((route) => (
+              <Route key={route.path} path={route.path.replace(/^\//, "")} element={route.element} />
+            ))}
+            <Route path="*" element={<DashboardPage />} />
+          </Route>
         </Routes>
       </Suspense>
     </BrowserRouter>

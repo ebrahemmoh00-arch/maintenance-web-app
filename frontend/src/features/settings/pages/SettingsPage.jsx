@@ -1,5 +1,13 @@
-import MaintenanceConsole from "../../../app/MaintenanceConsole.jsx";
+import { useCMMS } from "../../../app/context/CMMSContext.jsx";
+import { SettingsSummary } from "../components/SettingsViews.jsx";
 
 export default function SettingsPage() {
-  return <MaintenanceConsole initialPage="settings" />;
+  const {
+    data,
+    language,
+    setActive,
+    isAdmin
+  } = useCMMS();
+
+  return <SettingsSummary data={data} language={language} onAccessControl={() => setActive("access-control")} isAdmin={isAdmin} />;
 }

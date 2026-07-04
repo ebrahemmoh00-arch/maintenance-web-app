@@ -97,3 +97,5 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
     </div>
   );
 }
+
+export { FormModal };

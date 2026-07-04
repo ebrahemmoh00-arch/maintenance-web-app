@@ -23,3 +23,5 @@ export default function MetricCard({ label, value, icon: Icon, tone = "blue", he
     </div>
   );
 }
+
+export { MetricCard };

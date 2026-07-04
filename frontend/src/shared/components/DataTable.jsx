@@ -83,3 +83,5 @@ export default function DataTable({ columns, rows, onEdit, onDelete, emptyMessag
     </div>
   );
 }
+
+export { DataTable };

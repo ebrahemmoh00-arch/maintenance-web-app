@@ -1,5 +1,23 @@
-import MaintenanceConsole from "../../../app/MaintenanceConsole.jsx";
+import { useCMMS } from "../../../app/context/CMMSContext.jsx";
+import { AccessControlView } from "../components/SettingsViews.jsx";
 
 export default function AccessControlPage() {
-  return <MaintenanceConsole initialPage="access-control" />;
+  const {
+    employeeRows,
+    currentUser,
+    saveUserPermissions,
+    language,
+    isAdmin
+  } = useCMMS();
+
+  if (!isAdmin) return null;
+
+  return (
+    <AccessControlView
+      users={employeeRows}
+      currentUser={currentUser}
+      onSaveUserPermissions={saveUserPermissions}
+      language={language}
+    />
+  );
 }
