@@ -8,6 +8,29 @@ import { AssetDetailsPanel, AssetHealthDot, AssetMiniSelect } from "./AssetDetai
 import { Building2, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+const INITIAL_HISTORY_FILTERS = {
+  page: 1,
+  page_size: 25,
+  search: "",
+  event_type: "",
+  date_from: "",
+  date_to: "",
+  technician: "",
+  status: "",
+  work_order: "",
+  pm_cm: "",
+  failure: "",
+  downtime: ""
+};
+
+const EMPTY_HISTORY_RESPONSE = {
+  items: [],
+  page: 1,
+  page_size: 25,
+  total: 0,
+  pages: 0
+};
+
 export function AssetsView({
   rows,
   departments,
@@ -41,7 +64,7 @@ export function AssetsView({
     criticality: ""
   });
   const [assetLifecycle, setAssetLifecycle] = useState({
-    history: [],
+    history: EMPTY_HISTORY_RESPONSE,
     timeline: [],
     health: null,
     measurements: [],
@@ -51,6 +74,7 @@ export function AssetsView({
     failures: [],
     downtime: []
   });
+  const [assetHistoryFilters, setAssetHistoryFilters] = useState(INITIAL_HISTORY_FILTERS);
   const [assetLifecycleLoading, setAssetLifecycleLoading] = useState(false);
   const [assetLifecycleError, setAssetLifecycleError] = useState("");
   const customerConfig = localizedConfig("customers", language);
@@ -61,6 +85,7 @@ export function AssetsView({
     children: assetTree.filter(asset => Number(asset.customer_id) === Number(department.id))
   })), [departments, assetTree]);
   const selectedAsset = rows.find(asset => Number(asset.id) === Number(selectedAssetId)) || rows[0];
+  const historyTechnicians = useMemo(() => [...new Set(workOrders.map(order => order.engineer_name || order.technician_name || "").filter(Boolean))].sort(), [workOrders]);
   const sections = [{
     key: "customers",
     title: t("Customers / Locations"),
@@ -80,9 +105,12 @@ export function AssetsView({
     }
   }, [rows, selectedAssetId]);
   useEffect(() => {
+    setAssetHistoryFilters(INITIAL_HISTORY_FILTERS);
+  }, [selectedAsset?.id]);
+  useEffect(() => {
     if (!selectedAsset?.id) {
       setAssetLifecycle({
-        history: [],
+        history: EMPTY_HISTORY_RESPONSE,
         timeline: [],
         health: null,
         measurements: [],
@@ -99,9 +127,9 @@ export function AssetsView({
       setAssetLifecycleLoading(true);
       setAssetLifecycleError("");
       try {
-        const [history, timeline, health, measurements, events, documents, photos, failures, downtime] = await Promise.all([api.list(`assets/${selectedAsset.id}/history`), api.list(`assets/${selectedAsset.id}/timeline`), api.list(`assets/${selectedAsset.id}/health`), api.list(`assets/${selectedAsset.id}/measurements`), api.list(`assets/${selectedAsset.id}/events`), api.list(`assets/${selectedAsset.id}/documents`), api.list(`assets/${selectedAsset.id}/photos`), api.list(`assets/${selectedAsset.id}/failures`).catch(() => []), api.list(`assets/${selectedAsset.id}/downtime`).catch(() => [])]);
+        const [history, timeline, health, measurements, events, documents, photos, failures, downtime] = await Promise.all([api.list(`assets/${selectedAsset.id}/history`, assetHistoryFilters), api.list(`assets/${selectedAsset.id}/timeline`), api.list(`assets/${selectedAsset.id}/health`), api.list(`assets/${selectedAsset.id}/measurements`), api.list(`assets/${selectedAsset.id}/events`), api.list(`assets/${selectedAsset.id}/documents`), api.list(`assets/${selectedAsset.id}/photos`), api.list(`assets/${selectedAsset.id}/failures`).catch(() => []), api.list(`assets/${selectedAsset.id}/downtime`).catch(() => [])]);
         if (!cancelled) setAssetLifecycle({
-          history,
+          history: normalizeHistoryResponse(history),
           timeline,
           health,
           measurements,
@@ -114,7 +142,7 @@ export function AssetsView({
       } catch (error) {
         if (!cancelled) {
           setAssetLifecycle({
-            history: [],
+            history: EMPTY_HISTORY_RESPONSE,
             timeline: [],
             health: null,
             measurements: [],
@@ -134,15 +162,15 @@ export function AssetsView({
     return () => {
       cancelled = true;
     };
-  }, [selectedAsset?.id]);
+  }, [selectedAsset?.id, assetHistoryFilters]);
   async function reloadAssetLifecycle(assetId = selectedAsset?.id) {
     if (!assetId) return;
     setAssetLifecycleLoading(true);
     setAssetLifecycleError("");
     try {
-      const [history, timeline, health, measurements, events, documents, photos, failures, downtime] = await Promise.all([api.list(`assets/${assetId}/history`), api.list(`assets/${assetId}/timeline`), api.list(`assets/${assetId}/health`), api.list(`assets/${assetId}/measurements`), api.list(`assets/${assetId}/events`), api.list(`assets/${assetId}/documents`), api.list(`assets/${assetId}/photos`), api.list(`assets/${assetId}/failures`).catch(() => []), api.list(`assets/${assetId}/downtime`).catch(() => [])]);
+      const [history, timeline, health, measurements, events, documents, photos, failures, downtime] = await Promise.all([api.list(`assets/${assetId}/history`, assetHistoryFilters), api.list(`assets/${assetId}/timeline`), api.list(`assets/${assetId}/health`), api.list(`assets/${assetId}/measurements`), api.list(`assets/${assetId}/events`), api.list(`assets/${assetId}/documents`), api.list(`assets/${assetId}/photos`), api.list(`assets/${assetId}/failures`).catch(() => []), api.list(`assets/${assetId}/downtime`).catch(() => [])]);
       setAssetLifecycle({
-        history,
+        history: normalizeHistoryResponse(history),
         timeline,
         health,
         measurements,
@@ -239,7 +267,7 @@ export function AssetsView({
             </div>
           </Panel>
 
-          <AssetDetailsPanel asset={selectedAsset} rows={rows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} onAddLifecycleItem={handleAssetLifecycleCreate} language={language} />
+          <AssetDetailsPanel asset={selectedAsset} rows={rows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} language={language} />
         </div> : null}
 
       {activeAssetSection === "assets" ? <Panel title={t("Assets")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
@@ -249,6 +277,19 @@ export function AssetsView({
           <DataTable columns={assetConfig.columns} rows={rows} onEdit={canEditAsset ? onEdit : null} onDelete={canDeleteAsset ? onDelete : null} emptyMessage={t("No equipment")} labels={tableLabels(language)} />
         </Panel> : null}
     </div>;
+}
+
+function normalizeHistoryResponse(value) {
+  if (Array.isArray(value)) {
+    return {
+      items: value,
+      page: 1,
+      page_size: value.length || 25,
+      total: value.length,
+      pages: value.length ? 1 : 0
+    };
+  }
+  return value || EMPTY_HISTORY_RESPONSE;
 }
 
 export function AssetCompanyNode({

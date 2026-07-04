@@ -1,7 +1,8 @@
-import { AlertTriangle, Eye, MoreHorizontal, Printer, QrCode, Save } from "lucide-react";
+import { AlertTriangle, Eye, MoreHorizontal, QrCode, Save } from "lucide-react";
 
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { PriorityBadge, StatusBadge } from "../../../shared/components/StatusBadges.jsx";
+import { DocumentCenterMenu } from "../documents/DocumentCenterMenu.jsx";
 import { SavedWorkOrderFilters, SavedWorkOrdersTable } from "./SavedWorkOrders.jsx";
 import {
   DocBand,
@@ -50,6 +51,8 @@ export function WorkOrdersWorkspace({ app }) {
     moreActionsOpen,
     setMoreActionsOpen,
     exportWorkOrderPdf,
+    preloadDocumentCenter,
+    printWorkOrderDocument,
     qrOpen,
     closeQrScanner,
     openQrScanner,
@@ -130,7 +133,9 @@ export function WorkOrdersWorkspace({ app }) {
                 </button>
                 {moreActionsOpen ? (
                   <div className="absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                    <button type="button" onClick={exportWorkOrderPdf} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><Printer className="h-4 w-4" />{t("Export PDF")}</button>
+                    <div className="px-1 py-1">
+                      <DocumentCenterMenu onExport={exportWorkOrderPdf} onPrint={printWorkOrderDocument} onOpen={preloadDocumentCenter} compact />
+                    </div>
                     <button type="button" onClick={qrOpen ? closeQrScanner : openQrScanner} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><QrCode className="h-4 w-4" />{t("Scan Equipment QR")}</button>
                     <button type="button" onClick={onBackToEquipment} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><Eye className="h-4 w-4" />{t("Back to Equipment")}</button>
                   </div>
@@ -274,7 +279,7 @@ export function WorkOrdersWorkspace({ app }) {
             <button type="button" onClick={openSelected} disabled={!selectedSavedId} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">{t("Open Selected")}</button>
             {canEdit ? <button type="button" onClick={editSelected} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit Selected")}</button> : null}
             {canDelete ? <button type="button" onClick={deleteSelected} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50">{t("Delete Selected")}</button> : null}
-            <button type="button" onClick={exportWorkOrderPdf} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-slate-400"><Printer className="h-4 w-4" />{t("Export PDF")}</button>
+            <DocumentCenterMenu onExport={exportWorkOrderPdf} onPrint={printWorkOrderDocument} onOpen={preloadDocumentCenter} compact />
             {canCreate ? <button type="button" onClick={newWorkOrder} className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">{t("New Work Order")}</button> : null}
           </div>
         }

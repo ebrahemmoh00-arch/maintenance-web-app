@@ -589,13 +589,13 @@ class FailureManagementService:
         created = self.failures.create(item)
         self.lifecycle.add_history(
             created["asset_id"],
-            "Failure",
+            "Failure Recorded",
             created["failure_id"],
             created.get("failure_description") or "Failure event recorded",
             "Failure Events",
             created["id"],
             created.get("reported_by_id"),
-            metadata={"severity": created.get("severity"), "status": created.get("status")},
+            metadata={"failure_code": created.get("failure_id"), "severity": created.get("severity"), "status": created.get("status")},
         )
         self.lifecycle.add_event(
             created["asset_id"],
@@ -707,11 +707,12 @@ class FailureManagementService:
         created = self.failures.create(item)
         self.lifecycle.add_history(
             created["asset_id"],
-            "Failure",
+            "Failure Recorded",
             created["failure_id"],
             created.get("failure_description") or "Failure event recorded",
             "Failure Events",
             created["id"],
+            metadata={"failure_code": created.get("failure_id"), "status": created.get("status")},
         )
         ReliabilityService().refresh_asset(created["asset_id"])
         return created
@@ -819,12 +820,35 @@ class DowntimeService:
         created = self.downtime.create(item)
         self.lifecycle.add_history(
             created["asset_id"],
-            "Downtime",
-            "Downtime event recorded",
+            "Downtime Started",
+            "Downtime started",
             f"{round(created['total_downtime_minutes'] / 60, 2)} downtime hours",
             "Downtime Events",
             created["id"],
+            metadata={
+                "status": "open" if not created.get("end_time") else "closed",
+                "downtime_duration_minutes": created.get("total_downtime_minutes", 0),
+                "failure_code": created.get("linked_failure_id", ""),
+                "work_order_id": created.get("linked_work_order_id"),
+                "event_time": created.get("start_time"),
+            },
         )
+        if created.get("end_time"):
+            self.lifecycle.add_history(
+                created["asset_id"],
+                "Downtime Ended",
+                "Downtime ended",
+                f"{round(created['total_downtime_minutes'] / 60, 2)} downtime hours",
+                "Downtime Events",
+                created["id"],
+                metadata={
+                    "status": "closed",
+                    "downtime_duration_minutes": created.get("total_downtime_minutes", 0),
+                    "failure_code": created.get("linked_failure_id", ""),
+                    "work_order_id": created.get("linked_work_order_id"),
+                    "event_time": created.get("end_time"),
+                },
+            )
         ReliabilityService().refresh_asset(created["asset_id"])
         return self.downtime.get(created["id"])
 
@@ -1018,6 +1042,21 @@ class WorkOrderService:
             "",
             created["status"],
             description=f"Work order #{created['id']} created",
+        )
+        AssetLifecycleRepository().add_history(
+            created["equipment_id"],
+            "Work Order Created",
+            f"Work Order #{created['id']} created",
+            created.get("description") or created.get("title") or "Work order created",
+            "Work Orders",
+            created["id"],
+            created.get("engineer_id"),
+            metadata={
+                "status": created.get("status"),
+                "work_order_id": created["id"],
+                "technician_name": created.get("engineer_name", ""),
+                "summary": created.get("title", ""),
+            },
         )
         return self.repo.get(created["id"])
 
@@ -1310,6 +1349,36 @@ class WorkOrderService:
             f"Notification event generated for status {to_status}",
             {"reason": reason},
         )
+        event_type = {
+            "assigned": "Work Order Assigned",
+            "in_progress": "Work Started",
+            "completed": "Work Completed",
+            "pending_supervisor_review": "Work Completed",
+            "approved": "Work Approved",
+            "closed": "Work Order Closed",
+        }.get(to_status)
+        if event_type:
+            AssetLifecycleRepository().add_history(
+                order["equipment_id"],
+                event_type,
+                event_type,
+                description or f"Work Order #{order['id']} changed from {from_status} to {to_status}",
+                "Work Orders",
+                order["id"],
+                actor_id,
+                metadata={
+                    "status": to_status,
+                    "work_order_id": order["id"],
+                    "technician_name": actor_name or order.get("engineer_name", ""),
+                    "event_time": (
+                        order.get("assigned_at")
+                        or order.get("started_at")
+                        or order.get("completed_at")
+                        or order.get("approved_at")
+                        or order.get("closed_at")
+                    ),
+                },
+            )
         AuditService.log_event(
             action="UPDATE",
             module="Work Orders",
@@ -1335,6 +1404,22 @@ class WorkOrderService:
             updates["current_hours"] = runtime
         self.equipment.update(order["equipment_id"], updates)
         deducted_parts = self._deduct_inventory_parts(order)
+        if deducted_parts:
+            AssetLifecycleRepository().add_history(
+                order["equipment_id"],
+                "Spare Parts Issued",
+                "Spare parts issued",
+                f"{len(deducted_parts)} spare part entries issued for Work Order #{order['id']}",
+                "Work Orders",
+                order["id"],
+                order.get("engineer_id"),
+                metadata={
+                    "status": "issued",
+                    "work_order_id": order["id"],
+                    "parts_used": deducted_parts,
+                    "technician_name": order.get("engineer_name", ""),
+                },
+            )
         AssetLifecycleService().record_work_order_closed(order, deducted_parts)
         FailureManagementService().create_from_work_order(order)
         AuditService.log_event(
@@ -1409,13 +1494,38 @@ class PreventiveMaintenanceService:
     def create(self, data):
         item = payload(data)
         self.equipment.get(item["equipment_id"])
-        return self.repo.create(item)
+        created = self.repo.create(item)
+        AssetLifecycleRepository().add_history(
+            created["equipment_id"],
+            "Preventive Maintenance",
+            created.get("task_name", "Preventive maintenance task"),
+            "Preventive maintenance task created",
+            "Preventive Maintenance",
+            created["id"],
+            metadata={"status": created.get("status"), "summary": created.get("task_name", "")},
+        )
+        return created
 
     def update(self, item_id: int, data):
         item = payload(data)
         if "equipment_id" in item:
             self.equipment.get(item["equipment_id"])
-        return self.repo.update(item_id, item)
+        updated = self.repo.update(item_id, item)
+        if "last_service_hours" in item:
+            AssetLifecycleRepository().add_history(
+                updated["equipment_id"],
+                "Preventive Maintenance",
+                updated.get("task_name", "Preventive maintenance completed"),
+                f"Maintenance recorded at {updated.get('last_service_hours') or 0} operating hours",
+                "Preventive Maintenance",
+                updated["id"],
+                metadata={
+                    "status": updated.get("status"),
+                    "summary": updated.get("task_name", ""),
+                    "event_time": updated.get("last_service_date") or date.today().isoformat(),
+                },
+            )
+        return updated
 
     def update_history_record(self, record_id: int, data):
         return self.repo.update_history_record(record_id, payload(data))

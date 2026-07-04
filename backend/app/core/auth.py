@@ -56,6 +56,8 @@ MODULE_ALIASES = {
     "customers": "customers",
     "equipment": "assets",
     "assets": "assets",
+    "asset-history": "asset_history",
+    "asset_history": "asset_history",
     "engineers": "users",
     "users": "users",
     "work-orders": "work_orders",
@@ -74,6 +76,7 @@ MODULE_ALIASES = {
 READ_ALL = {
     "customers:read",
     "assets:read",
+    "asset_history:read",
     "work_orders:read",
     "inventory:read",
     "users:read",
@@ -364,13 +367,31 @@ def role_permissions(role: str | None) -> set[str]:
     return set(ROLE_PERMISSIONS.get(normalize_role(role), ROLE_PERMISSIONS["viewer"]))
 
 
+def normalize_permission_name(permission: str) -> str:
+    if ":" not in permission:
+        return permission.strip()
+    module_key, action = permission.split(":", 1)
+    module = MODULE_ALIASES.get(str(module_key).strip(), str(module_key).strip())
+    action_aliases = {
+        "view": "read",
+        "read": "read",
+        "add": "create",
+        "create": "create",
+        "edit": "update",
+        "update": "update",
+        "delete": "delete",
+        "write": "write",
+    }
+    return f"{module}:{action_aliases.get(action.strip(), action.strip())}"
+
+
 def custom_permissions(raw_permissions: str | None) -> set[str]:
     if not raw_permissions:
         return set()
     try:
         parsed = json.loads(raw_permissions) if isinstance(raw_permissions, str) else raw_permissions
     except json.JSONDecodeError:
-        return {item.strip() for item in raw_permissions.split(",") if item.strip()}
+        return {normalize_permission_name(item.strip()) for item in raw_permissions.split(",") if item.strip()}
     if not isinstance(parsed, dict):
         return set()
 
@@ -390,14 +411,37 @@ def custom_permissions(raw_permissions: str | None) -> set[str]:
         if actions.get("delete"):
             permissions.add(f"{module}:delete")
             permissions.add(f"{module}:write")
+    if "asset-history" not in parsed and "asset_history" not in parsed and legacy_full_access_permissions(parsed):
+        permissions.add("asset_history:read")
     return permissions
 
 
+def legacy_full_access_permissions(parsed: dict[str, Any]) -> bool:
+    required_modules = [
+        "customers",
+        "equipment",
+        "engineers",
+        "work-orders",
+        "preventive-maintenance",
+        "inventory",
+        "reports",
+        "settings",
+    ]
+    for module in required_modules:
+        actions = parsed.get(module)
+        if not isinstance(actions, dict) or not actions.get("view"):
+            return False
+        if module not in {"reports", "settings"} and not (actions.get("add") and actions.get("edit") and actions.get("delete")):
+            return False
+    return True
+
+
 def has_permission(user: CurrentUser, permission: str) -> bool:
-    allowed = role_permissions(user.role) | custom_permissions(user.permissions)
-    if "*" in allowed or permission in allowed:
+    normalized_permission = normalize_permission_name(permission)
+    allowed = {normalize_permission_name(item) for item in (role_permissions(user.role) | custom_permissions(user.permissions))}
+    if "*" in allowed or normalized_permission in allowed:
         return True
-    module, action = permission.split(":", 1)
+    module, action = normalized_permission.split(":", 1)
     if action in {"create", "update", "delete"} and f"{module}:write" in allowed:
         return True
     if action == "read" and f"{module}:write" in allowed:

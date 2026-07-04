@@ -307,9 +307,30 @@ class AssetLifecycleRepository:
         actor_id: int | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        metadata = metadata or {}
+        source = source_module or metadata.get("reference_type", "")
+        source_id = str(source_record_id or metadata.get("reference_id") or "")
+        work_order_id = metadata.get("work_order_id")
+        if not work_order_id and source.lower().startswith("work order") and str(source_id).isdigit():
+            work_order_id = int(source_id)
         item = {
             "asset_id": asset_id,
             "event_type": event_type,
+            "event_time": metadata.get("event_time") or metadata.get("timestamp") or datetime.now().replace(microsecond=0).isoformat(),
+            "reference_type": source,
+            "reference_id": source_id,
+            "user_id": metadata.get("user_id") or actor_id,
+            "summary": metadata.get("summary") or title,
+            "details": metadata.get("details") or description,
+            "status": metadata.get("status", ""),
+            "work_order_id": work_order_id,
+            "pm_plan_id": metadata.get("pm_plan_id"),
+            "failure_code": metadata.get("failure_code", ""),
+            "downtime_duration_minutes": int(metadata.get("downtime_duration_minutes") or 0),
+            "parts_used": json.dumps(metadata.get("parts_used"), ensure_ascii=False, default=str) if isinstance(metadata.get("parts_used"), (dict, list)) else metadata.get("parts_used", ""),
+            "technician_name": metadata.get("technician_name", ""),
+            "category": metadata.get("category", ""),
+            "event_icon": metadata.get("event_icon", ""),
             "title": title,
             "description": description,
             "source_module": source_module,

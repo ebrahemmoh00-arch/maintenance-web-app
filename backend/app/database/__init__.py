@@ -108,6 +108,21 @@ CREATE TABLE IF NOT EXISTS asset_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     asset_id INTEGER NOT NULL,
     event_type TEXT NOT NULL,
+    event_time TEXT DEFAULT '',
+    reference_type TEXT DEFAULT '',
+    reference_id TEXT DEFAULT '',
+    user_id INTEGER,
+    summary TEXT DEFAULT '',
+    details TEXT DEFAULT '',
+    status TEXT DEFAULT '',
+    work_order_id INTEGER,
+    pm_plan_id INTEGER,
+    failure_code TEXT DEFAULT '',
+    downtime_duration_minutes INTEGER DEFAULT 0,
+    parts_used TEXT DEFAULT '',
+    technician_name TEXT DEFAULT '',
+    category TEXT DEFAULT '',
+    event_icon TEXT DEFAULT '',
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     source_module TEXT DEFAULT '',
@@ -116,6 +131,7 @@ CREATE TABLE IF NOT EXISTS asset_history (
     metadata TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES engineers(id) ON DELETE SET NULL,
     FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -692,6 +708,21 @@ CREATE TABLE IF NOT EXISTS asset_history (
     id SERIAL PRIMARY KEY,
     asset_id INTEGER NOT NULL,
     event_type TEXT NOT NULL,
+    event_time TEXT DEFAULT '',
+    reference_type TEXT DEFAULT '',
+    reference_id TEXT DEFAULT '',
+    user_id INTEGER,
+    summary TEXT DEFAULT '',
+    details TEXT DEFAULT '',
+    status TEXT DEFAULT '',
+    work_order_id INTEGER,
+    pm_plan_id INTEGER,
+    failure_code TEXT DEFAULT '',
+    downtime_duration_minutes INTEGER DEFAULT 0,
+    parts_used TEXT DEFAULT '',
+    technician_name TEXT DEFAULT '',
+    category TEXT DEFAULT '',
+    event_icon TEXT DEFAULT '',
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     source_module TEXT DEFAULT '',
@@ -700,6 +731,7 @@ CREATE TABLE IF NOT EXISTS asset_history (
     metadata TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES engineers(id) ON DELETE SET NULL,
     FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -1308,6 +1340,27 @@ def init_db() -> None:
                 "contractor_cost": "REAL DEFAULT 0",
             },
         )
+        ensure_columns(
+            db,
+            "asset_history",
+            {
+                "event_time": "TEXT DEFAULT ''",
+                "reference_type": "TEXT DEFAULT ''",
+                "reference_id": "TEXT DEFAULT ''",
+                "user_id": "INTEGER",
+                "summary": "TEXT DEFAULT ''",
+                "details": "TEXT DEFAULT ''",
+                "status": "TEXT DEFAULT ''",
+                "work_order_id": "INTEGER",
+                "pm_plan_id": "INTEGER",
+                "failure_code": "TEXT DEFAULT ''",
+                "downtime_duration_minutes": "INTEGER DEFAULT 0",
+                "parts_used": "TEXT DEFAULT ''",
+                "technician_name": "TEXT DEFAULT ''",
+                "category": "TEXT DEFAULT ''",
+                "event_icon": "TEXT DEFAULT ''",
+            },
+        )
         for statement in [
             "CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name)",
             "CREATE INDEX IF NOT EXISTS idx_engineers_role ON engineers(role)",
@@ -1330,6 +1383,10 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_inventory_items_stock_quantity ON inventory_items(stock_quantity)",
             "CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_equipment_id ON preventive_maintenance(equipment_id)",
             "CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_status ON preventive_maintenance(status)",
+            "CREATE INDEX IF NOT EXISTS idx_asset_history_event_time ON asset_history(event_time)",
+            "CREATE INDEX IF NOT EXISTS idx_asset_history_event_type ON asset_history(event_type)",
+            "CREATE INDEX IF NOT EXISTS idx_asset_history_work_order_id ON asset_history(work_order_id)",
+            "CREATE INDEX IF NOT EXISTS idx_asset_history_pm_plan_id ON asset_history(pm_plan_id)",
         ]:
             db.execute(statement)
         ensure_columns(

@@ -5,3 +5,4 @@ the existing import contract used by the routers.
 """
 
 from .legacy import *  # noqa: F401,F403
+from .asset_history import AssetHistoryService  # noqa: F401

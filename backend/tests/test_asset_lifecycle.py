@@ -5,6 +5,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -17,8 +18,9 @@ if str(BACKEND_DIR) not in sys.path:
 os.environ.pop("DATABASE_URL", None)
 
 from app import database  # noqa: E402
+from app.core.auth import CurrentUser, has_permission  # noqa: E402
 from app.schemas import AssetMeasurementCreate, EquipmentCreate, WorkOrderCreate, WorkOrderLifecycleAction  # noqa: E402
-from app.services import AssetLifecycleService, EquipmentService, WorkOrderService  # noqa: E402
+from app.services import AssetHistoryService, AssetLifecycleService, EquipmentService, WorkOrderService  # noqa: E402
 
 
 class AssetLifecycleTest(unittest.TestCase):
@@ -29,6 +31,7 @@ class AssetLifecycleTest(unittest.TestCase):
         database.DB_PATH = self.temp_dir / "maintenance.db"
         database.init_db()
         self.assets = EquipmentService()
+        self.asset_history = AssetHistoryService()
         self.lifecycle = AssetLifecycleService()
         self.work_orders = WorkOrderService()
 
@@ -122,6 +125,70 @@ class AssetLifecycleTest(unittest.TestCase):
         self.assertTrue(any(entry["source_module"] == "Work Orders" and str(entry["source_record_id"]) == str(order["id"]) for entry in history))
         self.assertTrue(any(event["event_type"] == "Breakdown" for event in events))
         self.assertTrue(any(item["measurement_type"] == "Runtime Hours" and item["value"] == 4600 for item in measurements))
+
+    def test_enterprise_asset_history_supports_pagination_and_filtering(self) -> None:
+        order = self.work_orders.create(
+            WorkOrderCreate(
+                title="Enterprise history inspection",
+                description="Inspection work order for asset history",
+                customer_id=1,
+                equipment_id=1,
+                engineer_id=1,
+                scheduled_date="2026-07-04",
+                status="new",
+                priority="medium",
+                service_hours=4427,
+            )
+        )
+
+        result = self.asset_history.history(1, page=1, page_size=5, event_type="Work Order Created")
+        self.assertEqual(result["page"], 1)
+        self.assertLessEqual(len(result["items"]), 5)
+        self.assertTrue(any(item["work_order_id"] == order["id"] for item in result["items"]))
+
+        searched = self.asset_history.history(1, page=1, page_size=25, search="inspection")
+        self.assertGreaterEqual(searched["total"], 1)
+        self.assertTrue(all("items" in searched and isinstance(searched["items"], list) for _ in [searched]))
+
+    def test_asset_history_permission_alias_and_legacy_full_access(self) -> None:
+        limited = CurrentUser(
+            id=10,
+            username="limited",
+            name="Limited",
+            role="store_keeper",
+            permissions="{}",
+            token_jti="test",
+        )
+        explicit = CurrentUser(
+            id=11,
+            username="explicit",
+            name="Explicit",
+            role="store_keeper",
+            permissions="asset_history:view",
+            token_jti="test",
+        )
+        full_permissions = {
+            "customers": {"view": True, "add": True, "edit": True, "delete": True},
+            "equipment": {"view": True, "add": True, "edit": True, "delete": True},
+            "engineers": {"view": True, "add": True, "edit": True, "delete": True},
+            "work-orders": {"view": True, "add": True, "edit": True, "delete": True},
+            "preventive-maintenance": {"view": True, "add": True, "edit": True, "delete": True},
+            "inventory": {"view": True, "add": True, "edit": True, "delete": True},
+            "reports": {"view": True, "add": True, "edit": True, "delete": True},
+            "settings": {"view": True, "add": True, "edit": True, "delete": True},
+        }
+        legacy_full_admin = CurrentUser(
+            id=12,
+            username="legacy-full",
+            name="Legacy Full",
+            role="store_keeper",
+            permissions=json.dumps(full_permissions),
+            token_jti="test",
+        )
+
+        self.assertFalse(has_permission(limited, "asset_history:view"))
+        self.assertTrue(has_permission(explicit, "asset_history:read"))
+        self.assertTrue(has_permission(legacy_full_admin, "asset_history:view"))
 
 
 if __name__ == "__main__":

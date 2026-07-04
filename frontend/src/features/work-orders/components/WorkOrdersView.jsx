@@ -1,5 +1,5 @@
 import { tr } from "../../../shared/config/appConfig.jsx";
-import { buildWorkOrderPdfFileName, buildWorkOrderReference, calculateDuration, createWorkOrderForm, formFromSavedOrder, getNextWorkOrderNo, getWorkOrderSavedDate, notifyManagerApproval, todayIso } from "../utils/workOrderForms.js";
+import { buildWorkOrderReference, calculateDuration, createWorkOrderForm, formFromSavedOrder, getNextWorkOrderNo, getWorkOrderSavedDate, notifyManagerApproval, todayIso } from "../utils/workOrderForms.js";
 import { normalizeWorkOrderStatus } from "../utils/workOrderStatus.js";
 import { lifecycleActionsForStatus } from "./WorkOrderDocumentParts.jsx";
 import { WorkOrdersWorkspace } from "./WorkOrdersWorkspace.jsx";
@@ -57,6 +57,8 @@ export function WorkOrdersView({
   const workOrderSectionRef = useRef(null);
   const videoRef = useRef(null);
   const qrStreamRef = useRef(null);
+  const pdfModuleRef = useRef(null);
+  const pdfModulePromiseRef = useRef(null);
   const selectedEquipment = equipment.find(item => Number(item.id) === Number(form.equipment_id));
   const selectedCustomer = customers.find(item => Number(item.id) === Number(form.customer_id));
   const selectedEngineer = engineers.find(item => Number(item.id) === Number(form.engineer_id));
@@ -362,29 +364,66 @@ export function WorkOrdersView({
       }
     }
   }
-  function exportWorkOrderPdf() {
+  function preloadDocumentCenter() {
+    if (pdfModuleRef.current) return Promise.resolve(pdfModuleRef.current);
+    if (!pdfModulePromiseRef.current) {
+      pdfModulePromiseRef.current = import("../documents/workOrderPdfTemplates.js").then(module => {
+        pdfModuleRef.current = module;
+        return module;
+      });
+    }
+    return pdfModulePromiseRef.current;
+  }
+  async function exportWorkOrderPdf(templateKey = "standard") {
+    const context = buildDocumentContext();
+    const { exportWorkOrderDocument: generateWorkOrderDocument } = pdfModuleRef.current || await preloadDocumentCenter();
+    generateWorkOrderDocument(templateKey, context);
+  }
+  function buildDocumentContext() {
     if (selectedSavedOrder) {
       const exportForm = formFromSavedOrder(selectedSavedOrder, equipment, customers, engineers);
       const exportCustomer = customers.find(item => Number(item.id) === Number(exportForm.customer_id));
       const exportEquipment = equipment.find(item => Number(item.id) === Number(exportForm.equipment_id));
-      const pdfTitle = buildWorkOrderPdfFileName(exportForm, exportCustomer, exportEquipment, selectedSavedOrder);
-      setEditingId(selectedSavedOrder.id);
-      setForm(exportForm);
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => printWorkOrderPdf(pdfTitle));
-      });
-      return;
+      const exportEngineer = engineers.find(item => Number(item.id) === Number(exportForm.engineer_id));
+      return {
+        form: exportForm,
+        savedOrder: selectedSavedOrder,
+        customer: exportCustomer,
+        equipment: exportEquipment,
+        engineer: exportEngineer,
+        engineers,
+        duration: calculateDuration(exportForm.start_time, exportForm.finished_time),
+        checklistProgress: selectedSavedOrder?.checklist_completed ? 100 : 0,
+        lifecycleDraft,
+        woReference: buildWorkOrderReference(exportForm, exportCustomer, exportEquipment),
+        documentCode: DOCUMENT_CODE,
+        issueNo: ISSUE_NO,
+        issueDate: ISSUE_DATE
+      };
     }
-    const pdfTitle = buildWorkOrderPdfFileName(form, selectedCustomer, selectedEquipment, null);
-    printWorkOrderPdf(pdfTitle);
+    return {
+      form,
+      savedOrder: activeSavedOrder || {},
+      customer: selectedCustomer,
+      equipment: selectedEquipment,
+      engineer: selectedEngineer,
+      engineers,
+      duration,
+      checklistProgress,
+      lifecycleDraft,
+      woReference,
+      documentCode: DOCUMENT_CODE,
+      issueNo: ISSUE_NO,
+      issueDate: ISSUE_DATE
+    };
   }
-  function printWorkOrderPdf(pdfTitle) {
+  function printWorkOrderDocument() {
     const previousTitle = document.title;
     const restoreTitle = () => {
       document.title = previousTitle;
       window.removeEventListener("afterprint", restoreTitle);
     };
-    document.title = pdfTitle;
+    document.title = `${woReference || "Work Order"} Print`;
     window.addEventListener("afterprint", restoreTitle, {
       once: true
     });
@@ -419,6 +458,8 @@ export function WorkOrdersView({
     moreActionsOpen,
     setMoreActionsOpen,
     exportWorkOrderPdf,
+    preloadDocumentCenter,
+    printWorkOrderDocument,
     qrOpen,
     closeQrScanner,
     openQrScanner,

@@ -10,10 +10,8 @@ export default function DashboardPage() {
     alerts,
     backendReliability,
     openCreate,
-    canAddWorkOrders,
     language,
-    dashboardAlertsOpen,
-    setDashboardAlertsOpen
+    setActive
   } = useCMMS();
 
   if (loading) return <SkeletonDashboard />;
@@ -25,10 +23,8 @@ export default function DashboardPage() {
       alerts={alerts}
       backendReliability={backendReliability}
       openCreate={openCreate}
-      canManage={canAddWorkOrders}
       language={language}
-      dashboardAlertsOpen={dashboardAlertsOpen}
-      setDashboardAlertsOpen={setDashboardAlertsOpen}
+      setActive={setActive}
     />
   );
 }

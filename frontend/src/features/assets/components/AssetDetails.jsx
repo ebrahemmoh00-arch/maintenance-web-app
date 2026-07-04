@@ -3,6 +3,7 @@ import { Panel } from "../../../shared/components/Panel.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
 import { todayIso } from "../../work-orders/utils/workOrderForms.js";
 import { buildAssetBreadcrumb } from "../utils/assetHierarchy.js";
+import { HistoryTimeline } from "./history/HistoryTimeline.jsx";
 import { GitBranch } from "lucide-react";
 import { useState } from "react";
 
@@ -21,10 +22,16 @@ export function AssetDetailsPanel({
   lifecycle = {},
   lifecycleLoading = false,
   lifecycleError = "",
+  historyFilters = {},
+  onHistoryFiltersChange,
+  onHistoryPageChange,
+  onHistoryRefresh,
+  historyTechnicians = [],
   onAddLifecycleItem,
   language
 }) {
   const t = text => tr(language, text);
+  const [activeTab, setActiveTab] = useState("overview");
   if (!asset) {
     return <Panel title="Asset Details"><EmptyState title={t("No equipment")} message="Select an asset from the tree." /></Panel>;
   }
@@ -38,7 +45,7 @@ export function AssetDetailsPanel({
   const health = lifecycle.health || {};
   const healthScore = Number(health.health_score ?? 100);
   const costTotal = Number(health.maintenance_cost ?? Number(asset.total_maintenance_cost || 0) + Number(asset.spare_parts_cost || 0) + Number(asset.labor_cost || 0) + Number(asset.contractor_cost || 0));
-  const timelineRows = lifecycle.timeline?.length ? lifecycle.timeline : lifecycle.history || [];
+  const timelineRows = lifecycle.timeline?.length ? lifecycle.timeline : lifecycle.history?.items || [];
   const statusText = health.health_status || asset.current_condition || "Excellent";
   return <Panel title="Asset Details" subtitle={breadcrumb.map(item => item.name).join(" / ")} actions={canManage ? <div className="flex gap-2">
           {canEdit ? <button type="button" onClick={() => onEdit(asset)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">Edit Asset</button> : null}
@@ -56,6 +63,22 @@ export function AssetDetailsPanel({
       {lifecycleError ? <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
           {lifecycleError}
         </div> : null}
+
+      <div className="mt-5 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+        {[{
+      key: "overview",
+      label: "Overview"
+    }, {
+      key: "history",
+      label: "History"
+    }].map(tab => <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeTab === tab.key ? "bg-slate-950 text-white shadow-sm" : "bg-white text-slate-600 hover:text-slate-950"}`}>
+            {tab.label}
+          </button>)}
+      </div>
+
+      {activeTab === "history" ? <div className="mt-5">
+          <HistoryTimeline history={lifecycle.history} filters={historyFilters} onFiltersChange={onHistoryFiltersChange || (() => {})} onPageChange={onHistoryPageChange || (() => {})} onRefresh={onHistoryRefresh || (() => {})} technicians={historyTechnicians} loading={lifecycleLoading} />
+        </div> : <>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -139,6 +162,7 @@ export function AssetDetailsPanel({
           Component failures roll up to parent Equipment, then System. Reports can aggregate work orders, downtime, and PM exposure through this parent-child path.
         </p>
       </div>
+      </>}
     </Panel>;
 }
 

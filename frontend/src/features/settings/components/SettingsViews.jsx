@@ -1,6 +1,8 @@
 import { EmptyState } from "../../../shared/components/EmptyState.jsx";
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { StatusBadge } from "../../../shared/components/StatusBadges.jsx";
+import { getDocumentBranding, saveDocumentBranding } from "../../work-orders/documents/documentBranding.js";
+import { readFileAsDataUrl } from "../../work-orders/utils/workOrderForms.js";
 import { PERMISSION_ACTIONS, PERMISSION_MODULES, parsePermissions, tr } from "../../../shared/config/appConfig.jsx";
 import { Activity, Lock, ShieldCheck, UsersRound, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -112,13 +114,16 @@ export function SettingsSummary({
   isAdmin = false
 }) {
   const t = text => tr(language, text);
-  return <Panel title={t("Settings")} subtitle={t("Presentation-ready system overview. Operational settings can be extended without changing current API contracts.")}>
-      <div className="grid gap-4 md:grid-cols-3">
-        <InfoTile icon={ShieldCheck} title={t("Access Control")} text={`${t("Full Admin Access")} - ${t("View, add, edit, and delete all maintenance records.")}`} onClick={isAdmin ? onAccessControl : null} />
-        <InfoTile icon={Activity} title={t("API Health")} text={t("Frontend is connected to the FastAPI maintenance service.")} />
-        <InfoTile icon={Wrench} title={t("Configured Assets")} text={`${data.equipment.length} ${t("equipment records available for maintenance control.")}`} />
-      </div>
-    </Panel>;
+  return <div className="space-y-6">
+      <Panel title={t("Settings")} subtitle={t("Presentation-ready system overview. Operational settings can be extended without changing current API contracts.")}>
+        <div className="grid gap-4 md:grid-cols-3">
+          <InfoTile icon={ShieldCheck} title={t("Access Control")} text={`${t("Full Admin Access")} - ${t("View, add, edit, and delete all maintenance records.")}`} onClick={isAdmin ? onAccessControl : null} />
+          <InfoTile icon={Activity} title={t("API Health")} text={t("Frontend is connected to the FastAPI maintenance service.")} />
+          <InfoTile icon={Wrench} title={t("Configured Assets")} text={`${data.equipment.length} ${t("equipment records available for maintenance control.")}`} />
+        </div>
+      </Panel>
+      <DocumentBrandingSettings />
+    </div>;
 }
 
 export function InfoTile({
@@ -135,4 +140,68 @@ export function InfoTile({
       <h3 className="mt-4 text-sm font-black text-slate-950">{title}</h3>
       <p className="mt-2 text-sm text-slate-500">{text}</p>
     </Component>;
+}
+
+export function DocumentBrandingSettings() {
+  const [branding, setBranding] = useState(getDocumentBranding);
+  const [saved, setSaved] = useState(false);
+
+  function update(key, value) {
+    setSaved(false);
+    setBranding(current => ({
+      ...current,
+      [key]: value
+    }));
+  }
+
+  async function uploadLogo(files) {
+    const file = files?.[0];
+    if (!file) return;
+    update("logo", await readFileAsDataUrl(file));
+  }
+
+  function save() {
+    saveDocumentBranding(branding);
+    setSaved(true);
+  }
+
+  return <Panel title="Document Branding" subtitle="Company information used by the enterprise PDF templates.">
+      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="grid h-32 place-items-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-white">
+            {branding.logo ? <img src={branding.logo} alt="Company logo" className="max-h-28 max-w-full object-contain" /> : <span className="text-sm font-black text-slate-400">Company Logo</span>}
+          </div>
+          <label className="mt-3 block rounded-lg bg-blue-700 px-3 py-2 text-center text-xs font-black text-white hover:bg-blue-800">
+            Upload Logo
+            <input type="file" accept="image/*" className="hidden" onChange={event => uploadLogo(event.target.files)} />
+          </label>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <BrandingField label="Company Name" value={branding.companyName} onChange={value => update("companyName", value)} />
+          <BrandingField label="Document Version" value={branding.documentVersion} onChange={value => update("documentVersion", value)} />
+          <BrandingField label="Phone" value={branding.phone} onChange={value => update("phone", value)} />
+          <BrandingField label="Email" value={branding.email} onChange={value => update("email", value)} />
+          <BrandingField label="Website" value={branding.website} onChange={value => update("website", value)} />
+          <label className="md:col-span-2">
+            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Company Address</span>
+            <textarea rows={3} value={branding.companyAddress} onChange={event => update("companyAddress", event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" />
+          </label>
+          <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={save} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-800">Save Document Branding</button>
+            {saved ? <span className="text-sm font-black text-emerald-700">Saved</span> : null}
+          </div>
+        </div>
+      </div>
+    </Panel>;
+}
+
+function BrandingField({
+  label,
+  value,
+  onChange
+}) {
+  return <label>
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <input value={value || ""} onChange={event => onChange(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" />
+    </label>;
 }

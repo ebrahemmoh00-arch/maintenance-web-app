@@ -144,6 +144,16 @@ async function request(path, options = {}) {
   throw lastNetworkError || new Error("Failed to fetch");
 }
 
+function buildQuery(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    query.set(key, value);
+  });
+  const text = query.toString();
+  return text ? `?${text}` : "";
+}
+
 export const api = {
   saveAuthTokens,
   clearAuthTokens,
@@ -162,7 +172,7 @@ export const api = {
   },
   auditExport: (format) => request("/audit-logs/export", { method: "POST", body: JSON.stringify({ format }) }),
   auditDelete: (ids) => request("/audit-logs", { method: "DELETE", body: JSON.stringify({ ids }) }),
-  list: (resource) => request(`/${resource}`),
+  list: (resource, params) => request(`/${resource}${buildQuery(params)}`),
   create: (resource, data) => request(`/${resource}`, { method: "POST", body: JSON.stringify(data) }),
   update: (resource, id, data) => request(`/${resource}/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (resource, id) => request(`/${resource}/${id}`, { method: "DELETE" }),

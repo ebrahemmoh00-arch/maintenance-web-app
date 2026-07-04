@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query
 
 from ...core.auth import require_permission
 from ...schemas import AssetDocument, AssetDocumentCreate, AssetEvent, AssetHealth, AssetHistory, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, DowntimeEvent, FailureEvent
-from ...services import AssetLifecycleService, DowntimeService, FailureManagementService
+from ...services import AssetHistoryService, AssetLifecycleService, DowntimeService, FailureManagementService
 from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/assets", tags=["Asset Lifecycle"])
 service = AssetLifecycleService()
+history_service = AssetHistoryService()
 failures = FailureManagementService()
 downtime = DowntimeService()
 
@@ -14,10 +17,35 @@ downtime = DowntimeService()
 @router.get("/{asset_id}/history", response_model=None)
 def asset_history(
     asset_id: int,
-    query: ListQuery = Depends(get_list_query),
-    _=Depends(require_permission("assets:read")),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=500),
+    event_type: str | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    technician: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    work_order: str | None = Query(default=None),
+    pm_cm: str | None = Query(default=None),
+    failure: str | None = Query(default=None),
+    downtime_filter: str | None = Query(default=None, alias="downtime"),
+    search: str | None = Query(default=None),
+    _=Depends(require_permission("asset_history:view")),
 ):
-    return query.apply(service.history(asset_id), search_fields=["event_type", "description", "user_name"], date_fields=["created_at", "timestamp"])
+    return history_service.history(
+        asset_id,
+        page=page,
+        page_size=page_size,
+        event_type=event_type,
+        date_from=date_from,
+        date_to=date_to,
+        technician=technician,
+        status=status,
+        work_order=work_order,
+        pm_cm=pm_cm,
+        failure=failure,
+        downtime=downtime_filter,
+        search=search,
+    )
 
 
 @router.get("/{asset_id}/timeline", response_model=None)

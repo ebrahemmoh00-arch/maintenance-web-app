@@ -25,6 +25,9 @@ export const PERMISSION_MODULES = [{
   label: "Assets / Equipment",
   resourceKey: "equipment"
 }, {
+  key: "asset-history",
+  label: "Asset History"
+}, {
   key: "engineers",
   label: "Resources / Users",
   resourceKey: "engineers"
