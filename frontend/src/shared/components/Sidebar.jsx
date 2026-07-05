@@ -81,6 +81,22 @@ export default function Sidebar({ active, setActive, collapsed, setCollapsed, la
     });
   }
 
+  if (collapsed) {
+    return (
+      <aside className="flex h-auto w-full shrink-0 items-center border-b border-slate-800 bg-slate-950 p-3 text-white transition-all duration-300 lg:h-screen lg:w-16 lg:flex-col lg:border-b-0 lg:border-r lg:border-slate-200">
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          aria-label={isArabic ? "إظهار القائمة الجانبية" : "Show sidebar"}
+          title={isArabic ? "إظهار القائمة الجانبية" : "Show sidebar"}
+          className="grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/5 text-slate-300 transition hover:border-cyan-400/60 hover:bg-cyan-400/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className={`flex h-auto w-full shrink-0 flex-col border-b border-slate-800 bg-slate-950 text-white transition-all duration-300 lg:h-screen lg:border-b-0 lg:border-r lg:border-slate-200 ${collapsed ? "lg:w-20" : "lg:w-72"}`}>
       <div className="border-b border-white/10 p-3 lg:p-4">
