@@ -6,7 +6,7 @@ import { getAlertKey, tr } from "../../../shared/config/appConfig.jsx";
 import { plannedBreakdownData, trendData } from "../utils/maintenanceMetrics.jsx";
 import { downtimeDistribution, engineerWorkloadData, equipmentMaintenanceTimeData, technicianWorkloadData } from "../utils/reliabilityMetrics.js";
 import { AlertTriangle, Bell, CheckCircle2 } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export function AnalyticsSection({
   data,
@@ -90,21 +90,72 @@ export function AlertList({
 export function NotificationMenu({
   alerts,
   language,
-  anchor,
+  triggerRef,
   onViewAlerts
 }) {
   const t = text => tr(language, text);
-  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-  const menuWidth = Math.min(viewportWidth * 0.92, 440);
-  const padding = 16;
-  const anchorCenter = anchor ? (anchor.left + anchor.right) / 2 : viewportWidth - padding - 20;
-  const anchoredLeft = anchorCenter - menuWidth / 2;
-  const left = Math.max(padding, Math.min(anchoredLeft, viewportWidth - menuWidth - padding));
-  const top = (anchor?.bottom ?? 72) + 10;
-  return <div className="fixed z-[90] max-h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/25" style={{
-    top,
-    left,
-    width: menuWidth
+  const menuRef = useRef(null);
+  const [position, setPosition] = useState({
+    left: 0,
+    top: 0,
+    maxHeight: 0,
+    ready: false
+  });
+  const updatePosition = useCallback(() => {
+    if (typeof window === "undefined" || !triggerRef?.current) return;
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const viewportPadding = 12;
+    const triggerGap = 10;
+    const fallbackWidth = Math.min(window.innerWidth - viewportPadding * 2, 440);
+    const menuWidth = menuRef.current?.offsetWidth || fallbackWidth;
+    const centeredLeft = triggerRect.left + triggerRect.width / 2 - menuWidth / 2;
+    const leftBoundary = viewportPadding;
+    const rightBoundary = Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding);
+    const nextLeft = Math.min(Math.max(centeredLeft, leftBoundary), rightBoundary);
+    const nextTop = triggerRect.bottom + triggerGap;
+    const nextMaxHeight = Math.max(180, window.innerHeight - nextTop - viewportPadding);
+    setPosition(current => {
+      const roundedLeft = Math.round(nextLeft);
+      const roundedTop = Math.round(nextTop);
+      const roundedMaxHeight = Math.round(nextMaxHeight);
+      if (current.ready && current.left === roundedLeft && current.top === roundedTop && current.maxHeight === roundedMaxHeight) {
+        return current;
+      }
+      return {
+        left: roundedLeft,
+        top: roundedTop,
+        maxHeight: roundedMaxHeight,
+        ready: true
+      };
+    });
+  }, [triggerRef]);
+
+  useLayoutEffect(() => {
+    updatePosition();
+    const frameId = window.requestAnimationFrame(updatePosition);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [alerts.length, language, updatePosition]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleViewportChange = () => updatePosition();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("scroll", handleViewportChange);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
+    };
+  }, [updatePosition]);
+
+  return <div ref={menuRef} className="fixed z-40 flex w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/25" style={{
+    top: position.top,
+    left: position.left,
+    maxHeight: position.maxHeight,
+    visibility: position.ready ? "visible" : "hidden"
   }}>
       <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
@@ -121,7 +172,7 @@ export function NotificationMenu({
         </div>
       </div>
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-y-auto p-2">
+      <div className="min-h-0 overflow-y-auto p-2">
         {alerts.map(alert => <div key={getAlertKey(alert)} className="rounded-xl border border-slate-100 px-3 py-3 hover:bg-slate-50">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">

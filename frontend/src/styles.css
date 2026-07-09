@@ -43,6 +43,58 @@ textarea {
   outline: none;
 }
 
+.auth-field-shell,
+.auth-field-shell:has(.auth-field-input:-webkit-autofill) {
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+.auth-field-shell:focus-within {
+  background: #ffffff !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 1px #2563eb, 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+.auth-field-input {
+  appearance: none;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #0f172a !important;
+  color-scheme: light;
+  box-shadow: none !important;
+}
+
+.auth-field-input:focus {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.auth-field-input:-webkit-autofill,
+.auth-field-input:-webkit-autofill:hover,
+.auth-field-input:-webkit-autofill:focus,
+.auth-field-input:-webkit-autofill:active,
+.auth-field-input:-internal-autofill-selected {
+  appearance: none !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  color: #0f172a !important;
+  caret-color: #0f172a;
+  filter: none !important;
+  transition: background-color 999999s ease-out 0s, color 999999s ease-out 0s;
+}
+
+.auth-field-input:-webkit-autofill::first-line {
+  color: #0f172a;
+  font: inherit;
+}
+
 @layer components {
   .history-filter-input {
     @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100;

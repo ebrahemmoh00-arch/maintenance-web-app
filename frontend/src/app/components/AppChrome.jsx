@@ -1,6 +1,9 @@
-import { Bell, Globe2, LogOut, Moon, Plus, RefreshCw, ShieldCheck, Sun } from "lucide-react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Bell, ChevronDown, Globe2, LogOut, Moon, Plus, RefreshCw, ShieldCheck, Sun } from "lucide-react";
 
 import { NotificationMenu } from "../../features/dashboard/components/AnalyticsAndNotifications.jsx";
+import { QUICK_ACTIONS } from "../../features/dashboard/utils/quickActions.js";
 import { FormModal } from "../../shared/components/FormModal.jsx";
 import { Sidebar } from "../../shared/components/Sidebar.jsx";
 import { localizedConfig, tr } from "../../shared/config/appConfig.jsx";
@@ -16,8 +19,6 @@ export function AppChrome({ app, children }) {
     setDarkMode,
     notificationsOpen,
     setNotificationsOpen,
-    notificationAnchor,
-    setNotificationAnchor,
     setDashboardAlertsOpen,
     language,
     setLanguage,
@@ -26,6 +27,7 @@ export function AppChrome({ app, children }) {
     error,
     isAdmin,
     canAddWorkOrders,
+    openCreate,
     loadAll,
     handleLogout,
     modal,
@@ -37,6 +39,17 @@ export function AppChrome({ app, children }) {
     addJobTitle
   } = app;
   const t = (text) => tr(language, text);
+  const notificationButtonRef = useRef(null);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+
+  function runQuickAction(action) {
+    setQuickActionsOpen(false);
+    if (action.resourceKey) {
+      openCreate?.(action.resourceKey);
+      return;
+    }
+    if (action.route) setActive(action.route);
+  }
 
   return (
     <div dir={language === "ar" ? "rtl" : "ltr"} className={`flex min-h-screen w-full flex-col overflow-x-hidden lg:flex-row ${darkMode ? "bg-slate-900" : "bg-slate-100"} text-slate-900`}>
@@ -59,12 +72,9 @@ export function AppChrome({ app, children }) {
               </label>
               <div className="relative">
                 <button
+                  ref={notificationButtonRef}
                   type="button"
-                  onClick={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setNotificationAnchor({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left });
-                    setNotificationsOpen((open) => !open);
-                  }}
+                  onClick={() => setNotificationsOpen((open) => !open)}
                   aria-expanded={notificationsOpen}
                   className={`relative grid h-10 w-10 place-items-center rounded-lg border bg-white text-slate-600 hover:text-slate-950 ${notificationsOpen ? "border-blue-300 shadow-sm ring-2 ring-blue-100" : "border-slate-200"}`}
                   title={t("Notifications")}
@@ -72,13 +82,13 @@ export function AppChrome({ app, children }) {
                   <Bell className="h-4 w-4" />
                   {alerts.length ? <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-red-600 text-[10px] font-bold text-white">{alerts.length}</span> : null}
                 </button>
-                {notificationsOpen ? (
+                {notificationsOpen && typeof document !== "undefined" ? createPortal(
                   <>
-                    <button type="button" aria-label="Close notifications" className="fixed inset-0 z-[80] cursor-default bg-transparent" onClick={() => setNotificationsOpen(false)} />
+                    <button type="button" aria-label="Close notifications" className="fixed inset-0 z-30 cursor-default bg-transparent" onClick={() => setNotificationsOpen(false)} />
                     <NotificationMenu
                       alerts={alerts}
                       language={language}
-                      anchor={notificationAnchor}
+                      triggerRef={notificationButtonRef}
                       onViewAlerts={() => {
                         setActive("dashboard");
                         setDashboardAlertsOpen(true);
@@ -86,7 +96,8 @@ export function AppChrome({ app, children }) {
                         window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
                       }}
                     />
-                  </>
+                  </>,
+                  document.body
                 ) : null}
               </div>
               <button type="button" onClick={() => setDarkMode(!darkMode)} className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-950" title="Toggle dark frame">
@@ -102,10 +113,47 @@ export function AppChrome({ app, children }) {
                 </button>
               ) : null}
               {canAddWorkOrders ? (
-                <button onClick={() => setActive("work-orders")} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-800">
-                  <Plus className="h-4 w-4" />
-                  {t("Add Work Order")}
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setQuickActionsOpen(open => !open)}
+                    aria-expanded={quickActionsOpen}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-800"
+                    title={t("Quick Actions")}
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("Quick Actions")}
+                    <ChevronDown className={`h-4 w-4 transition ${quickActionsOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {quickActionsOpen ? (
+                    <>
+                      <button type="button" aria-label={t("Close")} className="fixed inset-0 z-30 cursor-default bg-transparent" onClick={() => setQuickActionsOpen(false)} />
+                      <div className="absolute end-0 top-12 z-40 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
+                        <div className="border-b border-slate-100 px-3 py-2">
+                          <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">{t("Quick Actions")}</p>
+                        </div>
+                        <div className="py-2">
+                          {QUICK_ACTIONS.map(action => {
+                            const Icon = action.icon;
+                            return (
+                              <button
+                                key={action.key}
+                                type="button"
+                                onClick={() => runQuickAction(action)}
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-start text-sm font-black text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                              >
+                                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700">
+                                  <Icon className="h-4 w-4" />
+                                </span>
+                                <span>{t(action.label)}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               ) : null}
               {isAdmin ? <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">{t("Full Admin Access")}</span> : null}
               <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-red-300 hover:text-red-700">

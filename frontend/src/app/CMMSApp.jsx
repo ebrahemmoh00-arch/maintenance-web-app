@@ -30,7 +30,6 @@ export default function CMMSApp({ initialPage = "" }) {
   const [collapsed, setCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notificationAnchor, setNotificationAnchor] = useState(null);
   const [dashboardAlertsOpen, setDashboardAlertsOpen] = useState(false);
   const [language, setLanguage] = useState(() => {
     const queryLanguage = new URLSearchParams(window.location.search).get("lang");
@@ -457,8 +456,6 @@ export default function CMMSApp({ initialPage = "" }) {
     setDarkMode,
     notificationsOpen,
     setNotificationsOpen,
-    notificationAnchor,
-    setNotificationAnchor,
     dashboardAlertsOpen,
     setDashboardAlertsOpen,
     language,

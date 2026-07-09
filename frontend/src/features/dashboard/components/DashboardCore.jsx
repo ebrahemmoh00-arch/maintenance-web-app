@@ -5,7 +5,7 @@ import { applyDashboardFilters, buildDashboardFilterOptions, createDashboardFilt
 import { buildExecutiveDashboardInsights, hasChartValue } from "../utils/executiveDashboardMetrics.js";
 import { buildMaintenanceDashboardMetrics } from "../utils/maintenanceMetrics.jsx";
 import { buildAssetReliability, engineerWorkloadData, technicianWorkloadData } from "../utils/reliabilityMetrics.js";
-import { CriticalAttentionPanel, DashboardEmptyState, ExecutiveKpiSection, MaintenanceOverviewSection, NotificationCenter, OperationsKpiSection, QuickActionsPanel, SiteStatusOverviewStrip, TopListsSection } from "./ExecutiveDashboardSections.jsx";
+import { CriticalAttentionPanel, DashboardEmptyState, ExecutiveKpiSection, MaintenanceOverviewSection, NotificationCenter, OperationsKpiSection, SiteStatusOverviewStrip, TopListsSection } from "./ExecutiveDashboardSections.jsx";
 import { WorkOrderParticipationPanel } from "./WorkOrderParticipation.jsx";
 import { useMemo, useState } from "react";
 
@@ -32,7 +32,6 @@ export function Dashboard({
       <DashboardFilterBar filters={filters} setFilters={setFilters} options={filterOptions} language={language} />
 
       <ExecutiveKpiSection data={filteredData} metrics={metrics} insights={insights} onNavigate={setActive} language={language} />
-      <QuickActionsPanel openCreate={openCreate} onNavigate={setActive} language={language} />
       <SiteStatusOverviewStrip metrics={metrics} language={language} />
       <MaintenanceOverviewSection metrics={metrics} insights={insights} openCreate={openCreate} language={language} />
       <OperationsKpiSection insights={insights} language={language} />

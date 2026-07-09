@@ -1,5 +1,6 @@
 import { EMPLOYEE_ROLE_OPTIONS } from "../../features/authentication/services/authSession.js";
 import { MaintenanceBadge, PriorityBadge, StatusBadge, StockBadge, WorkOrderStatus, valueLabel } from "../components/StatusBadges.jsx";
+import { translate } from "../i18n/index.js";
 import { resources } from "./resourceRegistry.jsx";
 
 export const PERMISSION_ACTIONS = [{
@@ -387,7 +388,7 @@ export const AR = {
 };
 
 export function tr(language, text) {
-  return language === "ar" ? AR[text] || text : text;
+  return translate(language, text, AR);
 }
 
 export function getAlertKey(alert) {
