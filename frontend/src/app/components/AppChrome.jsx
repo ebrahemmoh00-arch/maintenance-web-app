@@ -93,7 +93,6 @@ export function AppChrome({ app, children }) {
                         setActive("dashboard");
                         setDashboardAlertsOpen(true);
                         setNotificationsOpen(false);
-                        window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
                       }}
                     />
                   </>,

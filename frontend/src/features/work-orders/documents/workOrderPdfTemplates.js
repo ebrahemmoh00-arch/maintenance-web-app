@@ -325,7 +325,10 @@ function locationName(ctx) {
 }
 
 function assignedTechnician(ctx) {
-  return ctx.form.assigned_to || ctx.form.executor_name || ctx.engineer.name || ctx.savedOrder.engineer_name || "-";
+  const teamMembers = Array.isArray(ctx.form.appointed_members_list)
+    ? ctx.form.appointed_members_list.map(member => String(member || "").trim()).filter(Boolean)
+    : [];
+  return teamMembers.length ? teamMembers.join(" / ") : ctx.form.executor_name || "-";
 }
 
 function runtime(ctx) {

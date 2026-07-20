@@ -5,7 +5,7 @@ import { MaintenanceBadge } from "../../../shared/components/StatusBadges.jsx";
 import { getAlertKey, tr } from "../../../shared/config/appConfig.jsx";
 import { plannedBreakdownData, trendData } from "../utils/maintenanceMetrics.jsx";
 import { downtimeDistribution, engineerWorkloadData, equipmentMaintenanceTimeData, technicianWorkloadData } from "../utils/reliabilityMetrics.js";
-import { AlertTriangle, Bell, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle2, Eye } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export function AnalyticsSection({
@@ -201,7 +201,8 @@ export function NotificationMenu({
       </div>
 
       <div className="border-t border-slate-200 bg-white p-3">
-        <button type="button" onClick={onViewAlerts} className="w-full rounded-lg bg-blue-700 px-4 py-2 text-sm font-black text-white hover:bg-blue-800">
+        <button type="button" onClick={onViewAlerts} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-black text-white hover:bg-blue-800">
+          <Eye className="h-4 w-4" />
           {t("View dashboard alerts")}
         </button>
       </div>

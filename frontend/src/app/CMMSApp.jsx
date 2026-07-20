@@ -17,7 +17,7 @@ export default function CMMSApp({ initialPage = "" }) {
   const navigate = useNavigate();
   const [active, setActiveState] = useState(() => {
     const page = initialPage || new URLSearchParams(window.location.search).get("page") || pathToPage(window.location.pathname);
-    return ["dashboard", "customers", "equipment", "engineers", "work-orders", "pm-plans", "schedule", "inventory", "reports", "settings", "access-control"].includes(page) ? page : "dashboard";
+    return ["dashboard", "customers", "equipment", "engineers", "work-orders", "pm-plans", "schedule", "inventory", "reports", "kpis", "settings", "access-control"].includes(page) ? page : "dashboard";
   });
   function setActive(nextPage) {
     const page = normalizePage(typeof nextPage === "function" ? nextPage(active) : nextPage);

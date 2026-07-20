@@ -11,7 +11,9 @@ export default function DashboardPage() {
     backendReliability,
     openCreate,
     language,
-    setActive
+    setActive,
+    dashboardAlertsOpen,
+    setDashboardAlertsOpen
   } = useCMMS();
 
   if (loading) return <SkeletonDashboard />;
@@ -25,6 +27,8 @@ export default function DashboardPage() {
       openCreate={openCreate}
       language={language}
       setActive={setActive}
+      dashboardAlertsOpen={dashboardAlertsOpen}
+      setDashboardAlertsOpen={setDashboardAlertsOpen}
     />
   );
 }

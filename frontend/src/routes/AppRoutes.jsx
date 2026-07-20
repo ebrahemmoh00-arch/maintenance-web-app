@@ -27,6 +27,7 @@ const routePages = [
   { path: "/technicians", element: <ResourcesPage /> },
   { path: "/reports", element: <ReportsPage /> },
   { path: "/reports-analytics", element: <ReportsPage /> },
+  { path: "/kpis", element: <ReportsPage /> },
   { path: "/users", element: <AccessControlPage /> },
   { path: "/access-control", element: <AccessControlPage /> },
   { path: "/settings", element: <SettingsPage /> }

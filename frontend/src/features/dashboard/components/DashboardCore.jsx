@@ -16,7 +16,9 @@ export function Dashboard({
   backendReliability,
   openCreate,
   language,
-  setActive
+  setActive,
+  dashboardAlertsOpen,
+  setDashboardAlertsOpen
 }) {
   const [filters, setFilters] = useState(createDashboardFilters);
   const filterOptions = useMemo(() => buildDashboardFilterOptions(data, alerts, language), [data, alerts, language]);
@@ -38,7 +40,13 @@ export function Dashboard({
       <CriticalAttentionPanel insights={insights} onNavigate={setActive} language={language} />
       <DashboardWorkOrderStatusPanel metrics={metrics} onNavigate={setActive} language={language} />
       <TopListsSection insights={insights} onNavigate={setActive} language={language} />
-      <NotificationCenter insights={insights} openCreate={openCreate} language={language} />
+      <NotificationCenter
+        insights={insights}
+        openCreate={openCreate}
+        language={language}
+        dashboardAlertsOpen={dashboardAlertsOpen}
+        setDashboardAlertsOpen={setDashboardAlertsOpen}
+      />
       <DashboardWorkOrderCountCharts workOrders={workOrders} language={language} />
     </>;
 }

@@ -14,6 +14,7 @@ export const pagePathMap = {
   schedule: "/schedule",
   inventory: "/inventory",
   reports: "/reports",
+  kpis: "/kpis",
   "access-control": "/access-control",
   settings: "/settings"
 };
@@ -33,6 +34,7 @@ export const pathPageMap = {
   "/inventory": "inventory",
   "/reports": "reports",
   "/reports-analytics": "reports",
+  "/kpis": "kpis",
   "/users": "access-control",
   "/access-control": "access-control",
   "/settings": "settings"
@@ -57,6 +59,7 @@ export function pageTitle(active, language = "en") {
     schedule: "Maintenance Schedule",
     inventory: "Inventory",
     reports: "Reports & Analytics",
+    kpis: "KPIs",
     "access-control": "Access Control",
     settings: "Settings"
   };

@@ -1,4 +1,4 @@
-import { AlertTriangle, Eye, MoreHorizontal, QrCode, Save } from "lucide-react";
+import { AlertTriangle, Eye, MoreHorizontal, Plus, QrCode, Save, Trash2, UsersRound } from "lucide-react";
 
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { PriorityBadge, StatusBadge } from "../../../shared/components/StatusBadges.jsx";
@@ -25,7 +25,6 @@ import {
   WorkOrderAttachmentsTab,
   WorkOrderChecklistTab,
   WorkOrderHistoryTab,
-  WorkOrderKpi,
   WorkOrderLaborTab,
   WorkOrderNotesTab,
   WorkOrderOverviewTab,
@@ -66,6 +65,8 @@ export function WorkOrdersWorkspace({ app }) {
     chooseCustomer,
     chooseEquipment,
     engineers,
+    assignedEngineerOptions,
+    teamMemberOptions,
     setForm,
     videoRef,
     qrMessage,
@@ -88,6 +89,7 @@ export function WorkOrdersWorkspace({ app }) {
     activeSavedOrder,
     updateMember,
     addMember,
+    removeMember,
     selectedSavedId,
     openSelected,
     editSelected,
@@ -170,14 +172,23 @@ export function WorkOrdersWorkspace({ app }) {
               <label>
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Assigned To")}</span>
                 <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-blue-500" value={form.engineer_id || ""} onChange={(event) => {
-                  const engineer = engineers.find((item) => Number(item.id) === Number(event.target.value));
-                  setForm((current) => ({ ...current, engineer_id: event.target.value, shift_engineer_name: engineer?.name || current.shift_engineer_name }));
+                  const engineer = assignedEngineerOptions.find((item) => Number(item.id) === Number(event.target.value));
+                  setForm((current) => ({ ...current, engineer_id: event.target.value, shift_engineer_name: engineer?.name || "", assigned_to: engineer?.name || "" }));
                 }}>
                   <option value=""></option>
-                  {engineers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  {assignedEngineerOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
             </div>
+
+            <TeamMembersCard
+              members={form.appointed_members_list || [""]}
+              options={teamMemberOptions}
+              onChange={updateMember}
+              onAdd={addMember}
+              onRemove={removeMember}
+              language={language}
+            />
 
             {qrOpen ? (
               <div className="border-b border-slate-200 bg-slate-950 p-4 text-white">
@@ -230,18 +241,6 @@ export function WorkOrdersWorkspace({ app }) {
           </div>
 
           <aside className="space-y-4">
-            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">KPI Sidebar</p>
-              <div className="mt-4 grid gap-3">
-                <WorkOrderKpi label="Execution Duration" value={duration} />
-                <WorkOrderKpi label="Completion" value={`${checklistProgress}%`} tone={checklistProgress === 100 ? "green" : "amber"} />
-                <WorkOrderKpi label="Labor Cost" value="0 EGP" />
-                <WorkOrderKpi label="Parts Cost" value={`${partsTotal.toLocaleString()} EGP`} />
-                <WorkOrderKpi label="Total Cost" value={`${partsTotal.toLocaleString()} EGP`} />
-                <WorkOrderKpi label="Downtime" value={duration} tone={duration === "0:00" ? "slate" : "red"} />
-              </div>
-            </div>
-
             <div className="rounded-2xl bg-blue-700 p-4 text-white shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -303,6 +302,77 @@ export function WorkOrdersWorkspace({ app }) {
   );
 }
 
+function TeamMembersCard({
+  members,
+  options,
+  onChange,
+  onAdd,
+  onRemove,
+  language
+}) {
+  const t = text => language === "ar" ? {
+    "TEAM Members": "أعضاء الفريق",
+    "Add the team members who worked on this work order.": "أضف أعضاء الفريق الذين عملوا على أمر الشغل.",
+    "Team Member": "عضو الفريق",
+    "Add Team Member": "إضافة عضو",
+    "Remove member": "حذف العضو"
+  }[text] || text : text;
+  const safeMembers = members?.length ? members : [""];
+  return (
+    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <UsersRound className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 className="text-sm font-black text-slate-950">{t("TEAM Members")}</h3>
+            <p className="mt-1 text-xs font-semibold text-slate-500">{t("Add the team members who worked on this work order.")}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 text-xs font-black text-blue-700 hover:bg-blue-100"
+        >
+          <Plus className="h-4 w-4" />
+          {t("Add Team Member")}
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {safeMembers.map((member, index) => (
+          <div key={index} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-slate-500 shadow-sm">{index + 1}</span>
+            <label className="min-w-0 flex-1">
+              <span className="sr-only">{t("Team Member")}</span>
+              <input
+                list={`team-members-${index}`}
+                value={member}
+                onChange={event => onChange(index, event.target.value)}
+                placeholder={t("Team Member")}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              />
+              <datalist id={`team-members-${index}`}>
+                {options.map(option => <option key={option} value={option} />)}
+              </datalist>
+            </label>
+            <button
+              type="button"
+              onClick={() => onRemove(index)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-red-100 bg-white text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+              title={t("Remove member")}
+              disabled={safeMembers.length === 1 && !member}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function WorkOrderPrintDocument({ app }) {
   const {
     t,
@@ -311,6 +381,8 @@ function WorkOrderPrintDocument({ app }) {
     updateMember,
     addMember,
     engineers,
+    assignedEngineerOptions,
+    teamMemberOptions,
     selectedEquipment,
     selectedCustomer,
     duration,
@@ -347,10 +419,10 @@ function WorkOrderPrintDocument({ app }) {
             <DocLabel>{t("THE WORK ORDER IS ISSUED BY SHIFT ENGINEER")}:</DocLabel>
             <DocSelect value={form.shift_engineer_name} onChange={(value) => update("shift_engineer_name", value)} options={engineers.map((item) => item.name)} />
             <DocLabel>{t("FOR REQUESTING AND ASSIGN THE TASK FOR")}:</DocLabel>
-            <DocSelect value={form.assigned_to} onChange={(value) => update("assigned_to", value)} options={engineers.map((item) => item.name)} />
+            <DocSelect value={form.assigned_to} onChange={(value) => update("assigned_to", value)} options={assignedEngineerOptions.map((item) => item.name)} />
           </div>
           <DocBand>{t("The Names of appointed Members to perform the task are")}:-</DocBand>
-          <NumberedMembersEditor members={form.appointed_members_list} onChange={updateMember} onAdd={addMember} options={engineers.map((item) => item.name)} addLabel={t("Add member")} />
+          <NumberedMembersEditor members={form.appointed_members_list} onChange={updateMember} onAdd={addMember} options={teamMemberOptions} addLabel={t("Add member")} />
           <DocBand>{t("The Description & details of the required task to be done / undertaken is")}:-</DocBand>
           <div className="grid grid-cols-[1fr_240px_220px] border-b-2 border-slate-950">
             <DocTextarea value={form.task_description} onChange={(value) => update("task_description", value)} rows={8} />

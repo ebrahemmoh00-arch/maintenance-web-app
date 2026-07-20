@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   ClipboardList,
   Cpu,
+  Eye,
+  EyeOff,
   FilePlus2,
   Gauge,
   PackageCheck,
@@ -23,6 +25,7 @@ import {
   TrendingUp,
   Wrench
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 const toneStyles = {
   blue: {
@@ -377,16 +380,113 @@ function TopListRow({
 export function NotificationCenter({
   insights,
   openCreate,
+  language,
+  dashboardAlertsOpen,
+  setDashboardAlertsOpen
+}) {
+  const cardRef = useRef(null);
+  const [visible, setVisible] = useState(false);
+  const notifications = insights.notifications || [];
+  const criticalCount = notifications.filter(item => item.priority === "critical").length;
+  const warningCount = notifications.filter(item => item.priority === "warning").length;
+  const infoCount = notifications.length - criticalCount - warningCount;
+  const ToggleIcon = visible ? EyeOff : Eye;
+  const toggleLabel = visible ? "Hide Notifications" : "Show Notifications";
+
+  useEffect(() => {
+    if (!dashboardAlertsOpen) return;
+    setVisible(true);
+    const frameId = window.requestAnimationFrame(() => {
+      cardRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+      setDashboardAlertsOpen?.(false);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [dashboardAlertsOpen, setDashboardAlertsOpen]);
+
+  return (
+    <div ref={cardRef} id="dashboard-alerts-notifications">
+      <Panel
+        title={tr(language, "Alerts & Notifications")}
+        subtitle={tr(language, "Professional notification center for critical, warning, success, and information messages.")}
+        actions={
+          <button
+            type="button"
+            onClick={() => setVisible(current => !current)}
+            aria-expanded={visible}
+            className={`inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-black transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${visible ? "border-blue-200 bg-blue-700 text-white hover:bg-blue-800" : "border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100"}`}
+            title={tr(language, toggleLabel)}
+          >
+            <ToggleIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">{tr(language, visible ? "Hide" : "Show")}</span>
+          </button>
+        }
+      >
+      <div className="grid gap-3 md:grid-cols-4">
+        <NotificationSummaryCard label="Total Alerts" value={notifications.length} icon={Bell} tone={notifications.length ? "blue" : "green"} language={language} />
+        <NotificationSummaryCard label="Critical" value={criticalCount} icon={AlertTriangle} tone={criticalCount ? "red" : "green"} language={language} />
+        <NotificationSummaryCard label="Warning" value={warningCount} icon={Bell} tone={warningCount ? "orange" : "green"} language={language} />
+        <NotificationSummaryCard label="Information" value={infoCount} icon={Activity} tone={infoCount ? "slate" : "green"} language={language} />
+      </div>
+
+      {visible ? (
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">{tr(language, "Notification Details")}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{tr(language, "Latest maintenance alerts ordered for fast review.")}</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600 shadow-sm">{notifications.length} {tr(language, "Alerts")}</span>
+          </div>
+          {notifications.length ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {notifications.map(item => <NotificationRow key={item.id} item={item} language={language} />)}
+            </div>
+          ) : <DashboardEmptyState title="No notifications available." actionLabel="Create First Work Order" onAction={() => openCreate?.("work-orders")} language={language} />}
+        </div>
+      ) : (
+        <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-dashed border-blue-100 bg-blue-50/60 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-black text-slate-900">{tr(language, "Notifications are hidden")}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">{tr(language, "Use the show icon to review the detailed notification list.")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVisible(true)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-blue-700 shadow-sm transition hover:bg-blue-700 hover:text-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+            title={tr(language, "Show Notifications")}
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      </Panel>
+    </div>
+  );
+}
+
+function NotificationSummaryCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
   language
 }) {
+  const style = toneStyles[tone] || toneStyles.blue;
   return (
-    <Panel title={tr(language, "Alerts & Notifications")} subtitle={tr(language, "Professional notification center for critical, warning, success, and information messages.")} actions={<span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{insights.notifications.length}</span>}>
-      {insights.notifications.length ? (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {insights.notifications.map(item => <NotificationRow key={item.id} item={item} language={language} />)}
+    <article className={`rounded-2xl border p-4 shadow-sm ${style.card}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{tr(language, label)}</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
         </div>
-      ) : <DashboardEmptyState title="No notifications available." actionLabel="Create First Work Order" onAction={() => openCreate?.("work-orders")} language={language} />}
-    </Panel>
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border ${style.icon}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+    </article>
   );
 }
 

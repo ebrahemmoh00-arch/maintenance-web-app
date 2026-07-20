@@ -8,6 +8,7 @@ export default function ReportsPage() {
     alerts,
     stats,
     language,
+    page,
     currentUser,
     isAdmin,
     deleteAuditLogs
@@ -19,6 +20,7 @@ export default function ReportsPage() {
       alerts={alerts}
       stats={stats}
       language={language}
+      mode={page === "kpis" ? "kpis" : "reports"}
       canViewAuditLogs={hasPermission(currentUser, "audit-logs", "view")}
       canDeleteAuditLogs={isAdmin}
       onDeleteAuditLogs={deleteAuditLogs}

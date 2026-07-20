@@ -30,7 +30,7 @@ export function isTechnicianEmployee(employee) {
 }
 
 export function isEngineerEmployee(employee) {
-  return /engineer/i.test(employeeJobTitle(employee));
+  return /engineer|مهندس/i.test(employeeJobTitle(employee));
 }
 
 export function isManagementEmployee(employee) {

@@ -49,7 +49,7 @@ const sidebarSections = [
     arabicLabel: "التحليلات",
     items: [
       { key: "reports", label: "Reports", arabicLabel: "التقارير", icon: BarChart3 },
-      { key: "kpis", target: "reports", label: "KPIs", arabicLabel: "مؤشرات الأداء", icon: Gauge }
+      { key: "kpis", label: "KPIs", arabicLabel: "مؤشرات الأداء", icon: Gauge }
     ]
   },
   {

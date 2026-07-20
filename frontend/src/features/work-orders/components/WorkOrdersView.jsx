@@ -1,4 +1,5 @@
 import { tr } from "../../../shared/config/appConfig.jsx";
+import { isEngineerEmployee } from "../../resources/utils/employeeUtils.js";
 import { buildWorkOrderReference, calculateDuration, createWorkOrderForm, formFromSavedOrder, getNextWorkOrderNo, getWorkOrderSavedDate, notifyManagerApproval, todayIso } from "../utils/workOrderForms.js";
 import { normalizeWorkOrderStatus } from "../utils/workOrderStatus.js";
 import { lifecycleActionsForStatus } from "./WorkOrderDocumentParts.jsx";
@@ -62,6 +63,10 @@ export function WorkOrdersView({
   const selectedEquipment = equipment.find(item => Number(item.id) === Number(form.equipment_id));
   const selectedCustomer = customers.find(item => Number(item.id) === Number(form.customer_id));
   const selectedEngineer = engineers.find(item => Number(item.id) === Number(form.engineer_id));
+  const assignedEngineerOptions = useMemo(() => engineers.filter(isEngineerEmployee), [engineers]);
+  const teamMemberOptions = useMemo(() => engineers.map(item => item.name).filter(Boolean).sort((first, second) => first.localeCompare(second, undefined, {
+    sensitivity: "base"
+  })), [engineers]);
   const filteredEquipment = form.customer_id ? equipment.filter(item => Number(item.customer_id) === Number(form.customer_id)) : [];
   const woReference = buildWorkOrderReference(form, selectedCustomer, selectedEquipment);
   const duration = calculateDuration(form.start_time, form.finished_time);
@@ -147,14 +152,23 @@ export function WorkOrdersView({
   function updateMember(index, value) {
     setForm(current => ({
       ...current,
-      appointed_members_list: current.appointed_members_list.map((item, itemIndex) => itemIndex === index ? value : item)
+      appointed_members_list: (current.appointed_members_list || [""]).map((item, itemIndex) => itemIndex === index ? value : item)
     }));
   }
   function addMember() {
     setForm(current => ({
       ...current,
-      appointed_members_list: [...current.appointed_members_list, ""]
+      appointed_members_list: [...(current.appointed_members_list || [""]), ""]
     }));
+  }
+  function removeMember(index) {
+    setForm(current => {
+      const nextMembers = (current.appointed_members_list || [""]).filter((_, itemIndex) => itemIndex !== index);
+      return {
+        ...current,
+        appointed_members_list: nextMembers.length ? nextMembers : [""]
+      };
+    });
   }
   function updateSparePart(index, patch) {
     setForm(current => ({
@@ -473,6 +487,8 @@ export function WorkOrdersView({
     chooseCustomer,
     chooseEquipment,
     engineers,
+    assignedEngineerOptions,
+    teamMemberOptions,
     setForm,
     videoRef,
     qrMessage,
@@ -495,6 +511,7 @@ export function WorkOrdersView({
     activeSavedOrder,
     updateMember,
     addMember,
+    removeMember,
     selectedSavedId,
     openSelected,
     editSelected,

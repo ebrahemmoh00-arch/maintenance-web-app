@@ -176,7 +176,7 @@ export function engineerWorkloadData(workOrders, language = "en", limit = 6) {
   const counts = new Map();
   for (const order of workOrders) {
     const meta = parseWorkOrderNotes(order.notes);
-    const name = cleanChartLabel(meta.shift_engineer_name || order.engineer_name || "") || tr(language, "Unassigned");
+    const name = cleanChartLabel(meta.assigned_to || meta.shift_engineer_name || order.engineer_name || "") || tr(language, "Unassigned");
     addChartValue(counts, name, 1);
   }
   return chartRowsFromMap(counts, "bg-blue-600", language, limit);
@@ -186,8 +186,8 @@ export function technicianWorkloadData(workOrders, language = "en", limit = 6) {
   const counts = new Map();
   for (const order of workOrders) {
     const meta = parseWorkOrderNotes(order.notes);
-    const names = extractTechnicianNames(meta);
-    const uniqueNames = names.length ? [...new Set(names)] : [tr(language, "Unassigned")];
+    const names = extractTechnicianNames(meta, order);
+    const uniqueNames = [...new Set(names)];
     for (const name of uniqueNames) addChartValue(counts, name, 1);
   }
   return chartRowsFromMap(counts, "bg-cyan-600", language, limit);
@@ -203,9 +203,18 @@ export function equipmentMaintenanceTimeData(workOrders, language = "en") {
   return chartRowsFromMap(totals, "bg-orange-500", language);
 }
 
-export function extractTechnicianNames(meta) {
-  const candidates = [meta.executor_name, meta.holder_name, meta.assigned_to, meta.appointed_members, ...(Array.isArray(meta.appointed_members_list) ? meta.appointed_members_list : [])];
-  return candidates.flatMap(splitChartNames).filter(Boolean);
+export function extractTechnicianNames(meta, order = {}) {
+  const teamMembers = [
+    meta.appointed_members,
+    ...(Array.isArray(meta.appointed_members_list) ? meta.appointed_members_list : [])
+  ].flatMap(splitChartNames).filter(Boolean);
+  const legacyMembers = teamMembers.length ? [] : [meta.executor_name, meta.holder_name].flatMap(splitChartNames).filter(Boolean);
+  const engineerNames = new Set([meta.assigned_to, meta.shift_engineer_name, order.engineer_name].flatMap(splitChartNames).map(normalizeChartName).filter(Boolean));
+  return [...teamMembers, ...legacyMembers].filter(name => !engineerNames.has(normalizeChartName(name)));
+}
+
+function normalizeChartName(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 export function splitChartNames(value) {

@@ -70,6 +70,8 @@ export function SavedWorkOrdersTable({
             const meta = parseWorkOrderNotes(row.notes);
             const reference = meta.wo_reference || `${row.customer_name || ""} ${row.equipment_name || ""}`.trim();
             const savedDate = getWorkOrderSavedDate(row);
+            const shiftEngineer = meta.assigned_to || meta.shift_engineer_name || row.engineer_name || "-";
+            const technicians = teamMembersLabel(meta);
             return <tr key={row.id} onClick={() => setSelectedId(row.id)} onDoubleClick={() => onOpen?.(row.id)} className={`cursor-pointer ${Number(row.id) === Number(selectedId) ? "bg-blue-50" : "odd:bg-white even:bg-slate-50"} hover:bg-cyan-50`}>
                   <td className="border border-slate-300 px-2 py-2 text-center">
                     <input type="radio" checked={Number(row.id) === Number(selectedId)} onChange={() => setSelectedId(row.id)} />
@@ -79,8 +81,8 @@ export function SavedWorkOrdersTable({
                   <td className="border border-slate-300 px-2 py-2">{row.customer_name} {row.equipment_name}</td>
                   <td className="border border-slate-300 px-2 py-2">{row.description}</td>
                   <td className="border border-slate-300 px-2 py-2 text-center">{meta.maintenance_type || valueLabel(row.priority, language)}</td>
-                  <td className="border border-slate-300 px-2 py-2 text-center">{meta.shift_engineer_name || row.engineer_name}</td>
-                  <td className="border border-slate-300 px-2 py-2 text-center">{meta.executor_name || meta.appointed_members || row.engineer_name}</td>
+                  <td className="border border-slate-300 px-2 py-2 text-center">{shiftEngineer}</td>
+                  <td className="border border-slate-300 px-2 py-2 text-center">{technicians}</td>
                   <td className="border border-slate-300 px-2 py-2 text-center font-black">{row.service_hours}</td>
                   <td className="border border-slate-300 px-2 py-2 text-center font-black">{meta.duration || calculateDuration(meta.start_time, meta.finished_time)}</td>
                 </tr>;
@@ -90,4 +92,12 @@ export function SavedWorkOrdersTable({
         </table>
       </div>
     </div>;
+}
+
+function teamMembersLabel(meta) {
+  const members = Array.isArray(meta.appointed_members_list)
+    ? meta.appointed_members_list
+    : String(meta.appointed_members || "").split(/\r?\n|,/);
+  const cleaned = members.map(member => String(member || "").trim()).filter(Boolean);
+  return cleaned.length ? cleaned.join(" / ") : "-";
 }
