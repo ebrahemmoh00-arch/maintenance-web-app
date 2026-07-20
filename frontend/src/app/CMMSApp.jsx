@@ -192,7 +192,7 @@ export default function CMMSApp({ initialPage = "" }) {
     }
   }, [authenticated]);
   useEffect(() => {
-    if (authenticated && active === "reports" && !auditLogsLoaded && hasPermission(currentUser, "audit-logs", "view")) {
+    if (authenticated && active === "settings" && !auditLogsLoaded && hasPermission(currentUser, "audit-logs", "view")) {
       loadAuditLogs();
     }
   }, [authenticated, active, auditLogsLoaded, currentUser]);

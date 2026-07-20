@@ -99,6 +99,12 @@ API docs:
 http://127.0.0.1:8000/docs
 ```
 
+Development email inbox for inventory alerts:
+
+```text
+http://127.0.0.1:8025
+```
+
 Stop containers without deleting the database:
 
 ```powershell
@@ -259,6 +265,40 @@ JWT_SECRET_KEY
 If `DATABASE_URL` is set, the backend uses PostgreSQL.
 
 If `DATABASE_URL` is not set, the backend falls back to SQLite for backward compatibility.
+
+Optional inventory low-stock email alerts use SMTP settings.
+
+Docker development uses Mailpit by default:
+
+```text
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+SMTP_FROM_EMAIL=cmms-test@local.test
+SMTP_USE_TLS=false
+```
+
+Open the test inbox:
+
+```text
+http://127.0.0.1:8025
+```
+
+For production or Render, replace the test values with the real company SMTP settings:
+
+```text
+SMTP_HOST
+SMTP_PORT
+SMTP_USERNAME
+SMTP_PASSWORD
+SMTP_FROM_EMAIL
+SMTP_USE_TLS
+```
+
+Users receive inventory threshold emails only when an admin grants:
+
+```text
+Inventory / Email Alerts
+```
 
 ## Production Configuration
 

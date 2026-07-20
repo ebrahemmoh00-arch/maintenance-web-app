@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from ..core.audit import AuditService
 from ..repositories import AssetLifecycleRepository, CauseCodeRepository, CorrectiveActionRepository, CustomerRepository, DowntimeEventRepository, EngineerRepository, EquipmentRepository, FailureCodeRepository, FailureEventRepository, FailureStatisticsRepository, InventoryRepository, JobTitleRepository, PMPlanRepository, PMPlanTaskRepository, PMPlanWorkOrderRepository, PreventiveMaintenanceRepository, ProblemCodeRepository, RemedyCodeRepository, RootCauseAnalysisRepository, WorkOrderRepository, parse_date
 from ..core.security import hash_password, is_password_hash
+from .inventory_email_alerts import InventoryEmailAlertService
 
 
 def payload(model: Any) -> dict[str, Any]:
@@ -1027,6 +1028,7 @@ class WorkOrderService:
         self.equipment = EquipmentRepository()
         self.engineers = EngineerRepository()
         self.inventory = InventoryRepository()
+        self.inventory_email_alerts = InventoryEmailAlertService()
 
     def list(self): return self.repo.list()
     def get(self, item_id: int): return self.repo.get(item_id)
@@ -1455,7 +1457,8 @@ class WorkOrderService:
             new_quantity = max(old_quantity - quantity, 0)
             if new_quantity == old_quantity:
                 continue
-            self.inventory.update(item["id"], {"stock_quantity": new_quantity, "linked_work_order_id": order["id"]})
+            updated_item = self.inventory.update(item["id"], {"stock_quantity": new_quantity, "linked_work_order_id": order["id"]})
+            self.inventory_email_alerts.notify_if_threshold_crossed(updated_item, item, source=f"Work Order #{order['id']}")
             deducted.append({"inventory_item_id": item["id"], "name": item["name"], "old_quantity": old_quantity, "new_quantity": new_quantity})
         return deducted
 
@@ -1464,6 +1467,7 @@ class InventoryService:
     def __init__(self) -> None:
         self.repo = InventoryRepository()
         self.work_orders = WorkOrderRepository()
+        self.email_alerts = InventoryEmailAlertService()
 
     def list(self): return self.repo.list()
     def get(self, item_id: int): return self.repo.get(item_id)
@@ -1472,13 +1476,18 @@ class InventoryService:
         item = payload(data)
         if item.get("linked_work_order_id"):
             self.work_orders.get(item["linked_work_order_id"])
-        return self.repo.create(item)
+        created = self.repo.create(item)
+        self.email_alerts.notify_if_threshold_crossed(created, None, source="Inventory create")
+        return created
 
     def update(self, item_id: int, data):
         item = payload(data)
         if item.get("linked_work_order_id"):
             self.work_orders.get(item["linked_work_order_id"])
-        return self.repo.update(item_id, item)
+        previous = self.repo.get(item_id)
+        updated = self.repo.update(item_id, item)
+        self.email_alerts.notify_if_threshold_crossed(updated, previous, source="Inventory update")
+        return updated
 
     def delete(self, item_id: int): return self.repo.delete(item_id)
 

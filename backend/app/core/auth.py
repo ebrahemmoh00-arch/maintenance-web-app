@@ -381,6 +381,8 @@ def normalize_permission_name(permission: str) -> str:
         "update": "update",
         "delete": "delete",
         "write": "write",
+        "emailAlerts": "email_alerts",
+        "email_alerts": "email_alerts",
     }
     return f"{module}:{action_aliases.get(action.strip(), action.strip())}"
 
@@ -411,6 +413,8 @@ def custom_permissions(raw_permissions: str | None) -> set[str]:
         if actions.get("delete"):
             permissions.add(f"{module}:delete")
             permissions.add(f"{module}:write")
+        if actions.get("email_alerts") or actions.get("emailAlerts"):
+            permissions.add(f"{module}:email_alerts")
     if "asset-history" not in parsed and "asset_history" not in parsed and legacy_full_access_permissions(parsed):
         permissions.add("asset_history:read")
     return permissions

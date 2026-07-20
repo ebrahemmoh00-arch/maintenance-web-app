@@ -17,6 +17,13 @@ export const PERMISSION_ACTIONS = [{
   label: "Delete"
 }];
 
+export const PERMISSION_EXTRA_ACTIONS = {
+  inventory: [{
+    key: "email_alerts",
+    label: "Email Alerts"
+  }]
+};
+
 export const PERMISSION_MODULES = [{
   key: "customers",
   label: "Locations / Customers",
@@ -61,26 +68,27 @@ export const PERMISSION_MODULES = [{
 
 export function createDefaultPermissions() {
   return PERMISSION_MODULES.reduce((acc, module) => {
-    acc[module.key] = {
-      view: module.key !== "audit-logs",
-      add: false,
-      edit: false,
-      delete: false
-    };
+    acc[module.key] = permissionActionsForModule(module).reduce((actions, action) => ({
+      ...actions,
+      [action.key]: action.key === "view" && module.key !== "audit-logs"
+    }), {});
     return acc;
   }, {});
 }
 
 export function createFullPermissions() {
   return PERMISSION_MODULES.reduce((acc, module) => {
-    acc[module.key] = {
-      view: true,
-      add: true,
-      edit: true,
-      delete: true
-    };
+    acc[module.key] = permissionActionsForModule(module).reduce((actions, action) => ({
+      ...actions,
+      [action.key]: true
+    }), {});
     return acc;
   }, {});
+}
+
+export function permissionActionsForModule(module) {
+  const key = typeof module === "string" ? module : module.key;
+  return [...PERMISSION_ACTIONS, ...(PERMISSION_EXTRA_ACTIONS[key] || [])];
 }
 
 export function normalizeEmployeeRole(role = "viewer") {
@@ -122,6 +130,7 @@ export function createRolePermissions(role = "viewer") {
       delete: false
     };
     permissions.inventory = {
+      ...permissions.inventory,
       view: true,
       add: false,
       edit: false,
@@ -130,6 +139,7 @@ export function createRolePermissions(role = "viewer") {
   }
   if (normalized === "store_keeper") {
     permissions.inventory = {
+      ...permissions.inventory,
       view: true,
       add: true,
       edit: true,
@@ -255,6 +265,11 @@ export const AR = {
   "Assets Monitored": "المعدات المراقبة",
   "Presentation-ready system overview. Operational settings can be extended without changing current API contracts.": "نظرة عامة جاهزة للعرض. يمكن توسيع الإعدادات دون تغيير عقود الـ API الحالية.",
   "Access Control": "التحكم في الصلاحيات",
+  "Control Area": "نطاق التحكم",
+  "Email Alerts": "إشعارات البريد",
+  "Inventory / Spare Parts": "المخزون وقطع الغيار",
+  "Audit Logs": "سجل التعديلات",
+  "security records available for review.": "سجل أمني متاح للمراجعة.",
   "Ready for role-based permissions when authentication is added.": "جاهز لصلاحيات حسب الدور عند إضافة تسجيل الدخول.",
   "API Health": "حالة الـ API",
   "Frontend is connected to the FastAPI maintenance service.": "الواجهة متصلة بخدمة FastAPI للصيانة.",

@@ -3,8 +3,8 @@ import { Panel } from "../../../shared/components/Panel.jsx";
 import { StatusBadge } from "../../../shared/components/StatusBadges.jsx";
 import { getDocumentBranding, saveDocumentBranding } from "../../work-orders/documents/documentBranding.js";
 import { readFileAsDataUrl } from "../../work-orders/utils/workOrderForms.js";
-import { PERMISSION_ACTIONS, PERMISSION_MODULES, parsePermissions, tr } from "../../../shared/config/appConfig.jsx";
-import { Activity, Lock, ShieldCheck, UsersRound, Wrench } from "lucide-react";
+import { PERMISSION_MODULES, parsePermissions, permissionActionsForModule, tr } from "../../../shared/config/appConfig.jsx";
+import { Activity, FileText, Lock, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function AccessControlView({
@@ -25,7 +25,7 @@ export function AccessControlView({
       </Panel>
 
       <div className="space-y-4">
-        {activeUsers.map(user => <AccessControlUserCard key={user.id} user={user} currentUser={currentUser} onSave={onSaveUserPermissions} />)}
+        {activeUsers.map(user => <AccessControlUserCard key={user.id} user={user} currentUser={currentUser} onSave={onSaveUserPermissions} language={language} />)}
         {!activeUsers.length ? <Panel title="No Users">
             <EmptyState title="No users found" message="Create users from Resources, then they will appear here automatically." />
           </Panel> : null}
@@ -36,9 +36,12 @@ export function AccessControlView({
 export function AccessControlUserCard({
   user,
   currentUser,
-  onSave
+  onSave,
+  language = "en"
 }) {
+  const t = text => tr(language, text);
   const [permissions, setPermissions] = useState(() => parsePermissions(user.permissions, user.role));
+  const allActions = allPermissionActions();
   useEffect(() => {
     setPermissions(parsePermissions(user.permissions, user.role));
   }, [user.permissions, user.role, user.id]);
@@ -61,7 +64,7 @@ export function AccessControlUserCard({
       };
     });
   };
-  const enabledCount = PERMISSION_MODULES.reduce((total, module) => total + PERMISSION_ACTIONS.filter(action => permissions[module.key]?.[action.key]).length, 0);
+  const enabledCount = PERMISSION_MODULES.reduce((total, module) => total + permissionActionsForModule(module).filter(action => permissions[module.key]?.[action.key]).length, 0);
   return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
         <div>
@@ -81,17 +84,21 @@ export function AccessControlUserCard({
         <table className="min-w-[760px] w-full border-collapse text-sm">
           <thead className="bg-white text-xs uppercase tracking-[0.14em] text-slate-500">
             <tr>
-              <th className="border border-slate-200 px-4 py-3 text-left">Control Area</th>
-              {PERMISSION_ACTIONS.map(action => <th key={action.key} className="border border-slate-200 px-4 py-3 text-center">{action.label}</th>)}
+              <th className="border border-slate-200 px-4 py-3 text-left">{t("Control Area")}</th>
+              {allActions.map(action => <th key={action.key} className="border border-slate-200 px-4 py-3 text-center">{t(action.label)}</th>)}
             </tr>
           </thead>
           <tbody>
             {PERMISSION_MODULES.map(module => <tr key={module.key} className="hover:bg-slate-50">
                 <td className="border border-slate-200 px-4 py-3">
-                  <p className="font-black text-slate-950">{module.label}</p>
+                  <p className="font-black text-slate-950">{t(module.label)}</p>
                   <p className="text-xs font-semibold text-slate-500">{module.key}</p>
                 </td>
-                {PERMISSION_ACTIONS.map(action => {
+                {allActions.map(action => {
+              const supported = permissionActionsForModule(module).some(item => item.key === action.key);
+              if (!supported) {
+                return <td key={action.key} className="border border-slate-200 px-4 py-3 text-center text-slate-300">-</td>;
+              }
               const checked = Boolean(permissions[module.key]?.[action.key]);
               return <td key={action.key} className="border border-slate-200 px-4 py-3 text-center">
                       <label className={`mx-auto inline-flex h-9 w-16 cursor-pointer items-center justify-center rounded-full border text-xs font-black transition ${checked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-100 text-slate-400"}`}>
@@ -107,22 +114,37 @@ export function AccessControlUserCard({
     </section>;
 }
 
+function allPermissionActions() {
+  const seen = new Set();
+  const actions = [];
+  for (const module of PERMISSION_MODULES) {
+    for (const action of permissionActionsForModule(module)) {
+      if (seen.has(action.key)) continue;
+      seen.add(action.key);
+      actions.push(action);
+    }
+  }
+  return actions;
+}
+
 export function SettingsSummary({
-  data,
   language,
-  onAccessControl,
-  isAdmin = false
+  canViewAuditLogs = false,
+  auditLogCount = 0,
+  auditLogsVisible = false,
+  onAuditLogs,
+  documentBrandingVisible = false,
+  onDocumentBranding
 }) {
   const t = text => tr(language, text);
   return <div className="space-y-6">
       <Panel title={t("Settings")} subtitle={t("Presentation-ready system overview. Operational settings can be extended without changing current API contracts.")}>
-        <div className="grid gap-4 md:grid-cols-3">
-          <InfoTile icon={ShieldCheck} title={t("Access Control")} text={`${t("Full Admin Access")} - ${t("View, add, edit, and delete all maintenance records.")}`} onClick={isAdmin ? onAccessControl : null} />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <InfoTile icon={Activity} title={t("API Health")} text={t("Frontend is connected to the FastAPI maintenance service.")} />
-          <InfoTile icon={Wrench} title={t("Configured Assets")} text={`${data.equipment.length} ${t("equipment records available for maintenance control.")}`} />
+          {canViewAuditLogs ? <InfoTile icon={Lock} title={t("Audit Logs")} text={`${auditLogCount} ${t("security records available for review.")}`} onClick={onAuditLogs} active={auditLogsVisible} /> : null}
+          <InfoTile icon={FileText} title={t("Document Branding")} text={t("Company information used by the enterprise PDF templates.")} onClick={onDocumentBranding} active={documentBrandingVisible} />
         </div>
       </Panel>
-      <DocumentBrandingSettings />
     </div>;
 }
 
@@ -130,11 +152,12 @@ export function InfoTile({
   icon: Icon,
   title,
   text,
-  onClick
+  onClick,
+  active = false
 }) {
   const Component = onClick ? "button" : "div";
-  return <Component type={onClick ? "button" : undefined} onClick={onClick} className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-200 hover:bg-blue-50">
-      <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-700 text-white">
+  return <Component type={onClick ? "button" : undefined} onClick={onClick} className={`rounded-xl border p-5 text-left transition hover:border-blue-200 hover:bg-blue-50 ${active ? "border-blue-300 bg-blue-50 shadow-sm ring-2 ring-blue-100" : "border-slate-200 bg-slate-50"}`}>
+      <div className={`grid h-10 w-10 place-items-center rounded-lg text-white ${active ? "bg-slate-950" : "bg-blue-700"}`}>
         <Icon className="h-4 w-4" />
       </div>
       <h3 className="mt-4 text-sm font-black text-slate-950">{title}</h3>

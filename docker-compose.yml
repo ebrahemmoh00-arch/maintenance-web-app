@@ -23,6 +23,14 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: cmms-mailpit
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_WEB_PORT:-8025}:8025"
+    restart: unless-stopped
+
   backend:
     container_name: cmms-backend
     build:
@@ -35,6 +43,10 @@ services:
       DATABASE_URL: ${DOCKER_DATABASE_URL}
       FRONTEND_ORIGINS: ${FRONTEND_ORIGINS}
       POSTGRES_WAIT_TIMEOUT_SECONDS: ${POSTGRES_WAIT_TIMEOUT_SECONDS:-60}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-cmms-test@local.test}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

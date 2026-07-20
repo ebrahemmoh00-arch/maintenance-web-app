@@ -21,6 +21,7 @@ from app import database  # noqa: E402
 from app.core.auth import CurrentUser, has_permission  # noqa: E402
 from app.schemas import AssetMeasurementCreate, EquipmentCreate, WorkOrderCreate, WorkOrderLifecycleAction  # noqa: E402
 from app.services import AssetHistoryService, AssetLifecycleService, EquipmentService, WorkOrderService  # noqa: E402
+from app.services.inventory_email_alerts import InventoryEmailAlertService, stock_alert_status  # noqa: E402
 
 
 class AssetLifecycleTest(unittest.TestCase):
@@ -189,6 +190,53 @@ class AssetLifecycleTest(unittest.TestCase):
         self.assertFalse(has_permission(limited, "asset_history:view"))
         self.assertTrue(has_permission(explicit, "asset_history:read"))
         self.assertTrue(has_permission(legacy_full_admin, "asset_history:view"))
+
+    def test_inventory_email_alert_permission_controls_recipients(self) -> None:
+        with database.get_connection() as db:
+            db.execute(
+                """
+                INSERT INTO engineers (name, email, username, role, permissions, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "Inventory Receiver",
+                    "stock-alert@example.com",
+                    "stock-alert",
+                    "store_keeper",
+                    json.dumps({"inventory": {"view": True, "email_alerts": True}}),
+                    "active",
+                ),
+            )
+            db.execute(
+                """
+                INSERT INTO engineers (name, email, username, role, permissions, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "Inventory Viewer",
+                    "viewer@example.com",
+                    "viewer",
+                    "viewer",
+                    json.dumps({"inventory": {"view": True}}),
+                    "active",
+                ),
+            )
+            db.commit()
+
+        recipients = InventoryEmailAlertService().recipients()
+        explicit_user = CurrentUser(
+            id=20,
+            username="stock-alert",
+            name="Inventory Receiver",
+            role="store_keeper",
+            permissions=json.dumps({"inventory": {"view": True, "email_alerts": True}}),
+            token_jti="test",
+        )
+
+        self.assertEqual(stock_alert_status({"stock_quantity": 1, "minimum_quantity": 5}), "LOW STOCK")
+        self.assertTrue(has_permission(explicit_user, "inventory:email_alerts"))
+        self.assertIn("stock-alert@example.com", recipients)
+        self.assertNotIn("viewer@example.com", recipients)
 
 
 if __name__ == "__main__":

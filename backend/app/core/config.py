@@ -89,3 +89,30 @@ def admin_email() -> str:
 
 def database_url() -> str:
     return os.getenv("DATABASE_URL", "").strip()
+
+
+def smtp_host() -> str:
+    return os.getenv("SMTP_HOST", "").strip()
+
+
+def smtp_port() -> int:
+    try:
+        return int(os.getenv("SMTP_PORT", "587"))
+    except ValueError:
+        return 587
+
+
+def smtp_username() -> str:
+    return os.getenv("SMTP_USERNAME", "").strip()
+
+
+def smtp_password() -> str:
+    return os.getenv("SMTP_PASSWORD", "")
+
+
+def smtp_from_email() -> str:
+    return os.getenv("SMTP_FROM_EMAIL", admin_email()).strip() or admin_email()
+
+
+def smtp_use_tls() -> bool:
+    return os.getenv("SMTP_USE_TLS", "true").strip().lower() not in {"0", "false", "no", "off"}

@@ -14,10 +14,7 @@ export function Reports({
   alerts,
   stats,
   language,
-  mode = "reports",
-  canViewAuditLogs = false,
-  canDeleteAuditLogs = false,
-  onDeleteAuditLogs
+  mode = "reports"
 }) {
   const t = text => tr(language, text);
   if (mode === "kpis") {
@@ -30,7 +27,6 @@ export function Reports({
         <MetricCard label={t("Assets Monitored")} value={data.equipment.length} icon={Wrench} tone="cyan" />
       </div>
       <AnalyticsSection data={data} alerts={alerts} language={language} />
-      {canViewAuditLogs ? <AuditLogsPanel logs={data["audit-logs"] || []} language={language} canDelete={canDeleteAuditLogs} onDeleteSelected={onDeleteAuditLogs} /> : null}
     </>;
 }
 
