@@ -101,16 +101,19 @@ export function PreviousRecordsTable({
 }
 
 export function buildScheduleCategories(equipment) {
-  const order = ["generators", "compressors", "boilers", "chillers", "fans", "other"];
-  const counts = equipment.reduce((acc, asset) => {
+  const categories = equipment.reduce((acc, asset) => {
     const category = equipmentCategory(asset);
-    acc[category.key] = (acc[category.key] || 0) + 1;
+    const current = acc.get(category.key) || {
+      ...category,
+      count: 0
+    };
+    current.count += 1;
+    acc.set(category.key, current);
     return acc;
-  }, {});
-  return order.filter(key => counts[key]).map(key => ({
-    key,
-    label: scheduleCategoryLabel(key),
-    count: counts[key]
+  }, new Map());
+  return [...categories.values()].sort((first, second) => equipmentTypeSortKey(first.label) - equipmentTypeSortKey(second.label) || first.label.localeCompare(second.label, undefined, {
+    numeric: true,
+    sensitivity: "base"
   }));
 }
 
@@ -127,6 +130,11 @@ export function assetSortKey(asset) {
 }
 
 export function equipmentCategory(asset) {
+  const label = equipmentTypeLabel(asset);
+  return {
+    key: scheduleCategoryKey(label),
+    label
+  };
   const text = `${asset.name || ""} ${asset.asset_type || ""} ${asset.model || ""}`.toLowerCase();
   if (/(generator|genset|m0\d|\bm\d\b)/.test(text)) return {
     key: "generators",
@@ -155,6 +163,9 @@ export function equipmentCategory(asset) {
 }
 
 export function scheduleCategoryLabel(key) {
+  const knownLabel = DEFAULT_EQUIPMENT_TYPE_ORDER.find(label => scheduleCategoryKey(label) === key);
+  if (knownLabel) return knownLabel;
+  if (String(key || "").startsWith("asset-type-")) return titleFromCategoryKey(key);
   const labels = {
     generators: "Generators / مولدات",
     compressors: "Compressors / كباسات",
@@ -165,6 +176,43 @@ export function scheduleCategoryLabel(key) {
   };
   return labels[key] || labels.other;
 }
+
+function equipmentTypeLabel(asset) {
+  const explicitType = String(asset.asset_type || "").trim();
+  if (explicitType && !GENERIC_ASSET_TYPES.has(explicitType.toLowerCase())) {
+    return canonicalEquipmentType(explicitType);
+  }
+  return canonicalEquipmentType(`${asset.name || ""} ${asset.model || ""} ${asset.category || ""}`);
+}
+
+function canonicalEquipmentType(value) {
+  const text = String(value || "").trim();
+  const normalized = text.toLowerCase();
+  if (/(generator|genset|مولد|m0\d|\bm\d\b)/i.test(text)) return "Generator";
+  if (/(compressor|comp\b|air comp|كباس)/i.test(text)) return "Compressor";
+  if (/(pump|مضخ)/i.test(text)) return "Pump";
+  if (/(engine|motor|محرك)/i.test(text)) return "Engine";
+  if (/(chiller|cooler|cooling|مبرد)/i.test(text)) return "Chiller";
+  if (/(boiler|steam|غلا)/i.test(text)) return "Boiler";
+  if (/(fan|blower|مروحة|مراوح)/i.test(text)) return "Fan";
+  return text && !GENERIC_ASSET_TYPES.has(normalized) ? text : "Other Equipment";
+}
+
+function scheduleCategoryKey(label) {
+  return `asset-type-${String(label || "Other Equipment").trim().toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, "-").replace(/^-+|-+$/g, "")}`;
+}
+
+function titleFromCategoryKey(key) {
+  return String(key || "").replace(/^asset-type-/, "").split("-").filter(Boolean).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+function equipmentTypeSortKey(label) {
+  const index = DEFAULT_EQUIPMENT_TYPE_ORDER.findIndex(item => item.toLowerCase() === String(label || "").toLowerCase());
+  return index >= 0 ? index : DEFAULT_EQUIPMENT_TYPE_ORDER.length;
+}
+
+const DEFAULT_EQUIPMENT_TYPE_ORDER = ["Generator", "Engine", "Compressor", "Pump", "Chiller", "Boiler", "Fan", "Other Equipment"];
+const GENERIC_ASSET_TYPES = new Set(["", "asset", "equipment", "component", "system", "site", "area / department"]);
 
 export function previousRecordsForTask(task) {
   const records = Array.isArray(task.previous_records) ? task.previous_records : [];

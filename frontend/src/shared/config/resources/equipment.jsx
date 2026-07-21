@@ -1,5 +1,7 @@
 import { MaintenanceBadge, StatusBadge } from "../../components/StatusBadges.jsx";
 
+export const DEFAULT_ASSET_TYPES = ["Engine", "Generator", "Compressor", "Pump", "Chiller", "Boiler"];
+
 export const equipmentResource = {
   title: "Assets",
   endpoint: "equipment",
@@ -13,7 +15,7 @@ export const equipmentResource = {
     manufacturer: "",
     location: "",
     parent_id: null,
-    asset_type: "Equipment",
+    asset_type: "",
     asset_level: "Equipment",
     asset_code: "",
     qr_code: "",
@@ -64,7 +66,10 @@ export const equipmentResource = {
     key: "asset_type",
     label: "Asset Type",
     type: "select",
-    options: ["Site", "Area / Department", "Cooling System", "Pump / Motor", "Generator", "Bearing / Seal", "Component"]
+    options: "assetTypes",
+    allowAddOption: true,
+    addPlaceholder: "Add Asset Type",
+    addLabel: "Add"
   }, {
     key: "asset_level",
     label: "Hierarchy Level",

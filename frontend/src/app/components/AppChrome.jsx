@@ -179,6 +179,7 @@ export function AppChrome({ app, children }) {
           options={options}
           onAddOption={async (field, optionName) => {
             if (field.key === "job_title") return addJobTitle(optionName);
+            if (field.key === "asset_type") return true;
             return false;
           }}
           labels={{ record: t("Maintenance Record"), close: t("Close"), cancel: t("Cancel"), save: t("Save Changes"), select: t("Select") }}

@@ -4,6 +4,7 @@ import { LoginScreen } from "../features/authentication/components/LoginScreen.j
 import { EMPLOYEE_ROLE_OPTIONS, clearAuthSession, getAuthSession, saveAuthSession } from "../features/authentication/services/authSession.js";
 import { businessEmployees, jobTitleOptions } from "../features/resources/utils/employeeUtils.js";
 import { buildSmartAlerts, createRolePermissions, hasPermission, isVisiblePageForUser, normalizeEmployeeRole, stringifyPermissions, tr } from "../shared/config/appConfig.jsx";
+import { DEFAULT_ASSET_TYPES } from "../shared/config/resources/equipment.jsx";
 import { resources } from "../shared/config/resourceRegistry.jsx";
 import { normalizeAssetForm, normalizeEngineerForm, normalizePMPlanForm, normalizePreventiveMaintenanceForm } from "../shared/utils/formNormalizers.js";
 import { maintenanceIdentityKey } from "../shared/utils/pmPlanSchedule.js";
@@ -111,6 +112,13 @@ export default function CMMSApp({ initialPage = "" }) {
       label: item.name
     })),
     jobTitles: jobTitleOptions(data["job-titles"], employeeRows),
+    assetTypes: [...new Set([
+      ...DEFAULT_ASSET_TYPES,
+      ...data.equipment.map(item => item.asset_type).filter(Boolean)
+    ])].map(item => ({
+      value: item,
+      label: item
+    })),
     assetParents: data.equipment.filter(item => !modal?.id || Number(item.id) !== Number(modal.id)).map(item => ({
       value: item.id,
       label: `${item.asset_code || `AST-${item.id}`} - ${item.name}`
