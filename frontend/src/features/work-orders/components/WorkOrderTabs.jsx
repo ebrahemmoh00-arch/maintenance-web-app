@@ -4,7 +4,7 @@ import { tr } from "../../../shared/config/appConfig.jsx";
 import { joinTime12, readFileAsDataUrl, splitTime12 } from "../utils/workOrderForms.js";
 import { formatLifecycleDate } from "./WorkOrderDocumentParts.jsx";
 import { SignaturePad } from "./WorkOrderMedia.jsx";
-import { UploadCloud } from "lucide-react";
+import { Trash2, UploadCloud } from "lucide-react";
 import { Fragment } from "react";
 
 export function WorkOrderActionButton({
@@ -56,6 +56,7 @@ export function WorkOrderKpi({
 export function WorkOrderOverviewTab({
   form,
   update,
+  updateStatus,
   status,
   selectedEquipment,
   selectedCustomer,
@@ -74,8 +75,8 @@ export function WorkOrderOverviewTab({
               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Current Status</p>
               <div className="mt-2"><StatusBadge value={status} language={language} /></div>
             </div>
-            <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-blue-500" value={form.status || ""} onChange={event => update("status", event.target.value)}>
-              {["pending", "assigned", "accepted", "in_progress", "waiting_for_parts", "completed", "approved", "closed", "cancelled"].map(option => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
+            <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black outline-none focus:border-blue-500" value={form.status || ""} onChange={event => updateStatus ? updateStatus(event.target.value) : update("status", event.target.value)}>
+              {["pending", "new", "assigned", "accepted", "in_progress", "on_hold", "waiting_for_parts", "completed", "pending_supervisor_review", "approved", "closed", "cancelled", "rejected", "overdue"].map(option => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
             </select>
           </div>
           <div className="mt-5">
@@ -87,14 +88,22 @@ export function WorkOrderOverviewTab({
           <CompactPhotoUploader title={t("After Maintenance Photos")} photos={photosAfter || []} onChange={photos => updatePhotos("after_photos", photos)} />
         </div>
       </div>
-      <div className="rounded-2xl bg-slate-50 p-4">
-        <h3 className="text-sm font-black text-slate-950">Summary</h3>
-        <div className="mt-4 space-y-3">
-          <SummaryLine label="Asset" value={selectedEquipment?.name || "-"} />
-          <SummaryLine label="Location" value={selectedCustomer?.name || selectedEquipment?.location || "-"} />
-          <SummaryLine label="Serial Number" value={selectedEquipment?.serial_number || form.serial_number || "-"} />
-          <SummaryLine label="Runtime" value={`${Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} h`} />
-          <SummaryLine label="Maintenance Type" value={form.maintenance_type || "-"} />
+      <div className="space-y-4">
+        <label className="block rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+          <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Type of maintenance")}</span>
+          <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold outline-none focus:border-blue-500" value={form.maintenance_type || ""} onChange={event => update("maintenance_type", event.target.value)}>
+            <option value="">{t("Select")}</option>
+            {["Preventive Maintenance", "Corrective Maintenance", "Condition Based / Predictive", "Periodic / Time based", "Breakdown", "Inspection", "Service"].map(option => <option key={option} value={option}>{t(option)}</option>)}
+          </select>
+        </label>
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <h3 className="text-sm font-black text-slate-950">Summary</h3>
+          <div className="mt-4 space-y-3">
+            <SummaryLine label="Asset" value={selectedEquipment?.name || "-"} />
+            <SummaryLine label="Location" value={selectedCustomer?.name || selectedEquipment?.location || "-"} />
+            <SummaryLine label="Serial Number" value={selectedEquipment?.serial_number || form.serial_number || "-"} />
+            <SummaryLine label="Runtime" value={`${Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} h`} />
+          </div>
         </div>
       </div>
     </div>;
@@ -180,7 +189,7 @@ export function WorkOrderLaborTab({
   setDraft,
   duration,
   selectedEquipment,
-  selectedEngineer
+  seniorTeamTechnician
 }) {
   const updateDraft = (key, value) => setDraft(current => ({
     ...current,
@@ -188,7 +197,7 @@ export function WorkOrderLaborTab({
   }));
   return <div className="grid gap-5 lg:grid-cols-2">
       <div className="space-y-4">
-        <ModernField label="Technician" value={selectedEngineer?.name || form.assigned_to || "-"} readOnly />
+        <ModernField label="Technician" value={seniorTeamTechnician?.name || "-"} readOnly />
         <div className="grid gap-3 sm:grid-cols-2">
           <ModernTimeField label="Start Time" value={form.start_time} onChange={value => update("start_time", value)} />
           <ModernTimeField label="Finish Time" value={form.finished_time} onChange={value => update("finished_time", value)} />
@@ -211,34 +220,93 @@ export function WorkOrderLaborTab({
 
 export function WorkOrderPartsTab({
   items,
+  inventory = [],
   onChange,
   onAdd,
+  onRemove,
   total
 }) {
+  function selectedInventoryItem(item) {
+    return inventory.find(part => Number(part.id) === Number(item.inventory_item_id)) || inventory.find(part => String(part.name || "").trim().toLowerCase() === String(item.name || "").trim().toLowerCase());
+  }
+
+  function chooseInventoryPart(index, itemId) {
+    const part = inventory.find(row => Number(row.id) === Number(itemId));
+    if (!part) {
+      onChange(index, {
+        inventory_item_id: "",
+        name: "",
+        part_number: "",
+        code: "",
+        warehouse: "",
+        available: 0,
+        unit: "",
+        unit_cost: 0,
+        total: 0
+      });
+      return;
+    }
+    onChange(index, {
+      inventory_item_id: part.id,
+      name: part.name,
+      part_number: part.part_number || "",
+      code: part.part_number || "",
+      warehouse: part.location || "Inventory",
+      available: Number(part.stock_quantity || 0),
+      reserved: part.linked_work_order_title || "",
+      unit: part.unit || "pcs",
+      unit_cost: Number(part.unit_cost || part.cost || 0),
+      qty: Math.max(Number(items[index]?.qty || 1), 1),
+      total: Math.max(Number(items[index]?.qty || 1), 1) * Number(part.unit_cost || part.cost || 0)
+    });
+  }
+
+  function updateQuantity(index, value) {
+    const quantity = Math.max(Number(value || 0), 0);
+    const item = items[index] || {};
+    onChange(index, {
+      qty: quantity,
+      total: quantity * Number(item.unit_cost || item.cost || 0)
+    });
+  }
+
   return <div className="space-y-4">
       <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
         <div className="overflow-x-auto">
-          <table className="min-w-[900px] w-full text-left text-sm">
+          <table className="min-w-[1080px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
               <tr>
-                {["Part", "Code", "Warehouse", "Available", "Reserved", "Quantity Used", "Unit Cost", "Total"].map(header => <th key={header} className="px-4 py-3">{header}</th>)}
+                {["Part", "Code", "Warehouse", "Available", "Reserved", "Quantity Used", "Unit Cost", "Total", ""].map(header => <th key={header || "actions"} className="px-4 py-3">{header}</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {items.map((item, index) => <tr key={index} className="hover:bg-slate-50">
-                  <td className="px-4 py-3"><input className="w-full rounded-lg border border-slate-200 px-3 py-2 font-bold outline-none focus:border-blue-500" value={item.name || ""} onChange={event => onChange(index, {
-                  name: event.target.value
-                })} /></td>
-                  <td className="px-4 py-3 text-slate-500">-</td>
-                  <td className="px-4 py-3 text-slate-500">Inventory</td>
-                  <td className="px-4 py-3 text-slate-500">-</td>
-                  <td className="px-4 py-3 text-slate-500">-</td>
-                  <td className="px-4 py-3"><input type="number" min="0" className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-center font-black outline-none focus:border-blue-500" value={item.qty || 0} onChange={event => onChange(index, {
-                  qty: Number(event.target.value)
-                })} /></td>
-                  <td className="px-4 py-3 text-slate-500">0</td>
-                  <td className="px-4 py-3 font-black text-slate-950">0</td>
-                </tr>)}
+              {items.map((item, index) => {
+                const inventoryItem = selectedInventoryItem(item) || {};
+                const available = Number(inventoryItem.stock_quantity ?? item.available ?? 0);
+                const unitCost = Number(item.unit_cost || item.cost || 0);
+                const rowTotal = Number(item.total || Number(item.qty || 0) * unitCost);
+                return <tr key={index} className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <select className="w-full min-w-[240px] rounded-lg border border-slate-200 px-3 py-2 font-bold outline-none focus:border-blue-500" value={item.inventory_item_id || inventoryItem.id || ""} onChange={event => chooseInventoryPart(index, event.target.value)}>
+                      <option value="">Select spare part</option>
+                      {inventory.map(part => <option key={part.id} value={part.id}>{part.name} ({Number(part.stock_quantity || 0)} {part.unit || "pcs"})</option>)}
+                    </select>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{item.part_number || item.code || inventoryItem.part_number || "-"}</td>
+                  <td className="px-4 py-3 text-slate-600">{item.warehouse || inventoryItem.location || "Inventory"}</td>
+                  <td className={`px-4 py-3 font-black ${available <= 0 ? "text-red-600" : available <= Number(inventoryItem.minimum_quantity || 0) ? "text-orange-600" : "text-emerald-700"}`}>{available}</td>
+                  <td className="px-4 py-3 text-slate-500">{item.reserved || inventoryItem.linked_work_order_title || "-"}</td>
+                  <td className="px-4 py-3"><input type="number" min="0" max={available || undefined} className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-center font-black outline-none focus:border-blue-500" value={item.qty || 0} onChange={event => updateQuantity(index, event.target.value)} /></td>
+                  <td className="px-4 py-3 text-slate-500">{unitCost.toLocaleString()}</td>
+                  <td className="px-4 py-3 font-black text-slate-950">{rowTotal.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button type="button" onClick={() => onRemove?.(index)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 bg-white text-red-600 hover:bg-red-50" title="Remove part from work order">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>;
+              })}
+              {!items.length ? <tr><td colSpan={9} className="px-4 py-8 text-center text-sm font-semibold text-slate-500">No spare parts selected.</td></tr> : null}
             </tbody>
           </table>
         </div>

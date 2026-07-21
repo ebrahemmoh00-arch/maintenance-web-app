@@ -4,7 +4,7 @@ import { tr } from "../../../shared/config/appConfig.jsx";
 import { todayIso } from "../../work-orders/utils/workOrderForms.js";
 import { buildAssetBreadcrumb } from "../utils/assetHierarchy.js";
 import { HistoryTimeline } from "./history/HistoryTimeline.jsx";
-import { GitBranch } from "lucide-react";
+import { GitBranch, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export function AssetDetailsPanel({
@@ -28,6 +28,8 @@ export function AssetDetailsPanel({
   onHistoryRefresh,
   historyTechnicians = [],
   onAddLifecycleItem,
+  canDeleteTimeline = false,
+  onDeleteTimelineEntry,
   language
 }) {
   const t = text => tr(language, text);
@@ -136,7 +138,7 @@ export function AssetDetailsPanel({
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <AssetTimeline rows={timelineRows} loading={lifecycleLoading} />
+        <AssetTimeline rows={timelineRows} loading={lifecycleLoading} canDelete={canDeleteTimeline} onDelete={onDeleteTimelineEntry} />
         <div className="space-y-4">
           <AssetRelationList title="Asset Events" rows={(lifecycle.events || []).map(item => `${item.event_type} - ${item.severity} - ${item.status}`)} empty="No asset events" />
           <AssetRelationList title="Failure History" rows={(lifecycle.failures || []).map(item => `${item.failure_id} - ${item.severity} - ${item.status}`)} empty="No failure events" />
@@ -227,8 +229,19 @@ export function AssetDetailLine({
 
 export function AssetTimeline({
   rows = [],
-  loading = false
+  loading = false,
+  canDelete = false,
+  onDelete
 }) {
+  const [deletingId, setDeletingId] = useState(null);
+
+  async function deleteEntry(entryId) {
+    if (!onDelete || !entryId) return;
+    setDeletingId(entryId);
+    await onDelete(entryId);
+    setDeletingId(null);
+  }
+
   return <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-black text-slate-950">Asset Timeline</h3>
@@ -241,7 +254,12 @@ export function AssetTimeline({
                 <p className="text-sm font-black text-slate-950">{item.title || item.event_type}</p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">{item.description || item.source_module || "Asset lifecycle event"}</p>
               </div>
-              <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-slate-500">{item.event_type || "Event"}</span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-slate-500">{item.event_type || "Event"}</span>
+                {canDelete ? <button type="button" onClick={() => deleteEntry(item.id)} disabled={deletingId === item.id} className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-100 bg-white text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" title="Delete timeline entry">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button> : null}
+              </div>
             </div>
             <p className="mt-2 text-xs font-bold text-blue-700">{item.created_at}</p>
           </div>)}

@@ -192,6 +192,30 @@ export default function CMMSApp({ initialPage = "" }) {
     }
   }, [authenticated]);
   useEffect(() => {
+    if (!authenticated) return undefined;
+    const keepServerReady = () => {
+      api.health().catch(() => null);
+    };
+    const refreshSession = () => {
+      api.refreshSession().catch(() => null);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        keepServerReady();
+        refreshSession();
+      }
+    };
+    const healthInterval = window.setInterval(keepServerReady, 4 * 60 * 1000);
+    const refreshInterval = window.setInterval(refreshSession, 20 * 60 * 1000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    keepServerReady();
+    return () => {
+      window.clearInterval(healthInterval);
+      window.clearInterval(refreshInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [authenticated]);
+  useEffect(() => {
     if (authenticated && active === "settings" && !auditLogsLoaded && hasPermission(currentUser, "audit-logs", "view")) {
       loadAuditLogs();
     }

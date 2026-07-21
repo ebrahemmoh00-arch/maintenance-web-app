@@ -57,6 +57,15 @@ def asset_timeline(
     return query.apply(service.timeline(asset_id), search_fields=["event_type", "description", "user_name"], date_fields=["created_at", "timestamp"])
 
 
+@router.delete("/{asset_id}/timeline/{entry_id}")
+def delete_asset_timeline_entry(
+    asset_id: int,
+    entry_id: int,
+    _=Depends(require_permission("asset_history:delete")),
+):
+    return service.delete_timeline_entry(asset_id, entry_id)
+
+
 @router.get("/{asset_id}/health", response_model=AssetHealth)
 def asset_health(asset_id: int, _=Depends(require_permission("assets:read"))):
     return service.health(asset_id)

@@ -1,4 +1,4 @@
-import { valueLabel } from "../../../shared/components/StatusBadges.jsx";
+import { StatusBadge, valueLabel } from "../../../shared/components/StatusBadges.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
 import { calculateDuration, formatShortDate, getWorkOrderSavedDate, parseWorkOrderNotes } from "../utils/workOrderForms.js";
 
@@ -50,7 +50,7 @@ export function SavedWorkOrdersTable({
   const t = text => tr(language, text);
   return <div className="overflow-hidden rounded-xl border border-slate-300 bg-white">
       <div className="overflow-auto">
-        <table className="min-w-[1120px] w-full border-collapse text-xs">
+        <table className="min-w-[1220px] w-full border-collapse text-xs">
           <thead>
             <tr className="bg-blue-600 text-white">
               <th className="w-10 border border-slate-600 px-2 py-2"></th>
@@ -63,6 +63,7 @@ export function SavedWorkOrdersTable({
               <th className="border border-slate-600 px-2 py-2">{t("Techn.")}</th>
               <th className="border border-slate-600 px-2 py-2">R.H</th>
               <th className="border border-slate-600 px-2 py-2">{t("Duration")}</th>
+              <th className="border border-slate-600 px-2 py-2">{t("Status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -85,9 +86,10 @@ export function SavedWorkOrdersTable({
                   <td className="border border-slate-300 px-2 py-2 text-center">{technicians}</td>
                   <td className="border border-slate-300 px-2 py-2 text-center font-black">{row.service_hours}</td>
                   <td className="border border-slate-300 px-2 py-2 text-center font-black">{meta.duration || calculateDuration(meta.start_time, meta.finished_time)}</td>
+                  <td className="border border-slate-300 px-2 py-2 text-center"><StatusBadge value={row.status} language={language} /></td>
                 </tr>;
           })}
-            {!rows.length ? <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-500">{t("No records found.")}</td></tr> : null}
+            {!rows.length ? <tr><td colSpan={11} className="px-4 py-10 text-center text-slate-500">{t("No records found.")}</td></tr> : null}
           </tbody>
         </table>
       </div>

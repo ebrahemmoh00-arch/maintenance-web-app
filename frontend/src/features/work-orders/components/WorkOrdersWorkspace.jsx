@@ -1,4 +1,4 @@
-import { AlertTriangle, Eye, MoreHorizontal, Plus, QrCode, Save, Trash2, UsersRound } from "lucide-react";
+import { AlertTriangle, Eye, MoreHorizontal, Plus, QrCode, RotateCcw, Save, Trash2, UsersRound } from "lucide-react";
 
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { PriorityBadge, StatusBadge } from "../../../shared/components/StatusBadges.jsx";
@@ -67,6 +67,7 @@ export function WorkOrdersWorkspace({ app }) {
     engineers,
     assignedEngineerOptions,
     teamMemberOptions,
+    inventory,
     setForm,
     videoRef,
     qrMessage,
@@ -76,14 +77,17 @@ export function WorkOrdersWorkspace({ app }) {
     activeWorkOrderTab,
     setActiveWorkOrderTab,
     update,
+    updateStatus,
     updatePhotos,
     lifecycleDraft,
     setLifecycleDraft,
     checklistProgress,
     duration,
     selectedEngineer,
+    seniorTeamTechnician,
     updateSparePart,
     addSparePart,
+    removeSparePart,
     partsTotal,
     updateSignature,
     activeSavedOrder,
@@ -146,6 +150,11 @@ export function WorkOrdersWorkspace({ app }) {
               {((editingId && canEdit) || (!editingId && !viewingSavedId && canCreate)) ? (
                 <button type="button" onClick={saveWorkOrder} className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-black text-white shadow-sm hover:bg-blue-800">
                   <Save className="h-4 w-4" /> {editingId ? t("Save Changes") : t("Save Work Order")}
+                </button>
+              ) : null}
+              {(editingId || viewingSavedId) ? (
+                <button type="button" onClick={newWorkOrder} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700">
+                  <RotateCcw className="h-4 w-4" /> {t("Default View")}
                 </button>
               ) : null}
             </div>
@@ -229,10 +238,10 @@ export function WorkOrdersWorkspace({ app }) {
               </div>
 
               <div className="p-5">
-                {activeWorkOrderTab === "overview" ? <WorkOrderOverviewTab form={form} update={update} status={currentStatus} selectedEquipment={selectedEquipment} selectedCustomer={selectedCustomer} photosBefore={form.before_photos} photosAfter={form.after_photos} updatePhotos={updatePhotos} language={language} /> : null}
+                {activeWorkOrderTab === "overview" ? <WorkOrderOverviewTab form={form} update={update} updateStatus={updateStatus} status={currentStatus} selectedEquipment={selectedEquipment} selectedCustomer={selectedCustomer} photosBefore={form.before_photos} photosAfter={form.after_photos} updatePhotos={updatePhotos} language={language} /> : null}
                 {activeWorkOrderTab === "checklist" ? <WorkOrderChecklistTab draft={lifecycleDraft} setDraft={setLifecycleDraft} checklistProgress={checklistProgress} form={form} /> : null}
-                {activeWorkOrderTab === "labor" ? <WorkOrderLaborTab form={form} update={update} draft={lifecycleDraft} setDraft={setLifecycleDraft} duration={duration} selectedEquipment={selectedEquipment} selectedEngineer={selectedEngineer} /> : null}
-                {activeWorkOrderTab === "parts" ? <WorkOrderPartsTab items={form.spare_parts_items} onChange={updateSparePart} onAdd={addSparePart} total={partsTotal} /> : null}
+                {activeWorkOrderTab === "labor" ? <WorkOrderLaborTab form={form} update={update} draft={lifecycleDraft} setDraft={setLifecycleDraft} duration={duration} selectedEquipment={selectedEquipment} seniorTeamTechnician={seniorTeamTechnician} /> : null}
+                {activeWorkOrderTab === "parts" ? <WorkOrderPartsTab items={form.spare_parts_items} inventory={inventory} onChange={updateSparePart} onAdd={addSparePart} onRemove={removeSparePart} total={partsTotal} /> : null}
                 {activeWorkOrderTab === "attachments" ? <WorkOrderAttachmentsTab form={form} updateSignature={updateSignature} labels={{ clear: t("Clear Signature") }} /> : null}
                 {activeWorkOrderTab === "history" ? <WorkOrderHistoryTab order={activeSavedOrder} /> : null}
                 {activeWorkOrderTab === "notes" ? <WorkOrderNotesTab form={form} update={update} selectedEngineer={selectedEngineer} /> : null}
@@ -442,7 +451,7 @@ function WorkOrderPrintDocument({ app }) {
             <div className="border-l-2 border-slate-950">
               <DocBand>{t("Location")}</DocBand>
               <div className="grid h-[126px] place-items-center border-b-2 border-slate-950 px-3 text-center text-lg font-black">{selectedCustomer?.name || selectedEquipment?.location || "-"}</div>
-              <DocStackSelect label={t("Type of maintenance")} value={form.maintenance_type} onChange={(value) => update("maintenance_type", value)} options={["Service", "Condition Based / Predictive", "Periodic / Time based", "Breakdown"]} />
+              <DocStackSelect label={t("Type of maintenance")} value={form.maintenance_type} onChange={(value) => update("maintenance_type", value)} options={["Preventive Maintenance", "Corrective Maintenance", "Condition Based / Predictive", "Periodic / Time based", "Breakdown", "Inspection", "Service"]} />
               <DocStackSelect label={t("Priority")} value={form.priority} onChange={(value) => update("priority", value)} options={["low", "medium", "high", "critical"]} />
               <DocStackSelect label={t("Status")} value={form.status} onChange={(value) => update("status", value)} options={["pending", "in_progress", "completed", "cancelled"]} />
             </div>

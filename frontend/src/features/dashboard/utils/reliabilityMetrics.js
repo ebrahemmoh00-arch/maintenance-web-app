@@ -141,10 +141,10 @@ export function isBreakdownTrendOrder(order) {
 }
 
 export function buildWorkOrderStatusPie(workOrders, language = "en") {
-  const openOrders = workOrders.filter(order => !["completed", "cancelled"].includes(String(order.status || "").toLowerCase()));
-  const buckets = new Map([["New", 0], ["Assigned", 0], ["In Progress", 0], ["Waiting for Parts", 0], ["Waiting for Approval", 0]]);
-  for (const order of openOrders) {
+  const buckets = new Map([["New", 0], ["Assigned", 0], ["In Progress", 0], ["Waiting for Parts", 0], ["Waiting for Approval", 0], ["Completed", 0]]);
+  for (const order of workOrders) {
     const bucket = workOrderStatusBucket(order);
+    if (!buckets.has(bucket)) continue;
     buckets.set(bucket, (buckets.get(bucket) || 0) + 1);
   }
   const colors = {
@@ -152,7 +152,8 @@ export function buildWorkOrderStatusPie(workOrders, language = "en") {
     Assigned: "#2563eb",
     "In Progress": "#0ea5e9",
     "Waiting for Parts": "#f97316",
-    "Waiting for Approval": "#8b5cf6"
+    "Waiting for Approval": "#8b5cf6",
+    Completed: "#16a34a"
   };
   return [...buckets.entries()].map(([label, value]) => ({
     label: tr(language, label),
@@ -163,11 +164,17 @@ export function buildWorkOrderStatusPie(workOrders, language = "en") {
 
 export function workOrderStatusBucket(order) {
   const meta = parseWorkOrderNotes(order.notes);
-  const status = String(order.status || "").toLowerCase();
+  const status = String(order.status || "").toLowerCase().replaceAll(" ", "_").replaceAll("-", "_");
   const text = `${status} ${order.title || ""} ${order.description || ""} ${meta.spare_parts || ""}`.toLowerCase();
-  if (text.includes("part") || text.includes("spare")) return "Waiting for Parts";
+  if (["closed", "completed", "approved"].includes(status)) return "Completed";
+  if (["waiting_for_parts"].includes(status)) return "Waiting for Parts";
+  if (["pending_supervisor_review"].includes(status)) return "Waiting for Approval";
+  if (["in_progress", "on_hold", "overdue"].includes(status)) return "In Progress";
+  if (["assigned", "accepted"].includes(status)) return "Assigned";
+  if (["new", "pending", "draft"].includes(status)) return "New";
   if (text.includes("approval")) return "Waiting for Approval";
-  if (status.includes("progress")) return "In Progress";
+  if (text.includes("part") || text.includes("spare")) return "Waiting for Parts";
+  if (text.includes("progress")) return "In Progress";
   if (order.engineer_id || meta.shift_engineer_name || meta.executor_name || meta.assigned_to) return "Assigned";
   return "New";
 }

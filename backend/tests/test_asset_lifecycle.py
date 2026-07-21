@@ -19,7 +19,7 @@ os.environ.pop("DATABASE_URL", None)
 
 from app import database  # noqa: E402
 from app.core.auth import CurrentUser, has_permission  # noqa: E402
-from app.schemas import AssetMeasurementCreate, EquipmentCreate, WorkOrderCreate, WorkOrderLifecycleAction  # noqa: E402
+from app.schemas import AssetMeasurementCreate, EquipmentCreate, WorkOrderCreate, WorkOrderLifecycleAction, WorkOrderUpdate  # noqa: E402
 from app.services import AssetHistoryService, AssetLifecycleService, EquipmentService, WorkOrderService  # noqa: E402
 from app.services.inventory_email_alerts import InventoryEmailAlertService, stock_alert_status  # noqa: E402
 
@@ -88,6 +88,38 @@ class AssetLifecycleTest(unittest.TestCase):
         self.assertGreaterEqual(health["health_score"], 0)
         self.assertTrue(any(entry["event_type"] == "Measurement" for entry in history))
 
+    def test_asset_timeline_entry_delete_is_scoped_to_asset(self) -> None:
+        self.lifecycle.add_measurement(
+            1,
+            AssetMeasurementCreate(
+                measurement_type="Runtime Hours",
+                value=6200,
+                unit="hrs",
+                reading_date="2026-07-21",
+                notes="Timeline deletion test",
+            ),
+        )
+        timeline_entry = next(entry for entry in self.lifecycle.timeline(1) if entry["event_type"] == "Measurement")
+        other_asset = self.assets.create(
+            EquipmentCreate(
+                customer_id=1,
+                name="Timeline Scope Asset",
+                asset_type="Site",
+                asset_level="Site",
+                asset_code="AST-TIMELINE-SCOPE",
+            )
+        )
+
+        with self.assertRaises(HTTPException) as context:
+            self.lifecycle.delete_timeline_entry(other_asset["id"], timeline_entry["id"])
+        self.assertEqual(context.exception.status_code, 404)
+
+        result = self.lifecycle.delete_timeline_entry(1, timeline_entry["id"])
+        remaining_ids = {entry["id"] for entry in self.lifecycle.timeline(1)}
+
+        self.assertTrue(result["ok"])
+        self.assertNotIn(timeline_entry["id"], remaining_ids)
+
     def test_closed_work_order_updates_asset_history_and_breakdown_event(self) -> None:
         order = self.work_orders.create(
             WorkOrderCreate(
@@ -126,6 +158,70 @@ class AssetLifecycleTest(unittest.TestCase):
         self.assertTrue(any(entry["source_module"] == "Work Orders" and str(entry["source_record_id"]) == str(order["id"]) for entry in history))
         self.assertTrue(any(event["event_type"] == "Breakdown" for event in events))
         self.assertTrue(any(item["measurement_type"] == "Runtime Hours" and item["value"] == 4600 for item in measurements))
+
+    def test_work_order_parts_sync_inventory_on_save_update_and_remove(self) -> None:
+        with database.get_connection() as db:
+            cursor = db.execute(
+                """
+                INSERT INTO inventory_items (part_number, name, category, stock_quantity, minimum_quantity, unit, location)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                ("FLT-001", "Oil Filter", "Filters", 10, 2, "pcs", "Main Store"),
+            )
+            inventory_item_id = cursor.lastrowid
+            db.commit()
+
+        created_notes = {
+            "__workOrderDocument": True,
+            "spare_parts_items": [
+                {
+                    "inventory_item_id": inventory_item_id,
+                    "name": "Oil Filter",
+                    "qty": 3,
+                }
+            ],
+        }
+        order = self.work_orders.create(
+            WorkOrderCreate(
+                title="Inventory linked work order",
+                description="Replace oil filter",
+                customer_id=1,
+                equipment_id=1,
+                engineer_id=1,
+                scheduled_date="2026-07-21",
+                status="new",
+                priority="medium",
+                service_hours=4427,
+                notes=json.dumps(created_notes),
+            )
+        )
+        with database.get_connection() as db:
+            quantity_after_create = db.execute(
+                "SELECT stock_quantity FROM inventory_items WHERE id = ?",
+                (inventory_item_id,),
+            ).fetchone()["stock_quantity"]
+        self.assertEqual(quantity_after_create, 7)
+
+        update_notes = json.loads(order["notes"])
+        update_notes["spare_parts_items"][0]["qty"] = 1
+        order = self.work_orders.update(order["id"], WorkOrderUpdate(notes=json.dumps(update_notes)))
+        with database.get_connection() as db:
+            quantity_after_reduction = db.execute(
+                "SELECT stock_quantity FROM inventory_items WHERE id = ?",
+                (inventory_item_id,),
+            ).fetchone()["stock_quantity"]
+        self.assertEqual(quantity_after_reduction, 9)
+
+        remove_notes = json.loads(order["notes"])
+        remove_notes["spare_parts_items"] = []
+        order = self.work_orders.update(order["id"], WorkOrderUpdate(notes=json.dumps(remove_notes)))
+        with database.get_connection() as db:
+            quantity_after_remove = db.execute(
+                "SELECT stock_quantity FROM inventory_items WHERE id = ?",
+                (inventory_item_id,),
+            ).fetchone()["stock_quantity"]
+        self.assertEqual(quantity_after_remove, 10)
+        self.assertEqual(json.loads(order["notes"]).get("inventory_issues"), [])
 
     def test_enterprise_asset_history_supports_pagination_and_filtering(self) -> None:
         order = self.work_orders.create(

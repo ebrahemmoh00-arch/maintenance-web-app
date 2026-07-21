@@ -263,6 +263,26 @@ class AssetLifecycleRepository:
             "created_at ASC, id ASC",
         )
 
+    def delete_history_entry(self, asset_id: int, entry_id: int) -> dict[str, bool]:
+        with get_connection() as db:
+            row = db.execute(
+                "SELECT * FROM asset_history WHERE id = ? AND asset_id = ?",
+                (entry_id, asset_id),
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Timeline entry not found")
+            old_item = dict(row)
+            db.execute("DELETE FROM asset_history WHERE id = ? AND asset_id = ?", (entry_id, asset_id))
+            db.commit()
+        AuditService.log_event(
+            action="DELETE",
+            module="Asset History",
+            record_id=entry_id,
+            description=f"Deleted timeline entry #{entry_id} for asset #{asset_id}",
+            old_values=old_item,
+        )
+        return {"ok": True}
+
     def events(self, asset_id: int) -> list[dict[str, Any]]:
         return self._list_for_asset(
             "asset_events",

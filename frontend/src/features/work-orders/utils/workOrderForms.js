@@ -28,7 +28,7 @@ export function createWorkOrderForm({
     start_date: "",
     finished_time: "",
     finished_date: "",
-    maintenance_type: "Service",
+    maintenance_type: "",
     executor_name: "",
     executor_job_title: "",
     status: "pending",

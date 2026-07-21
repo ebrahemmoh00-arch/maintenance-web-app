@@ -103,7 +103,7 @@ export function DashboardWorkOrderStatusPanel({
   onNavigate,
   language
 }) {
-  return <Panel title={tr(language, "Work Order Status")} subtitle={tr(language, "Open work orders grouped by current workflow status.")} actions={<button type="button" onClick={() => onNavigate?.("work-orders")} className="text-sm font-black text-blue-700 hover:text-blue-900">{tr(language, "View All")}</button>}>
+  return <Panel title={tr(language, "Work Order Status")} subtitle={tr(language, "Work orders grouped by current workflow status.")} actions={<button type="button" onClick={() => onNavigate?.("work-orders")} className="text-sm font-black text-blue-700 hover:text-blue-900">{tr(language, "View All")}</button>}>
       {hasChartValue(metrics.workOrderStatusPie) ? <DonutChart data={metrics.workOrderStatusPie} centerLabel="Orders" /> : <DashboardEmptyState title="No work order status data available yet." actionLabel="Create First Work Order" onAction={() => onNavigate?.("work-orders")} language={language} />}
     </Panel>;
 }

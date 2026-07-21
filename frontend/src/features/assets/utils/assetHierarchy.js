@@ -42,6 +42,59 @@ export function buildAssetTree(rows, search = "", filters = {}) {
   return filterAssetNodes(sortedRoots, query, filters);
 }
 
+export function buildCompanyTrees(departments, assetTree, selectedDepartment, showAllAssets) {
+  if (!showAllAssets && selectedDepartment) {
+    return [{
+      ...selectedDepartment,
+      children: assetTree
+    }];
+  }
+  const trees = departments.map(department => ({
+    ...department,
+    children: assetTree.filter(asset => nodeBelongsToDepartment(asset, department))
+  }));
+  const groupedIds = new Set();
+  trees.forEach(tree => collectNodeIds(tree.children, groupedIds));
+  const unassigned = assetTree.filter(asset => !groupedIds.has(idKey(asset.id)));
+  if (unassigned.length) {
+    trees.push({
+      id: "unassigned-assets",
+      name: "Unassigned Assets",
+      children: unassigned
+    });
+  }
+  return trees;
+}
+
+export function filterAssetsByDepartment(rows, department) {
+  const byId = new Map(rows.map(row => [idKey(row.id), row]));
+  const childrenByParent = rows.reduce((map, row) => {
+    const parentKey = idKey(row.parent_id);
+    if (!parentKey) return map;
+    if (!map.has(parentKey)) map.set(parentKey, []);
+    map.get(parentKey).push(row);
+    return map;
+  }, new Map());
+  const included = new Set();
+  rows.filter(row => assetLinkedToDepartment(row, department)).forEach(row => {
+    let cursor = row;
+    const visited = new Set();
+    while (cursor && !visited.has(idKey(cursor.id))) {
+      included.add(idKey(cursor.id));
+      visited.add(idKey(cursor.id));
+      cursor = byId.get(idKey(cursor.parent_id));
+    }
+    const stack = [...(childrenByParent.get(idKey(row.id)) || [])];
+    while (stack.length) {
+      const child = stack.pop();
+      if (!child || included.has(idKey(child.id))) continue;
+      included.add(idKey(child.id));
+      stack.push(...(childrenByParent.get(idKey(child.id)) || []));
+    }
+  });
+  return rows.filter(row => included.has(idKey(row.id)));
+}
+
 export function sortAssetNodes(nodes) {
   return nodes.sort((first, second) => String(first.asset_code || first.name).localeCompare(String(second.asset_code || second.name), undefined, {
     numeric: true
@@ -134,4 +187,40 @@ export function buildAssetBreadcrumb(asset, rows) {
     cursor = byId.get(Number(cursor.parent_id));
   }
   return path;
+}
+
+function nodeBelongsToDepartment(node, department) {
+  return assetLinkedToDepartment(node, department) || (node.children || []).some(child => nodeBelongsToDepartment(child, department));
+}
+
+function assetLinkedToDepartment(asset, department) {
+  if (!asset || !department) return false;
+  if (sameId(asset.customer_id, department.id)) return true;
+  const departmentName = normalizeText(department.name);
+  if (!departmentName) return false;
+  return [asset.customer_name, asset.customer, asset.location, asset.site, asset.department, asset.work_location].some(value => {
+    const normalized = normalizeText(value);
+    return normalized && (normalized === departmentName || normalized.includes(departmentName) || departmentName.includes(normalized));
+  });
+}
+
+function collectNodeIds(nodes, target) {
+  nodes.forEach(node => {
+    target.add(idKey(node.id));
+    collectNodeIds(node.children || [], target);
+  });
+}
+
+export function sameId(first, second) {
+  if (first === null || first === undefined || second === null || second === undefined) return false;
+  return String(first) === String(second) || Number(first) === Number(second);
+}
+
+function idKey(value) {
+  if (value === null || value === undefined || value === "") return "";
+  return String(value);
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
 }

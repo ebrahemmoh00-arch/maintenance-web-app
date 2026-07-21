@@ -1,5 +1,5 @@
 import { tr } from "../../../shared/config/appConfig.jsx";
-import { isEngineerEmployee } from "../../resources/utils/employeeUtils.js";
+import { findSeniorTeamTechnician, isEngineerEmployee } from "../../resources/utils/employeeUtils.js";
 import { buildWorkOrderReference, calculateDuration, createWorkOrderForm, formFromSavedOrder, getNextWorkOrderNo, getWorkOrderSavedDate, notifyManagerApproval, todayIso } from "../utils/workOrderForms.js";
 import { normalizeWorkOrderStatus } from "../utils/workOrderStatus.js";
 import { lifecycleActionsForStatus } from "./WorkOrderDocumentParts.jsx";
@@ -18,6 +18,7 @@ export function WorkOrdersView({
   customers,
   equipment,
   engineers,
+  inventory = [],
   onSave,
   onDelete,
   onLifecycleAction,
@@ -67,6 +68,7 @@ export function WorkOrdersView({
   const teamMemberOptions = useMemo(() => engineers.map(item => item.name).filter(Boolean).sort((first, second) => first.localeCompare(second, undefined, {
     sensitivity: "base"
   })), [engineers]);
+  const seniorTeamTechnician = useMemo(() => findSeniorTeamTechnician(form.appointed_members_list, engineers), [form.appointed_members_list, engineers]);
   const filteredEquipment = form.customer_id ? equipment.filter(item => Number(item.customer_id) === Number(form.customer_id)) : [];
   const woReference = buildWorkOrderReference(form, selectedCustomer, selectedEquipment);
   const duration = calculateDuration(form.start_time, form.finished_time);
@@ -110,6 +112,14 @@ export function WorkOrdersView({
       ...current,
       [key]: value
     }));
+  }
+  function updateStatus(value) {
+    if (activeSavedOrder && !editingId && canEdit) {
+      setEditingId(activeSavedOrder.id);
+      setViewingSavedId(null);
+      setSelectedSavedId(activeSavedOrder.id);
+    }
+    update("status", value);
   }
   function chooseCustomer(value) {
     setForm(current => {
@@ -183,10 +193,24 @@ export function WorkOrdersView({
     setForm(current => ({
       ...current,
       spare_parts_items: [...current.spare_parts_items, {
+        inventory_item_id: "",
         name: "",
         qty: 1
       }]
     }));
+  }
+  function removeSparePart(index) {
+    setForm(current => {
+      const nextParts = (current.spare_parts_items || []).filter((_, itemIndex) => itemIndex !== index);
+      return {
+        ...current,
+        spare_parts_items: nextParts.length ? nextParts : [{
+          inventory_item_id: "",
+          name: "",
+          qty: 1
+        }]
+      };
+    });
   }
   function updatePhotos(key, photos) {
     setForm(current => ({
@@ -258,8 +282,20 @@ export function WorkOrdersView({
     loop();
   }
   function newWorkOrder() {
+    closeQrScanner();
     setEditingId(null);
     setViewingSavedId(null);
+    setActiveWorkOrderTab("overview");
+    setMoreActionsOpen(false);
+    setLifecycleDraft({
+      engineer_id: "",
+      runtime_reading: "",
+      notes: "",
+      reason: "",
+      completion_notes: "",
+      supervisor_notes: "",
+      checklist_completed: false
+    });
     setForm(createWorkOrderForm({
       equipment,
       customers,
@@ -363,13 +399,17 @@ export function WorkOrdersView({
       })
     };
     const wasEditing = Boolean(editingId);
+    const savedEditingId = editingId;
     const saved = await onSave(payload, editingId);
     if (saved) {
       if (form.status === "completed") {
         notifyManagerApproval(t);
       }
       setEditingId(null);
-      if (!wasEditing) {
+      if (wasEditing) {
+        setViewingSavedId(savedEditingId);
+        setSelectedSavedId(savedEditingId);
+      } else {
         setViewingSavedId(null);
         setForm(current => ({
           ...current,
@@ -451,7 +491,7 @@ export function WorkOrdersView({
   const actionKeys = new Set(lifecycleActions.map(action => action.key));
   const quickAssignedTo = form.assigned_to || selectedEngineer?.name || activeSavedOrder?.engineer_name || "-";
   const checklistProgress = activeSavedOrder?.checklist_completed || lifecycleDraft.checklist_completed ? 100 : 0;
-  const partsTotal = (form.spare_parts_items || []).reduce((total, item) => total + Number(item.total || item.cost || 0), 0);
+  const partsTotal = (form.spare_parts_items || []).reduce((total, item) => total + Number(item.total || Number(item.qty || 0) * Number(item.unit_cost || item.cost || 0)), 0);
   const estimatedHours = duration && duration !== "0:00" ? duration : form.estimated_hours || "-";
   const smartAlerts = [!form.after_photos?.length ? "No after-maintenance photos" : "", checklistProgress < 100 ? "Checklist is not complete" : "", !form.signature_executor ? "Technician signature is missing" : "", !(form.spare_parts_items || []).some(item => item.name) ? "No spare parts recorded" : ""].filter(Boolean);
   const workOrderTabs = [["overview", "Overview", Activity], ["checklist", "Checklist", CheckCircle2], ["labor", "Labor & Time", Clock3], ["parts", "Parts", Box], ["attachments", "Attachments", Paperclip], ["history", "History", TimerReset], ["notes", "Notes", MessageSquare]];
@@ -489,6 +529,7 @@ export function WorkOrdersView({
     engineers,
     assignedEngineerOptions,
     teamMemberOptions,
+    inventory,
     setForm,
     videoRef,
     qrMessage,
@@ -498,14 +539,17 @@ export function WorkOrdersView({
     activeWorkOrderTab,
     setActiveWorkOrderTab,
     update,
+    updateStatus,
     updatePhotos,
     lifecycleDraft,
     setLifecycleDraft,
     checklistProgress,
     duration,
     selectedEngineer,
+    seniorTeamTechnician,
     updateSparePart,
     addSparePart,
+    removeSparePart,
     partsTotal,
     updateSignature,
     activeSavedOrder,

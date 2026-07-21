@@ -38,6 +38,7 @@ export default function AssetsPage() {
       canCreateAsset={hasPermission(currentUser, "equipment", "add")}
       canEditAsset={hasPermission(currentUser, "equipment", "edit")}
       canDeleteAsset={hasPermission(currentUser, "equipment", "delete")}
+      canDeleteTimeline={hasPermission(currentUser, "asset-history", "delete")}
       canCreateDepartment={hasPermission(currentUser, "customers", "add")}
       canEditDepartment={hasPermission(currentUser, "customers", "edit")}
       canDeleteDepartment={hasPermission(currentUser, "customers", "delete")}

@@ -3,7 +3,7 @@ import { DataTable } from "../../../shared/components/DataTable.jsx";
 import { EmptyState } from "../../../shared/components/EmptyState.jsx";
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { localizedConfig, tableLabels, tr } from "../../../shared/config/appConfig.jsx";
-import { assetLevelMeta, buildAssetTree, canPlaceAssetUnder } from "../utils/assetHierarchy.js";
+import { assetLevelMeta, buildAssetTree, buildCompanyTrees, canPlaceAssetUnder, filterAssetsByDepartment, sameId } from "../utils/assetHierarchy.js";
 import { AssetDetailsPanel, AssetHealthDot, AssetMiniSelect } from "./AssetDetails.jsx";
 import { Building2, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -48,6 +48,7 @@ export function AssetsView({
   canCreateAsset = canManage,
   canEditAsset = canManage,
   canDeleteAsset = canManage,
+  canDeleteTimeline = false,
   canCreateDepartment = canManage,
   canEditDepartment = canManage,
   canDeleteDepartment = canManage,
@@ -63,6 +64,8 @@ export function AssetsView({
     level: "",
     criticality: ""
   });
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(departments[0]?.id ? String(departments[0].id) : "");
+  const [showAllAssets, setShowAllAssets] = useState(false);
   const [assetLifecycle, setAssetLifecycle] = useState({
     history: EMPTY_HISTORY_RESPONSE,
     timeline: [],
@@ -79,12 +82,12 @@ export function AssetsView({
   const [assetLifecycleError, setAssetLifecycleError] = useState("");
   const customerConfig = localizedConfig("customers", language);
   const assetConfig = localizedConfig("equipment", language);
-  const assetTree = useMemo(() => buildAssetTree(rows, assetSearch, assetFilters), [rows, assetSearch, assetFilters]);
-  const companyTrees = useMemo(() => departments.map(department => ({
-    ...department,
-    children: assetTree.filter(asset => Number(asset.customer_id) === Number(department.id))
-  })), [departments, assetTree]);
-  const selectedAsset = rows.find(asset => Number(asset.id) === Number(selectedAssetId)) || rows[0];
+  const selectedDepartment = useMemo(() => departments.find(department => sameId(department.id, selectedDepartmentId)) || null, [departments, selectedDepartmentId]);
+  const scopedRows = useMemo(() => showAllAssets || !selectedDepartment ? rows : filterAssetsByDepartment(rows, selectedDepartment), [rows, selectedDepartment, showAllAssets]);
+  const assetTree = useMemo(() => buildAssetTree(scopedRows, assetSearch, assetFilters), [scopedRows, assetSearch, assetFilters]);
+  const companyTrees = useMemo(() => buildCompanyTrees(departments, assetTree, selectedDepartment, showAllAssets), [departments, assetTree, selectedDepartment, showAllAssets]);
+  const selectedAsset = scopedRows.find(asset => Number(asset.id) === Number(selectedAssetId)) || scopedRows[0];
+  const scopeLabel = showAllAssets ? t("All Assets") : selectedDepartment?.name || t("No customer / location selected");
   const historyTechnicians = useMemo(() => [...new Set(workOrders.map(order => order.engineer_name || order.technician_name || "").filter(Boolean))].sort(), [workOrders]);
   const sections = [{
     key: "customers",
@@ -93,17 +96,30 @@ export function AssetsView({
   }, {
     key: "hierarchy",
     title: t("Asset Hierarchy"),
-    count: rows.length
+    count: scopedRows.length
   }, {
     key: "assets",
     title: t("Assets"),
-    count: rows.length
+    count: scopedRows.length
   }];
   useEffect(() => {
-    if (rows.length && !rows.some(asset => Number(asset.id) === Number(selectedAssetId))) {
-      setSelectedAssetId(rows[0].id);
+    if (!departments.length) {
+      if (selectedDepartmentId) setSelectedDepartmentId("");
+      return;
     }
-  }, [rows, selectedAssetId]);
+    if (!departments.some(department => sameId(department.id, selectedDepartmentId))) {
+      setSelectedDepartmentId(String(departments[0].id));
+    }
+  }, [departments, selectedDepartmentId]);
+  useEffect(() => {
+    if (!scopedRows.length) {
+      if (selectedAssetId) setSelectedAssetId("");
+      return;
+    }
+    if (!scopedRows.some(asset => Number(asset.id) === Number(selectedAssetId))) {
+      setSelectedAssetId(scopedRows[0].id);
+    }
+  }, [scopedRows, selectedAssetId]);
   useEffect(() => {
     setAssetHistoryFilters(INITIAL_HISTORY_FILTERS);
   }, [selectedAsset?.id]);
@@ -196,6 +212,19 @@ export function AssetsView({
       window.alert(error.message || "Failed to save asset lifecycle item");
     }
   }
+  async function handleAssetTimelineDelete(entryId) {
+    if (!selectedAsset?.id || !entryId) return false;
+    const confirmed = window.confirm("Delete this timeline entry?");
+    if (!confirmed) return false;
+    try {
+      await api.remove(`assets/${selectedAsset.id}/timeline`, entryId);
+      await reloadAssetLifecycle(selectedAsset.id);
+      return true;
+    } catch (error) {
+      window.alert(error.message || "Failed to delete timeline entry");
+      return false;
+    }
+  }
   function toggleExpanded(id) {
     setExpanded(current => ({
       ...current,
@@ -221,6 +250,11 @@ export function AssetsView({
         </div>
       </div>
 
+      {activeAssetSection !== "customers" ? <AssetScopeBar departments={departments} selectedDepartmentId={selectedDepartmentId} onSelectedDepartmentChange={value => {
+      setSelectedDepartmentId(value);
+      setShowAllAssets(false);
+    }} showAllAssets={showAllAssets} onToggleShowAll={() => setShowAllAssets(value => !value)} assetCount={scopedRows.length} scopeLabel={scopeLabel} language={language} /> : null}
+
       {activeAssetSection === "customers" ? <Panel title={t("Customers / Locations")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateDepartment ? <button onClick={onCreateDepartment} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
               <Plus className="h-4 w-4" />
               {t("New Record")}
@@ -231,12 +265,12 @@ export function AssetsView({
       {activeAssetSection === "hierarchy" ? <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
           <Panel title={t("Asset Hierarchy")} subtitle={t("Customer / location to asset structure for fast plant navigation.")} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800">
                 <Plus className="h-4 w-4" />
-                Add Asset
+                {t("Add Asset")}
               </button> : null}>
             <div className="mb-4 space-y-3">
               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <Search className="h-4 w-4 text-slate-400" />
-                <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none" placeholder="Search by name or code" value={assetSearch} onChange={event => setAssetSearch(event.target.value)} />
+                <input className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none" placeholder={t("Search by name or code")} value={assetSearch} onChange={event => setAssetSearch(event.target.value)} />
               </label>
               <div className="grid gap-2 sm:grid-cols-3">
                 <AssetMiniSelect value={assetFilters.status} onChange={value => setAssetFilters(current => ({
@@ -267,15 +301,47 @@ export function AssetsView({
             </div>
           </Panel>
 
-          <AssetDetailsPanel asset={selectedAsset} rows={rows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} language={language} />
+          <AssetDetailsPanel asset={selectedAsset} rows={scopedRows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} canDeleteTimeline={canDeleteTimeline} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} onDeleteTimelineEntry={handleAssetTimelineDelete} language={language} />
         </div> : null}
 
       {activeAssetSection === "assets" ? <Panel title={t("Assets")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
               <Plus className="h-4 w-4" />
               {t("New Record")}
             </button> : null}>
-          <DataTable columns={assetConfig.columns} rows={rows} onEdit={canEditAsset ? onEdit : null} onDelete={canDeleteAsset ? onDelete : null} emptyMessage={t("No equipment")} labels={tableLabels(language)} />
+          <DataTable columns={assetConfig.columns} rows={scopedRows} onEdit={canEditAsset ? onEdit : null} onDelete={canDeleteAsset ? onDelete : null} emptyMessage={t("No equipment")} labels={tableLabels(language)} />
         </Panel> : null}
+    </div>;
+}
+
+function AssetScopeBar({
+  departments,
+  selectedDepartmentId,
+  onSelectedDepartmentChange,
+  showAllAssets,
+  onToggleShowAll,
+  assetCount,
+  scopeLabel,
+  language
+}) {
+  const t = text => tr(language, text);
+  return <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-3 lg:grid-cols-[minmax(240px,1fr)_auto_auto] lg:items-end">
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{t("Customer / Location")}</span>
+          <select className="w-full rounded-xl border border-slate-200 bg-cyan-50/50 px-3 py-3 text-sm font-black text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white" value={selectedDepartmentId} onChange={event => onSelectedDepartmentChange(event.target.value)} disabled={!departments.length}>
+            {!departments.length ? <option value="">{t("No customers / locations")}</option> : null}
+            {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+          </select>
+        </label>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{t("Visible Scope")}</p>
+          <p className="mt-1 text-sm font-black text-slate-950">{scopeLabel}</p>
+          <p className="mt-1 text-xs font-bold text-blue-700">{assetCount} {t("assets")}</p>
+        </div>
+        <button type="button" onClick={onToggleShowAll} disabled={!departments.length} className={`rounded-xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${showAllAssets ? "bg-slate-950 text-white hover:bg-slate-800" : "border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"}`}>
+          {showAllAssets ? t("Show Selected Location") : t("Show All Assets")}
+        </button>
+      </div>
     </div>;
 }
 

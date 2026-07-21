@@ -370,6 +370,10 @@ class AssetLifecycleService:
         self.assets.get(asset_id)
         return self.lifecycle.timeline(asset_id)
 
+    def delete_timeline_entry(self, asset_id: int, entry_id: int):
+        self.assets.get(asset_id)
+        return self.lifecycle.delete_history_entry(asset_id, entry_id)
+
     def events(self, asset_id: int):
         self.assets.get(asset_id)
         return self.lifecycle.events(asset_id)
@@ -1036,6 +1040,7 @@ class WorkOrderService:
     def create(self, data):
         item = payload(data)
         self._validate_assignments(item)
+        self._validate_inventory_parts_available(item.get("notes"))
         item["status"] = status_value(item.get("status") or "new")
         created = self.repo.create(item)
         self.repo.add_timeline(
@@ -1060,12 +1065,14 @@ class WorkOrderService:
                 "summary": created.get("title", ""),
             },
         )
-        return self.repo.get(created["id"])
+        created, _ = self._sync_inventory_parts(self.repo.get(created["id"]))
+        return created
 
     def update(self, item_id: int, data):
         item = payload(data)
         self._validate_assignments(item)
         old_order = self.repo.get(item_id)
+        self._validate_inventory_parts_available(item.get("notes"), old_order.get("notes"))
         current_status = status_value(old_order.get("status"))
         target_status = status_value(item.get("status")) if "status" in item and item.get("status") else current_status
         if current_status == "closed":
@@ -1080,6 +1087,7 @@ class WorkOrderService:
             self._record_status_change(updated, old_status, new_status, None, "Manual status update")
         if old_status not in {"completed", "closed", "close"} and new_status in {"completed", "closed", "close"}:
             PMPlanEngineService().complete_work_order(updated)
+        updated, _ = self._sync_inventory_parts(updated)
         return updated
 
     def delete(self, item_id: int): return self.repo.delete(item_id)
@@ -1433,34 +1441,128 @@ class WorkOrderService:
         )
 
     def _deduct_inventory_parts(self, order: dict[str, Any]) -> list[dict[str, Any]]:
+        order, movements = self._sync_inventory_parts(order)
+        return [movement for movement in movements if movement.get("action") == "ISSUE"]
+
+    def _validate_inventory_parts_available(self, notes_value: str | None, previous_notes_value: str | None = None) -> None:
+        notes = self._work_order_document_notes(notes_value)
+        if not notes:
+            return
+        previous_notes = self._work_order_document_notes(previous_notes_value)
+        requested = self._requested_inventory_quantities(notes)
+        previous = self._issued_inventory_quantities(previous_notes)
+        inventory = {int(item["id"]): item for item in self.inventory.list()}
+        for item_id, requested_qty in requested.items():
+            previous_qty = previous.get(item_id, 0)
+            if requested_qty <= previous_qty:
+                continue
+            item = inventory.get(item_id)
+            available = int(item.get("stock_quantity") or 0) if item else 0
+            needed = requested_qty - previous_qty
+            if needed > available:
+                name = item.get("name") if item else f"Inventory item #{item_id}"
+                raise HTTPException(status_code=400, detail=f"Insufficient inventory stock for {name}. Available: {available}, requested: {needed}")
+
+    def _sync_inventory_parts(self, order: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         try:
             notes = json.loads(order.get("notes") or "{}")
         except json.JSONDecodeError:
-            return []
+            return order, []
         if not notes.get("__workOrderDocument"):
-            return []
-        requested_parts = notes.get("spare_parts_items") or []
-        if not isinstance(requested_parts, list):
-            return []
-
-        inventory_by_name = {str(item.get("name", "")).strip().lower(): item for item in self.inventory.list()}
-        deducted: list[dict[str, Any]] = []
-        for part in requested_parts:
-            name = str(part.get("name", "")).strip()
-            quantity = int(part.get("qty") or 0)
-            if not name or quantity <= 0:
-                continue
-            item = inventory_by_name.get(name.lower())
+            return order, []
+        requested = self._requested_inventory_quantities(notes)
+        issued = self._issued_inventory_quantities(notes)
+        inventory = {int(item["id"]): item for item in self.inventory.list()}
+        movements: list[dict[str, Any]] = []
+        for item_id in sorted(set(requested) | set(issued)):
+            item = inventory.get(item_id)
             if not item:
                 continue
+            requested_qty = requested.get(item_id, 0)
+            issued_qty = issued.get(item_id, 0)
+            delta = requested_qty - issued_qty
+            if delta == 0:
+                continue
             old_quantity = int(item.get("stock_quantity") or 0)
-            new_quantity = max(old_quantity - quantity, 0)
+            new_quantity = max(old_quantity - delta, 0) if delta > 0 else old_quantity + abs(delta)
             if new_quantity == old_quantity:
                 continue
             updated_item = self.inventory.update(item["id"], {"stock_quantity": new_quantity, "linked_work_order_id": order["id"]})
             self.inventory_email_alerts.notify_if_threshold_crossed(updated_item, item, source=f"Work Order #{order['id']}")
-            deducted.append({"inventory_item_id": item["id"], "name": item["name"], "old_quantity": old_quantity, "new_quantity": new_quantity})
-        return deducted
+            movements.append({
+                "action": "ISSUE" if delta > 0 else "RETURN",
+                "inventory_item_id": item["id"],
+                "name": item["name"],
+                "quantity": abs(delta),
+                "old_quantity": old_quantity,
+                "new_quantity": new_quantity,
+            })
+        next_issues = [
+            {
+                "inventory_item_id": item_id,
+                "name": inventory[item_id].get("name", ""),
+                "qty": qty,
+            }
+            for item_id, qty in sorted(requested.items())
+            if qty > 0 and item_id in inventory
+        ]
+        if movements or notes.get("inventory_issues") != next_issues:
+            notes["inventory_issues"] = next_issues
+            notes["inventory_deducted_at"] = utc_timestamp() if next_issues else ""
+            order = self.repo.update(order["id"], {"notes": json.dumps(notes, ensure_ascii=False, default=str)})
+            for movement in movements:
+                AuditService.log_event(
+                    action=movement["action"],
+                    module="Inventory",
+                    record_id=movement["inventory_item_id"],
+                    description=f"{movement['action'].title()} {movement['quantity']} {movement['name']} for Work Order #{order['id']}",
+                    old_values={"stock_quantity": movement["old_quantity"]},
+                    new_values={"stock_quantity": movement["new_quantity"], "work_order_id": order["id"]},
+                )
+        return order, movements
+
+    def _work_order_document_notes(self, value: str | None) -> dict[str, Any]:
+        if not value:
+            return {}
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if parsed.get("__workOrderDocument") else {}
+
+    def _requested_inventory_quantities(self, notes: dict[str, Any]) -> dict[int, int]:
+        inventory_by_name = {str(item.get("name", "")).strip().lower(): int(item["id"]) for item in self.inventory.list()}
+        requested_parts = notes.get("spare_parts_items") or []
+        if not isinstance(requested_parts, list):
+            return {}
+        quantities: dict[int, int] = {}
+        for part in requested_parts:
+            item_id = part.get("inventory_item_id")
+            if not item_id:
+                item_id = inventory_by_name.get(str(part.get("name", "")).strip().lower())
+            try:
+                item_id = int(item_id or 0)
+            except (TypeError, ValueError):
+                item_id = 0
+            quantity = int(part.get("qty") or 0)
+            if item_id > 0 and quantity > 0:
+                quantities[item_id] = quantities.get(item_id, 0) + quantity
+        return quantities
+
+    def _issued_inventory_quantities(self, notes: dict[str, Any]) -> dict[int, int]:
+        issues = notes.get("inventory_issues") or []
+        if not isinstance(issues, list):
+            return {}
+        quantities: dict[int, int] = {}
+        for issue in issues:
+            try:
+                item_id = int(issue.get("inventory_item_id") or 0)
+            except (TypeError, ValueError):
+                item_id = 0
+            quantity = int(issue.get("qty") or issue.get("quantity") or 0)
+            if item_id > 0 and quantity > 0:
+                quantities[item_id] = quantities.get(item_id, 0) + quantity
+        return quantities
 
 
 class InventoryService:

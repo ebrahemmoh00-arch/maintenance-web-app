@@ -22,6 +22,7 @@ export default function WorkOrdersPage() {
       customers={data.customers}
       equipment={data.equipment}
       engineers={employeeRows}
+      inventory={data.inventory}
       onSave={saveWorkOrderDocument}
       onDelete={(id) => deleteRecord("work-orders", id)}
       onLifecycleAction={runWorkOrderLifecycleAction}

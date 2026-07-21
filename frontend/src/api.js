@@ -1,6 +1,6 @@
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const ACTIVE_API_BASE_KEY = "maintenance-active-api-base";
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 60000);
 
 function normalizeApiBase(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -54,9 +54,9 @@ function apiBasesInRetryOrder() {
   return uniqueValues([getActiveApiBase(), ...API_BASE_CANDIDATES]);
 }
 
-async function fetchWithTimeout(url, options = {}) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
@@ -66,12 +66,13 @@ async function fetchWithTimeout(url, options = {}) {
 
 function networkError(error) {
   const message = error?.message || "Failed to fetch";
-  const next = new Error(message.includes("abort") ? "Connection timeout" : "Failed to fetch");
+  const isTimeout = error?.name === "AbortError" || message.toLowerCase().includes("abort");
+  const next = new Error(isTimeout ? "Connection timeout. The server may be waking up. Please try again in a moment." : "Connection failed. Please check the server connection and try again.");
   next.network = true;
   return next;
 }
 
-async function refreshAccessToken(base = getActiveApiBase()) {
+async function refreshAccessToken(base = getActiveApiBase(), timeoutMs = REQUEST_TIMEOUT_MS) {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return "";
   let response;
@@ -80,7 +81,7 @@ async function refreshAccessToken(base = getActiveApiBase()) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refreshToken })
-    });
+    }, timeoutMs);
   } catch (error) {
     throw networkError(error);
   }
@@ -95,7 +96,7 @@ async function refreshAccessToken(base = getActiveApiBase()) {
 }
 
 async function requestFromBase(base, path, options = {}) {
-  const { auth = true, retry = true, ...fetchOptions } = options;
+  const { auth = true, retry = true, timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
   const token = auth ? getAccessToken() : "";
   let response;
   try {
@@ -106,13 +107,13 @@ async function requestFromBase(base, path, options = {}) {
         ...(fetchOptions.headers || {})
       },
       ...fetchOptions
-    });
+    }, timeoutMs);
   } catch (error) {
     throw networkError(error);
   }
 
   if (response.status === 401 && auth && retry) {
-    const refreshedToken = await refreshAccessToken(base);
+    const refreshedToken = await refreshAccessToken(base, timeoutMs);
     if (refreshedToken) {
       return requestFromBase(base, path, { ...options, retry: false });
     }
@@ -158,6 +159,7 @@ export const api = {
   saveAuthTokens,
   clearAuthTokens,
   getRefreshToken,
+  refreshSession: () => refreshAccessToken(),
   login: async (credentials) => {
     const payload = await request("/login", { method: "POST", body: JSON.stringify(credentials), auth: false });
     saveAuthTokens(payload);
@@ -181,5 +183,6 @@ export const api = {
   dashboardReliability: () => request("/dashboard/reliability"),
   schedule: () => request("/schedule"),
   alerts: () => request("/maintenance-alerts"),
+  health: () => request("/health", { auth: false, timeoutMs: 30000 }),
   serverTime: () => request("/server-time")
 };

@@ -42,6 +42,31 @@ export function isSupervisorEmployee(employee) {
   return String(employee?.role || "").toLowerCase() === "supervisor" || /supervisor/i.test(employeeJobTitle(employee));
 }
 
+export function technicianSeniorityRank(employee) {
+  const title = employeeJobTitle(employee).toLowerCase();
+  if (/\u0645\u0634\u0631\u0641|supervisor/.test(title)) return 50;
+  if (/\u0645\u0644\u0627\u062d\u0638|foreman|lead/.test(title)) return 40;
+  if (/senior|sr\.?|\u0623\u0648\u0644|\u0643\u0628\u064a\u0631/.test(title) && /technician|tech|\u0641\u0646\u064a|\u0641\u0646\u0649/.test(title)) return 30;
+  if (/technician|tech|\u0641\u0646\u064a|\u0641\u0646\u0649/.test(title) && !/assistant|helper|\u0645\u0633\u0627\u0639\u062f/.test(title)) return 20;
+  if (/assistant|helper|\u0645\u0633\u0627\u0639\u062f/.test(title) && /technician|tech|\u0641\u0646\u064a|\u0641\u0646\u0649/.test(title)) return 10;
+  return 0;
+}
+
+export function findSeniorTeamTechnician(memberNames = [], employees = []) {
+  const selectedNames = (memberNames || []).map(member => String(member || "").trim()).filter(Boolean);
+  if (!selectedNames.length) return null;
+  const selectedKeys = new Set(selectedNames.map(name => name.toLowerCase()));
+  const matchingEmployees = employees.filter(employee => selectedKeys.has(String(employee?.name || "").trim().toLowerCase()));
+  const ranked = matchingEmployees
+    .map(employee => ({
+      employee,
+      rank: technicianSeniorityRank(employee)
+    }))
+    .filter(item => item.rank > 0)
+    .sort((first, second) => second.rank - first.rank || String(first.employee.name || "").localeCompare(String(second.employee.name || ""), undefined, { sensitivity: "base" }));
+  return ranked[0]?.employee || null;
+}
+
 export function employeeMatchesGroup(employee, group) {
   if (!group) return false;
   if (group === "all") return true;
