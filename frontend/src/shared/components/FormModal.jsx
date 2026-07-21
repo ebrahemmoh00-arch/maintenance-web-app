@@ -8,6 +8,19 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
     return raw === "" ? null : Number(raw);
   };
   const updateOptionDraft = (key, next) => setOptionDrafts((current) => ({ ...current, [key]: next }));
+  const visibleFields = fields.filter((field) => !field.visibleWhen || field.visibleWhen(value));
+  const selectOptions = (field) => {
+    const rawOptions = options[field.options] || field.options || [];
+    const normalized = rawOptions.map((option) => ({
+      value: option.value ?? option,
+      label: option.label ?? option
+    }));
+    const currentValue = value[field.key];
+    if (currentValue !== "" && currentValue !== null && currentValue !== undefined && !normalized.some((option) => String(option.value) === String(currentValue))) {
+      return [{ value: currentValue, label: currentValue }, ...normalized];
+    }
+    return normalized;
+  };
   const addOption = async (field) => {
     const draft = String(optionDrafts[field.key] || "").trim();
     if (!draft || !onAddOption) return;
@@ -31,18 +44,18 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
           </button>
         </div>
         <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-6 md:grid-cols-2">
-          {fields.map((field) => {
+          {visibleFields.map((field) => {
             const common = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
             return (
               <label key={field.key} className={field.type === "textarea" ? "md:col-span-2" : ""}>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{field.label}</span>
                 {field.type === "select" ? (
                   <>
-                    <select className={common} value={value[field.key] ?? ""} onChange={(event) => update(field.key, optionValue(field, event.target.value))}>
+                    <select className={common} value={value[field.key] ?? ""} onChange={(event) => update(field.key, optionValue(field, event.target.value))} disabled={field.readOnly}>
                       <option value="">{labels.select || "Select"}</option>
-                      {(options[field.options] || field.options || []).map((option) => (
-                        <option key={option.value ?? option} value={option.value ?? option}>
-                          {option.label ?? option}
+                      {selectOptions(field).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -72,15 +85,17 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
                     ) : null}
                   </>
                 ) : field.type === "textarea" ? (
-                  <textarea className={common} rows={4} value={value[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} />
+                  <textarea className={common} rows={4} value={value[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} readOnly={field.readOnly} />
                 ) : (
                   <input
-                    className={common}
+                    className={`${common} ${field.readOnly ? "bg-slate-50 font-bold text-slate-600" : ""}`}
                     type={field.type || "text"}
                     value={value[field.key] ?? ""}
                     onChange={(event) => update(field.key, field.type === "number" ? Number(event.target.value) : event.target.value)}
+                    readOnly={field.readOnly}
                   />
                 )}
+                {field.hint ? <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">{field.hint}</p> : null}
               </label>
             );
           })}

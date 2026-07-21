@@ -6,6 +6,7 @@ import { businessEmployees, jobTitleOptions } from "../features/resources/utils/
 import { buildSmartAlerts, createRolePermissions, hasPermission, isVisiblePageForUser, normalizeEmployeeRole, stringifyPermissions, tr } from "../shared/config/appConfig.jsx";
 import { resources } from "../shared/config/resourceRegistry.jsx";
 import { normalizeAssetForm, normalizeEngineerForm, normalizePMPlanForm, normalizePreventiveMaintenanceForm } from "../shared/utils/formNormalizers.js";
+import { maintenanceIdentityKey } from "../shared/utils/pmPlanSchedule.js";
 import { AppChrome } from "./components/AppChrome.jsx";
 import { CMMSContext } from "./context/CMMSContext.jsx";
 import { normalizePage, pageToPath, pathToPage } from "./utils/navigation.js";
@@ -136,7 +137,7 @@ export default function CMMSApp({ initialPage = "" }) {
         "pm-plans": pmPlans,
         "job-titles": jobTitles
       }));
-      setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance));
+      setAlerts(buildSmartAlerts(maintenanceAlerts, inventory, preventiveMaintenance, pmPlans));
       setStats(dashboard);
       setBackendReliability(reliability);
       const storedUsername = sessionStorage.getItem("maintenance-auth-user") || "";
@@ -331,6 +332,76 @@ export default function CMMSApp({ initialPage = "" }) {
       setError(err.message);
     }
   }
+  async function importMaintenanceFollowUp(sourceEquipmentId, targetEquipmentId) {
+    if (!hasPermission(currentUser, "preventive-maintenance", "add")) return { created: 0, skipped: 0 };
+    const targetAsset = data.equipment.find(asset => Number(asset.id) === Number(targetEquipmentId));
+    const sourcePlans = data["pm-plans"].filter(plan => Number(plan.equipment_id) === Number(sourceEquipmentId));
+    const targetPlans = data["pm-plans"].filter(plan => Number(plan.equipment_id) === Number(targetEquipmentId));
+    const sourceTasks = data["preventive-maintenance"].filter(task => Number(task.equipment_id) === Number(sourceEquipmentId));
+    const targetTasks = data["preventive-maintenance"].filter(task => Number(task.equipment_id) === Number(targetEquipmentId));
+    const targetNames = new Set([
+      ...targetPlans.map(plan => maintenanceIdentityKey(targetEquipmentId, plan.name)),
+      ...targetTasks.map(task => maintenanceIdentityKey(targetEquipmentId, task.task_name))
+    ]);
+    const plansToCreate = sourcePlans.filter(plan => {
+      const key = maintenanceIdentityKey(targetEquipmentId, plan.name);
+      return plan.name && !targetNames.has(key);
+    });
+    const createdPlanNames = new Set(plansToCreate.map(plan => maintenanceIdentityKey(targetEquipmentId, plan.name)));
+    const tasksToCreate = sourceTasks.filter(task => {
+      const key = maintenanceIdentityKey(targetEquipmentId, task.task_name);
+      return task.task_name && !targetNames.has(key) && !createdPlanNames.has(key);
+    });
+    const sourceTotal = sourcePlans.length + sourceTasks.length;
+    const createTotal = plansToCreate.length + tasksToCreate.length;
+    if (!sourceTotal) return { created: 0, skipped: 0, message: "Selected source equipment has no maintenance tasks." };
+    if (!createTotal) return { created: 0, skipped: sourceTotal, message: "All source maintenance tasks already exist on the target equipment." };
+    try {
+      for (const plan of plansToCreate) {
+        const intervalValue = Math.max(Number(plan.interval_value || 1), 1);
+        const currentHours = Number(targetAsset?.current_hours || 0);
+        await api.create("pm-plans", normalizePMPlanForm({
+          equipment_id: Number(targetEquipmentId),
+          name: plan.name,
+          description: plan.description || "",
+          priority: plan.priority || "medium",
+          recurrence_type: plan.recurrence_type || "Runtime Hours",
+          interval_value: intervalValue,
+          start_date: new Date().toISOString().slice(0, 10),
+          next_due_runtime: String(plan.recurrence_type || "Runtime Hours").toLowerCase() === "runtime hours" ? currentHours + intervalValue : 0,
+          last_runtime: currentHours,
+          last_service_date: "",
+          estimated_duration_minutes: Number(plan.estimated_duration_minutes || 60),
+          required_skills: plan.required_skills || "",
+          checklist_template: plan.checklist_template || "",
+          planned_spare_parts: plan.planned_spare_parts || "",
+          status: plan.status === "paused" ? "paused" : "active"
+        }));
+      }
+      for (const task of tasksToCreate) {
+        await api.create("preventive-maintenance", {
+          equipment_id: Number(targetEquipmentId),
+          task_name: task.task_name,
+          interval_hours: Number(task.interval_hours || 0),
+          interval_days: Number(task.interval_days || 0),
+          last_service_hours: 0,
+          last_service_date: "",
+          next_due_date: "",
+          status: task.status === "paused" ? "paused" : "active"
+        });
+      }
+      await loadAll({
+        silent: true
+      });
+      return {
+        created: createTotal,
+        skipped: sourceTotal - createTotal
+      };
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }
   async function saveUserPermissions(user, permissions) {
     if (!isAdmin || !user?.id) return;
     try {
@@ -506,6 +577,7 @@ export default function CMMSApp({ initialPage = "" }) {
     addJobTitle,
     deleteJobTitle,
     updatePreventiveMaintenanceHistory,
+    importMaintenanceFollowUp,
     runPMScheduler,
     deleteAuditLogs,
     saveUserPermissions,

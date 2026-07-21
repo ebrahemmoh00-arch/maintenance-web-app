@@ -33,13 +33,21 @@ export const pmPlansResource = {
     label: "Plan Name"
   }, {
     key: "recurrence_type",
-    label: "Recurrence Type",
+    label: "Interval Based On",
     type: "select",
-    options: ["Daily", "Weekly", "Monthly", "Runtime Hours"]
+    options: [{
+      value: "Runtime Hours",
+      label: "Operating Hours"
+    }, {
+      value: "Daily",
+      label: "Calendar Days"
+    }],
+    hint: "Choose Operating Hours for runtime-based PM, or Calendar Days for date-based PM."
   }, {
     key: "interval_value",
-    label: "Interval",
-    type: "number"
+    label: "Interval Value",
+    type: "number",
+    hint: "If the plan is based on Operating Hours, this value is hours. If it is based on Calendar Days, this value is days."
   }, {
     key: "start_date",
     label: "Start Date",
@@ -47,11 +55,15 @@ export const pmPlansResource = {
   }, {
     key: "next_due_date",
     label: "Next Due Date",
-    type: "date"
+    type: "date",
+    visibleWhen: value => value.recurrence_type !== "Runtime Hours",
+    readOnly: true,
+    hint: "Calculated automatically from Start Date and Interval Value."
   }, {
     key: "next_due_runtime",
     label: "Next Due Runtime",
-    type: "number"
+    type: "number",
+    visibleWhen: value => value.recurrence_type === "Runtime Hours"
   }, {
     key: "priority",
     label: "Priority",
@@ -90,10 +102,12 @@ export const pmPlansResource = {
     label: "Asset"
   }, {
     key: "recurrence_type",
-    label: "Recurrence"
+    label: "Interval Type",
+    render: row => row.recurrence_type === "Runtime Hours" ? "Operating Hours" : row.recurrence_type === "Daily" ? "Calendar Days" : row.recurrence_type
   }, {
     key: "interval_value",
-    label: "Interval"
+    label: "Interval",
+    render: row => <span className="font-black text-slate-800">{row.interval_value} {row.recurrence_type === "Runtime Hours" ? "Hours" : row.recurrence_type === "Daily" ? "Days" : row.recurrence_type}</span>
   }, {
     key: "next_due_date",
     label: "Next Due Date"

@@ -1,4 +1,5 @@
 import { tr } from "../../../shared/config/appConfig.jsx";
+import { buildUnifiedPmRows } from "../../../shared/utils/pmPlanSchedule.js";
 import { formatShortDate, getWorkOrderSavedDate, parseWorkOrderNotes } from "../../work-orders/utils/workOrderForms.js";
 import { addChartValue, assetHealthCategory, buildAssetReliabilityRows, buildBreakdownTrend, buildSiteSummary, buildTopDowntimeAssets, buildWorkOrderStatusPie, equipmentIndustrialStatus, formatReliabilityHours, isPmOverdue, isReliabilityFaultOrder } from "./reliabilityMetrics.js";
 import { clampPercent, createMonthBuckets, monthLabel, toMonthKey } from "./dashboardDateUtils.js";
@@ -48,6 +49,8 @@ export function buildMaintenanceDashboardMetrics(data, alerts, reliability, lang
   const equipment = data.equipment || [];
   const workOrders = data["work-orders"] || [];
   const pmTasks = data["preventive-maintenance"] || [];
+  const pmPlans = data["pm-plans"] || [];
+  const unifiedPmTasks = buildUnifiedPmRows(pmTasks, pmPlans, equipment);
   const inventory = data.inventory || [];
   const customers = data.customers || [];
   const equipmentById = new Map(equipment.map(asset => [Number(asset.id), asset]));
@@ -61,9 +64,9 @@ export function buildMaintenanceDashboardMetrics(data, alerts, reliability, lang
   const mtbfHours = Number(reliability?.mtbfHours || 0);
   const breakdownEquipment = equipment.filter(asset => equipmentIndustrialStatus(asset) === "Breakdown").length;
   const breakdownCount = Number(reliability?.failureCount ?? faultOrders.length + breakdownEquipment + alerts.filter(alert => alert.alert_level === "DUE NOW").length);
-  const overduePmTasks = buildOverduePmRows(pmTasks, equipmentById);
+  const overduePmTasks = buildOverduePmRows(unifiedPmTasks, equipmentById);
   const cost = buildMaintenanceCostMetrics(workOrders, equipmentById, language);
-  const assetReliabilityRows = buildAssetReliabilityRows(workOrders, equipment, pmTasks);
+  const assetReliabilityRows = buildAssetReliabilityRows(workOrders, equipment, unifiedPmTasks);
   const assetHealthRanking = assetReliabilityRows.map(row => ({
     ...row,
     category: assetHealthCategory(row.health)
@@ -79,6 +82,7 @@ export function buildMaintenanceDashboardMetrics(data, alerts, reliability, lang
     mtbfHours,
     mtbfLabel: reliability?.mtbfLabel || "N/A",
     breakdownCount,
+    pmTasks: unifiedPmTasks,
     overduePmTasks,
     cost,
     assetHealthAverage,

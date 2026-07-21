@@ -28,19 +28,32 @@ export function normalizePreventiveMaintenanceForm(value) {
 
 export function normalizePMPlanForm(value) {
   const recurrenceType = value.recurrence_type || "Runtime Hours";
+  const intervalValue = Math.max(Number(value.interval_value || 1), 1);
+  const startDate = value.start_date || todayIso();
+  const calculatedNextDueDate = calculatePMNextDueDate(startDate, intervalValue, recurrenceType);
   return {
     ...value,
     equipment_id: Number(value.equipment_id || 0),
-    interval_value: Math.max(Number(value.interval_value || 1), 1),
+    interval_value: intervalValue,
     recurrence_type: recurrenceType,
-    start_date: value.start_date || todayIso(),
-    next_due_date: recurrenceType === "Runtime Hours" ? "" : value.next_due_date || value.start_date || todayIso(),
-    next_due_runtime: recurrenceType === "Runtime Hours" ? Number(value.next_due_runtime || 0) : Number(value.next_due_runtime || 0),
+    start_date: startDate,
+    next_due_date: recurrenceType === "Runtime Hours" ? "" : calculatedNextDueDate,
+    next_due_runtime: recurrenceType === "Runtime Hours" ? Number(value.next_due_runtime || 0) : 0,
     last_runtime: Number(value.last_runtime || 0),
     estimated_duration_minutes: Number(value.estimated_duration_minutes || 0),
     status: value.status || "active",
     priority: value.priority || "medium"
   };
+}
+
+function calculatePMNextDueDate(startDate, intervalValue, recurrenceType) {
+  const [year, month, day] = String(startDate || todayIso()).split("-").map(Number);
+  if (!year || !month || !day) return todayIso();
+  const base = new Date(Date.UTC(year, month - 1, day));
+  if (recurrenceType === "Weekly") base.setUTCDate(base.getUTCDate() + intervalValue * 7);
+  else if (recurrenceType === "Monthly") base.setUTCMonth(base.getUTCMonth() + intervalValue);
+  else base.setUTCDate(base.getUTCDate() + intervalValue);
+  return base.toISOString().slice(0, 10);
 }
 
 export function normalizeEngineerForm(value) {

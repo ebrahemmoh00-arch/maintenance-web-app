@@ -13,7 +13,7 @@ const PRIORITY_ORDER = {
 export function buildExecutiveDashboardInsights(data, alerts, metrics, reliability, stats, language = "en") {
   const equipment = data.equipment || [];
   const workOrders = data["work-orders"] || [];
-  const pmTasks = data["preventive-maintenance"] || [];
+  const pmTasks = metrics.pmTasks || data["preventive-maintenance"] || [];
   const activeWorkOrders = workOrders.filter(isActiveWorkOrder);
   const criticalAlerts = (alerts || []).filter(isCriticalAlert);
   const completionRate = calculateCompletionRate(workOrders);
@@ -121,7 +121,8 @@ export function buildCriticalAttentionItems(workOrders, metrics, alerts) {
       type: "Overdue PM",
       title: task.task_name || task.equipment_name || "Preventive maintenance task",
       asset: task.equipment_name || "-",
-      detail: task.required_maintenance || task.maintenance_type || task.dueLabel || "Maintenance required",
+      detail: task.dueLabel || task.pm_alert || "Preventive maintenance is overdue",
+      requiredAction: task.required_maintenance || task.maintenance_type || task.task_name || "Complete preventive maintenance task",
       priority: "critical"
     });
   }
@@ -133,6 +134,7 @@ export function buildCriticalAttentionItems(workOrders, metrics, alerts) {
       title: asset.name || `Asset ${asset.id}`,
       asset: asset.site || "-",
       detail: `${asset.statusLabel || "Critical"} / Health ${asset.health || 0}%`,
+      requiredAction: "Inspect asset condition and create corrective work order",
       priority: Number(asset.health || 0) < 60 ? "critical" : "high"
     });
   }
@@ -144,6 +146,7 @@ export function buildCriticalAttentionItems(workOrders, metrics, alerts) {
       title: order.title || order.equipment_name || `WO ${order.id}`,
       asset: order.equipment_name || order.customer_name || "-",
       detail: workOrderStatusBucket(order),
+      requiredAction: "Restore equipment and close the breakdown work order",
       priority: normalize(order.priority) || "high"
     });
   }
@@ -155,6 +158,7 @@ export function buildCriticalAttentionItems(workOrders, metrics, alerts) {
       title: order.title || `WO ${order.id}`,
       asset: order.equipment_name || "-",
       detail: order.customer_name || "Supervisor review required",
+      requiredAction: "Supervisor approval is required",
       priority: "medium"
     });
   }
@@ -166,6 +170,7 @@ export function buildCriticalAttentionItems(workOrders, metrics, alerts) {
       title: order.title || `WO ${order.id}`,
       asset: order.equipment_name || "-",
       detail: order.customer_name || "Inventory action required",
+      requiredAction: "Reserve or issue the required spare parts",
       priority: "high"
     });
   }
@@ -174,10 +179,11 @@ export function buildCriticalAttentionItems(workOrders, metrics, alerts) {
     if (!isCriticalAlert(alert)) continue;
     items.push({
       id: alert.alert_key || `alert-${alert.equipment_name}`,
-      type: "Critical Alarm",
-      title: alert.equipment_name || "Maintenance alert",
-      asset: alert.location || "-",
-      detail: alert.message || alert.alert_type || "Immediate attention required",
+      type: alertTypeLabel(alert),
+      title: alertTitle(alert),
+      asset: alert.location || alert.serial_number || "-",
+      detail: buildAlertReason(alert),
+      requiredAction: buildAlertRequiredAction(alert),
       priority: "critical"
     });
   }
@@ -253,8 +259,10 @@ export function buildNotificationItems(workOrders, alerts) {
       id: alert.alert_key || `alert-${alert.equipment_name}-${alert.alert_level}`,
       priority: critical ? "critical" : "warning",
       timestamp: alert.next_maintenance_date || alert.created_at || "",
-      asset: alert.equipment_name || alert.location || "-",
-      description: alert.message || alert.alert_type || "Maintenance notification"
+      type: alertTypeLabel(alert),
+      asset: alertTitle(alert),
+      description: buildAlertReason(alert),
+      requiredAction: buildAlertRequiredAction(alert)
     });
   }
 
@@ -264,8 +272,10 @@ export function buildNotificationItems(workOrders, alerts) {
       id: `wo-${bucket}-${order.id}`,
       priority: bucket === "Waiting for Parts" ? "warning" : "info",
       timestamp: getWorkOrderSavedDate(order) || order.created_at || order.due_date || "",
+      type: "Work Order",
       asset: order.equipment_name || order.customer_name || "-",
-      description: `${order.title || `WO ${order.id}`} is ${bucket.toLowerCase()}`
+      description: `${order.title || `WO ${order.id}`} is ${bucket.toLowerCase()}`,
+      requiredAction: bucket === "Waiting for Parts" ? "Issue or reserve spare parts" : "Review and approve the work order"
     });
   }
 
@@ -274,8 +284,10 @@ export function buildNotificationItems(workOrders, alerts) {
       id: `success-${order.id}`,
       priority: "success",
       timestamp: getWorkOrderSavedDate(order) || order.created_at || "",
+      type: "Work Order Completed",
       asset: order.equipment_name || "-",
-      description: `${order.title || `WO ${order.id}`} completed successfully`
+      description: `${order.title || `WO ${order.id}`} completed successfully`,
+      requiredAction: "No action required"
     });
   }
 
@@ -299,6 +311,59 @@ function dedupeById(rows) {
     seen.add(row.id);
     return true;
   });
+}
+
+function alertTypeLabel(alert) {
+  const type = normalize(alert.alert_type);
+  if (type === "pm") return "Overdue PM";
+  if (type === "inventory") return "Inventory Alert";
+  if (type === "asset") return "Critical Alarm";
+  return "Maintenance Alert";
+}
+
+function alertTitle(alert) {
+  if (normalize(alert.alert_type) === "pm" && alert.equipment_name) return alert.equipment_name;
+  return alert.equipment_name || alert.location || alert.serial_number || "Maintenance alert";
+}
+
+function buildAlertReason(alert) {
+  const reason = firstMeaningful(alert.reason, alert.message, alert.description);
+  if (reason) return reason;
+
+  const hours = Number(alert.hours_until_maintenance);
+  const days = Number(alert.days_until_maintenance);
+  if (Number.isFinite(hours)) {
+    return hours <= 0 ? "Required maintenance hours have been reached" : `${hours} running hours remaining before maintenance`;
+  }
+  if (Number.isFinite(days)) {
+    return days <= 0 ? "Required maintenance date has been reached" : `${days} days remaining before maintenance`;
+  }
+  if (normalize(alert.alert_type) === "inventory") return "Spare part stock is below the minimum limit";
+  if (normalize(alert.alert_type) === "asset") return "Asset is outside the safe maintenance condition";
+  return "Maintenance attention is required";
+}
+
+function buildAlertRequiredAction(alert) {
+  const type = normalize(alert.alert_type);
+  if (type === "pm") return `Perform ${maintenanceTaskName(alert)} maintenance`;
+  if (type === "inventory") return "Review stock level and raise purchase or transfer request";
+  if (type === "asset") return "Inspect the asset and create corrective maintenance if required";
+  return "Review the alert and assign the required action";
+}
+
+function maintenanceTaskName(alert) {
+  const name = String(alert.equipment_name || "").split(" - ")[0]?.trim();
+  return name || "the required preventive";
+}
+
+function firstMeaningful(...values) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (!text) continue;
+    if (["asset", "pm", "inventory"].includes(normalize(text))) continue;
+    return text;
+  }
+  return "";
 }
 
 function dateMs(value) {

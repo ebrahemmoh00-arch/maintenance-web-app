@@ -1,6 +1,15 @@
 import { useState } from "react";
 
 export function formatInterval(task) {
+  if (task.source === "pm-plan") {
+    const recurrence = String(task.recurrence_type || "Runtime Hours");
+    const value = formatScheduleCell(task.interval_value);
+    if (recurrence === "Runtime Hours") return `${value} HR`;
+    if (recurrence === "Daily") return `${value} Days`;
+    if (recurrence === "Weekly") return `${value} Weeks`;
+    if (recurrence === "Monthly") return `${value} Months`;
+    return `${value} ${recurrence}`;
+  }
   const parts = [];
   if (Number(task.interval_hours || 0)) parts.push(`${formatScheduleCell(task.interval_hours)} HR`);
   if (Number(task.interval_days || 0)) parts.push(`${formatScheduleCell(task.interval_days)} Days`);

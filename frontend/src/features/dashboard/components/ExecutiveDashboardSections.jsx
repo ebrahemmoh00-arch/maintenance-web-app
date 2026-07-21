@@ -296,22 +296,6 @@ function SparkTrend({
   );
 }
 
-export function CriticalAttentionPanel({
-  insights,
-  onNavigate,
-  language
-}) {
-  return (
-    <Panel title={tr(language, "Critical Attention")} subtitle={tr(language, "Items requiring the fastest maintenance response. Critical items appear first.")} actions={<button type="button" onClick={() => onNavigate?.("work-orders")} className="text-sm font-black text-blue-700 hover:text-blue-900">{tr(language, "View All")}</button>}>
-      {insights.criticalItems.length ? (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {insights.criticalItems.map(item => <CriticalItemRow key={item.id} item={item} language={language} />)}
-        </div>
-      ) : <DashboardEmptyState title="No critical maintenance attention required." actionLabel="Review Work Orders" onAction={() => onNavigate?.("work-orders")} language={language} />}
-    </Panel>
-  );
-}
-
 function CriticalItemRow({
   item,
   language
@@ -319,17 +303,49 @@ function CriticalItemRow({
   const tone = item.priority === "critical" ? "red" : item.priority === "high" ? "orange" : "blue";
   const style = toneStyles[tone] || toneStyles.blue;
   return (
-    <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={`text-xs font-black uppercase tracking-[0.14em] ${style.text}`}>{tr(language, item.type)}</p>
           <h3 className="mt-2 truncate text-base font-black text-slate-950" title={item.title}>{item.title}</h3>
-          <p className="mt-1 truncate text-sm font-semibold text-slate-500" title={item.detail}>{item.detail}</p>
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black ${style.chip}`}>{tr(language, item.priority)}</span>
       </div>
-      <p className="mt-3 text-xs font-bold text-slate-500">{item.asset}</p>
+      <div className="mt-3 grid gap-2 text-sm">
+        <p className="font-semibold text-slate-600">
+          <span className="font-black text-slate-900">{tr(language, "Reason")}:</span> {tr(language, item.detail)}
+        </p>
+        {item.requiredAction ? <p className="font-semibold text-slate-600">
+            <span className="font-black text-slate-900">{tr(language, "Required Action")}:</span> {tr(language, item.requiredAction)}
+          </p> : null}
+        <p className="text-xs font-bold text-slate-500">{tr(language, "Asset")}: {item.asset}</p>
+      </div>
     </article>
+  );
+}
+
+function ImmediateAttentionSection({
+  items,
+  onViewAll,
+  language
+}) {
+  return (
+    <div className="mt-5 rounded-2xl border border-red-100 bg-red-50/40 p-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-red-700">{tr(language, "Immediate Attention")}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-600">{tr(language, "Critical maintenance items with clear reason and required action.")}</p>
+        </div>
+        <button type="button" onClick={onViewAll} className="text-sm font-black text-blue-700 hover:text-blue-900">
+          {tr(language, "View All")}
+        </button>
+      </div>
+      {items.length ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {items.slice(0, 4).map(item => <CriticalItemRow key={item.id} item={item} language={language} />)}
+        </div>
+      ) : <DashboardEmptyState title="No critical maintenance attention required." actionLabel="Review Work Orders" onAction={onViewAll} compact language={language} />}
+    </div>
   );
 }
 
@@ -380,6 +396,7 @@ function TopListRow({
 export function NotificationCenter({
   insights,
   openCreate,
+  onNavigate,
   language,
   dashboardAlertsOpen,
   setDashboardAlertsOpen
@@ -387,6 +404,7 @@ export function NotificationCenter({
   const cardRef = useRef(null);
   const [visible, setVisible] = useState(false);
   const notifications = insights.notifications || [];
+  const immediateItems = insights.criticalItems || [];
   const criticalCount = notifications.filter(item => item.priority === "critical").length;
   const warningCount = notifications.filter(item => item.priority === "warning").length;
   const infoCount = notifications.length - criticalCount - warningCount;
@@ -430,6 +448,8 @@ export function NotificationCenter({
         <NotificationSummaryCard label="Warning" value={warningCount} icon={Bell} tone={warningCount ? "orange" : "green"} language={language} />
         <NotificationSummaryCard label="Information" value={infoCount} icon={Activity} tone={infoCount ? "slate" : "green"} language={language} />
       </div>
+
+      <ImmediateAttentionSection items={immediateItems} onViewAll={() => onNavigate?.("work-orders")} language={language} />
 
       {visible ? (
         <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -505,10 +525,16 @@ function NotificationRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-2.5 py-1 text-xs font-black ${style.chip}`}>{tr(language, item.priority)}</span>
+          {item.type ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600">{tr(language, item.type)}</span> : null}
           <span className="text-xs font-bold text-slate-500">{formatShortDate(item.timestamp) || "--"}</span>
         </div>
         <p className="mt-2 truncate text-sm font-black text-slate-950" title={item.asset}>{item.asset}</p>
-        <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-500">{item.description}</p>
+        <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-500">
+          <span className="font-black text-slate-800">{tr(language, "Reason")}:</span> {tr(language, item.description)}
+        </p>
+        {item.requiredAction ? <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-500">
+            <span className="font-black text-slate-800">{tr(language, "Required Action")}:</span> {tr(language, item.requiredAction)}
+          </p> : null}
       </div>
     </article>
   );

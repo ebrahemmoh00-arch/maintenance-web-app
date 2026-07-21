@@ -2,19 +2,22 @@ import { EmptyState } from "../../../shared/components/EmptyState.jsx";
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { MaintenanceBadge, WorkOrderStatus } from "../../../shared/components/StatusBadges.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
+import { buildUnifiedPmRows, daysUntilDate } from "../../../shared/utils/pmPlanSchedule.js";
 import { PreviousRecordsTable, buildScheduleCategories, equipmentCategory, formatInterval, formatScheduleCell, previousRecordsForTask, scheduleCategoryLabel, sortEquipmentByName } from "./MaintenanceFollowUp.jsx";
-import { Plus } from "lucide-react";
+import { Download, Plus } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 
 export function Schedule({
   customers = [],
   workOrders,
   pmTasks,
+  pmPlans = [],
   equipment = [],
   onCreatePm,
   onEditPm,
   onDeletePm,
   onUpdatePmHistory,
+  onImportMaintenanceFollowUp,
   canManage = true,
   canAdd = canManage,
   canEdit = canManage,
@@ -115,7 +118,7 @@ export function Schedule({
         </div>
       </Panel>
 
-      {selectedCustomerId && selectedCategory && selectedEquipment ? <MaintenanceFollowUpBoard title={`${selectedEquipment.name} - Maintenance Follow-up`} subtitle={`${selectedCustomer?.name || "Customer"} / ${scheduleCategoryLabel(selectedCategory)}. This page shows the selected equipment maintenance table only.`} equipment={[selectedEquipment]} pmTasks={pmTasks} workOrders={workOrders} onCreatePm={onCreatePm} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} canManage={canManage} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete} language={language} /> : selectedCustomerId && selectedCategory ? <Panel title="Select Equipment" subtitle="Choose an equipment name above to open its preventive maintenance follow-up page.">
+      {selectedCustomerId && selectedCategory && selectedEquipment ? <MaintenanceFollowUpBoard title={`${selectedEquipment.name} - Maintenance Follow-up`} subtitle={`${selectedCustomer?.name || "Customer"} / ${scheduleCategoryLabel(selectedCategory)}. This page shows the selected equipment maintenance table only.`} equipment={[selectedEquipment]} allEquipment={equipment} pmTasks={pmTasks} pmPlans={pmPlans} workOrders={workOrders} onCreatePm={onCreatePm} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} onImportMaintenanceFollowUp={onImportMaintenanceFollowUp} canManage={canManage} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete} language={language} /> : selectedCustomerId && selectedCategory ? <Panel title="Select Equipment" subtitle="Choose an equipment name above to open its preventive maintenance follow-up page.">
           <EmptyState title="No equipment selected" message="Click one equipment name to show its maintenance table." />
         </Panel> : null}
 
@@ -143,12 +146,15 @@ export function MaintenanceFollowUpBoard({
   title = "Equipment Preventive Maintenance Follow-up",
   subtitle = "Dynamic tables are generated from each asset maintenance type, interval, running hours, and previous service data.",
   equipment,
+  allEquipment = equipment,
   pmTasks,
+  pmPlans = [],
   workOrders,
   onCreatePm,
   onEditPm,
   onDeletePm,
   onUpdatePmHistory,
+  onImportMaintenanceFollowUp,
   canManage,
   canAdd = canManage,
   canEdit = canManage,
@@ -156,12 +162,64 @@ export function MaintenanceFollowUpBoard({
   language
 }) {
   const t = text => tr(language, text);
-  return <Panel title={title} subtitle={subtitle} actions={canAdd ? <button onClick={onCreatePm} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"><Plus className="h-4 w-4" />{t("New Record")}</button> : null}>
+  const targetAsset = equipment[0] || null;
+  const followUpRows = buildUnifiedPmRows(pmTasks, pmPlans, allEquipment);
+  return <Panel title={title} subtitle={subtitle} actions={<div className="flex flex-wrap items-center gap-2">
+        {canAdd && targetAsset ? <MaintenanceImportControl targetAsset={targetAsset} equipment={allEquipment} pmTasks={pmTasks} pmPlans={pmPlans} onImport={onImportMaintenanceFollowUp} language={language} /> : null}
+        {canAdd ? <button onClick={onCreatePm} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"><Plus className="h-4 w-4" />{t("New Record")}</button> : null}
+      </div>}>
       <div className="space-y-5">
-        {sortEquipmentByName(equipment).map(asset => <EquipmentMaintenanceCard key={asset.id} asset={asset} pmTasks={pmTasks.filter(task => Number(task.equipment_id) === Number(asset.id))} workOrders={workOrders.filter(order => Number(order.equipment_id) === Number(asset.id))} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} canManage={canManage} canEdit={canEdit} canDelete={canDelete} />)}
+        {sortEquipmentByName(equipment).map(asset => {
+          const rows = followUpRows.filter(task => Number(task.equipment_id) === Number(asset.id));
+          return <EquipmentMaintenanceCard key={asset.id} asset={asset} pmTasks={rows} workOrders={workOrders.filter(order => Number(order.equipment_id) === Number(asset.id))} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} canManage={canManage} canEdit={canEdit} canDelete={canDelete} />;
+        })}
         {!equipment.length ? <EmptyState title={t("No equipment")} message="Add assets first, then create preventive maintenance tasks." /> : null}
       </div>
     </Panel>;
+}
+
+function MaintenanceImportControl({
+  targetAsset,
+  equipment,
+  pmTasks,
+  pmPlans = [],
+  onImport,
+  language
+}) {
+  const t = text => tr(language, text);
+  const [sourceEquipmentId, setSourceEquipmentId] = useState("");
+  const [importing, setImporting] = useState(false);
+  const sourceOptions = sortEquipmentByName(equipment.filter(asset => Number(asset.id) !== Number(targetAsset.id) && (
+    pmTasks.some(task => Number(task.equipment_id) === Number(asset.id))
+    || pmPlans.some(plan => Number(plan.equipment_id) === Number(asset.id))
+  )));
+
+  async function importTasks() {
+    if (!sourceEquipmentId || !onImport) return;
+    setImporting(true);
+    try {
+      const result = await onImport(sourceEquipmentId, targetAsset.id);
+      const created = Number(result?.created || 0);
+      const skipped = Number(result?.skipped || 0);
+      window.alert(result?.message || `Imported ${created} maintenance tasks. Skipped ${skipped} duplicate tasks.`);
+      if (created) setSourceEquipmentId("");
+    } catch (error) {
+      window.alert(error.message || "Failed to import maintenance follow-up.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+      <select value={sourceEquipmentId} onChange={event => setSourceEquipmentId(event.target.value)} className="min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100">
+        <option value="">{t("Import from equipment")}</option>
+        {sourceOptions.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+      </select>
+      <button type="button" onClick={importTasks} disabled={!sourceEquipmentId || importing} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+        <Download className="h-4 w-4" />
+        {importing ? t("Importing") : t("Import")}
+      </button>
+    </div>;
 }
 
 export function EquipmentMaintenanceCard({
@@ -189,7 +247,7 @@ export function EquipmentMaintenanceCard({
       </div>
 
       <div className="overflow-auto">
-        <table className="min-w-[1180px] w-full border-collapse text-center text-sm text-slate-950">
+        <table className="min-w-[1420px] w-full border-collapse text-center text-sm text-slate-950">
           <thead>
             <tr className="bg-white text-sm font-bold">
               <th className="border border-slate-950 px-3 py-2">Preventive Maintenance Type</th>
@@ -198,6 +256,8 @@ export function EquipmentMaintenanceCard({
               <th className="border border-slate-950 px-3 py-2">Operating Hours at Maintenance</th>
               <th className="border border-slate-950 px-3 py-2">Next Maintenance Hour</th>
               <th className="border border-slate-950 px-3 py-2">Remaining Hours</th>
+              <th className="border border-slate-950 px-3 py-2">Next Due Date</th>
+              <th className="border border-slate-950 px-3 py-2">Remaining Days</th>
               <th className="border border-slate-950 px-3 py-2">Status</th>
               {canEdit || canDelete ? <th className="border border-slate-950 px-3 py-2">Actions</th> : null}
             </tr>
@@ -205,13 +265,23 @@ export function EquipmentMaintenanceCard({
           <tbody>
             {pmTasks.map(task => {
             const runningHour = Number(task.current_hours ?? asset.current_hours ?? 0);
-            const nextHour = Number(task.last_service_hours || 0) + Number(task.interval_hours || 0);
+            const hasHourSchedule = Number(task.interval_hours || 0) > 0 || Number(task.next_due_runtime || 0) > 0;
+            const nextHour = hasHourSchedule ? task.source === "pm-plan" && Number(task.next_due_runtime || 0) ? Number(task.next_due_runtime || 0) : Number(task.last_service_hours || 0) + Number(task.interval_hours || 0) : "";
             const remainingHours = task.hours_until_due ?? (Number(task.interval_hours || 0) ? nextHour - runningHour : "");
+            const remainingDays = task.days_until_due ?? daysUntilDate(task.next_due_date);
+            const remainingHoursTone = remainingHours === "" || remainingHours === null || remainingHours === undefined ? "text-slate-500" : Number(remainingHours) <= 0 ? "text-red-600" : Number(remainingHours) <= 100 ? "text-orange-600" : "text-emerald-700";
+            const remainingDaysTone = remainingDays === "" || remainingDays === null || remainingDays === undefined ? "text-slate-500" : Number(remainingDays) <= 0 ? "text-red-600" : Number(remainingDays) <= 7 ? "text-orange-600" : "text-emerald-700";
             const previousRecords = previousRecordsForTask(task);
-            const recordsOpen = Number(activeRecordsTaskId) === Number(task.id);
+            const recordsOpen = String(activeRecordsTaskId) === String(task.id);
+            const isPmPlan = task.source === "pm-plan";
             return <Fragment key={task.id}>
                   <tr className="bg-white">
-                    <td className="border border-slate-950 px-3 py-2 font-semibold">{task.task_name}</td>
+                    <td className="border border-slate-950 px-3 py-2 font-semibold">
+                      <div className="flex flex-col items-center gap-1">
+                        <span>{task.task_name}</span>
+                        {isPmPlan ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700">PM Plan</span> : null}
+                      </div>
+                    </td>
                     <td className="border border-slate-950 px-3 py-2">{formatInterval(task)}</td>
                     <td className="border border-slate-950 px-3 py-2">{formatScheduleCell(runningHour)}</td>
                     <td className="border border-slate-950 px-3 py-2">
@@ -221,22 +291,26 @@ export function EquipmentMaintenanceCard({
                       </button>
                     </td>
                     <td className="border border-slate-950 px-3 py-2">{formatScheduleCell(nextHour)}</td>
-                    <td className={`border border-slate-950 px-3 py-2 font-black ${Number(remainingHours) <= 0 ? "text-red-600" : Number(remainingHours) <= 100 ? "text-orange-600" : "text-emerald-700"}`}>{formatScheduleCell(remainingHours)}</td>
+                    <td className={`border border-slate-950 px-3 py-2 font-black ${remainingHoursTone}`}>{formatScheduleCell(remainingHours)}</td>
+                    <td className="border border-slate-950 px-3 py-2">{task.next_due_date || "-"}</td>
+                    <td className={`border border-slate-950 px-3 py-2 font-black ${remainingDaysTone}`}>{formatScheduleCell(remainingDays)}</td>
                     <td className="border border-slate-950 px-3 py-2">{task.pm_alert || task.status}</td>
                     {canEdit || canDelete ? <td className="border border-slate-950 px-3 py-2">
-                        {canEdit ? <button type="button" onClick={() => onEditPm(task)} className="mr-2 rounded border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">Edit</button> : null}
-                        {canDelete ? <button type="button" onClick={() => onDeletePm(task.id)} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">Delete</button> : null}
+                        {isPmPlan ? <span className="text-xs font-black text-slate-500">Managed in PM Plans</span> : <>
+                            {canEdit ? <button type="button" onClick={() => onEditPm(task)} className="mr-2 rounded border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">Edit</button> : null}
+                            {canDelete ? <button type="button" onClick={() => onDeletePm(task.id)} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">Delete</button> : null}
+                          </>}
                       </td> : null}
                   </tr>
                   {recordsOpen ? <tr>
-                      <td colSpan={canEdit || canDelete ? 8 : 7} className="border border-slate-950 bg-slate-50 p-3">
-                        <PreviousRecordsTable records={previousRecords} canManage={canEdit} onUpdateRecord={onUpdatePmHistory} />
+                      <td colSpan={canEdit || canDelete ? 10 : 9} className="border border-slate-950 bg-slate-50 p-3">
+                        <PreviousRecordsTable records={previousRecords} canManage={canEdit && !isPmPlan} onUpdateRecord={onUpdatePmHistory} />
                       </td>
                     </tr> : null}
                 </Fragment>;
           })}
             {!pmTasks.length ? <tr>
-                <td colSpan={canEdit || canDelete ? 8 : 7} className="border border-slate-950 px-3 py-8 text-center text-slate-500">No preventive maintenance tasks for this equipment.</td>
+                <td colSpan={canEdit || canDelete ? 10 : 9} className="border border-slate-950 px-3 py-8 text-center text-slate-500">No preventive maintenance tasks for this equipment.</td>
               </tr> : null}
           </tbody>
         </table>

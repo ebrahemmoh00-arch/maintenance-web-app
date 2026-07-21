@@ -9,6 +9,7 @@ export default function SchedulePage() {
     openEdit,
     deleteRecord,
     updatePreventiveMaintenanceHistory,
+    importMaintenanceFollowUp,
     currentUser,
     language
   } = useCMMS();
@@ -18,11 +19,13 @@ export default function SchedulePage() {
       customers={data.customers}
       workOrders={data["work-orders"]}
       pmTasks={data["preventive-maintenance"]}
+      pmPlans={data["pm-plans"]}
       equipment={data.equipment}
       onCreatePm={() => openCreate("preventive-maintenance")}
       onEditPm={(row) => openEdit("preventive-maintenance", row)}
       onDeletePm={(id) => deleteRecord("preventive-maintenance", id)}
       onUpdatePmHistory={updatePreventiveMaintenanceHistory}
+      onImportMaintenanceFollowUp={importMaintenanceFollowUp}
       canManage={
         hasPermission(currentUser, "preventive-maintenance", "add")
         || hasPermission(currentUser, "preventive-maintenance", "edit")

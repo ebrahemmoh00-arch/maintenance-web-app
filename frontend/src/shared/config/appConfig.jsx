@@ -1,6 +1,7 @@
 import { EMPLOYEE_ROLE_OPTIONS } from "../../features/authentication/services/authSession.js";
 import { MaintenanceBadge, PriorityBadge, StatusBadge, StockBadge, WorkOrderStatus, valueLabel } from "../components/StatusBadges.jsx";
 import { translate } from "../i18n/index.js";
+import { buildUnifiedPmRows, maintenanceIdentityKey, pmPlanToFollowUpTask } from "../utils/pmPlanSchedule.js";
 import { resources } from "./resourceRegistry.jsx";
 
 export const PERMISSION_ACTIONS = [{
@@ -410,34 +411,18 @@ export function getAlertKey(alert) {
   return alert.alert_key || `${alert.alert_type || "asset"}-${alert.equipment_id ?? alert.pm_id ?? alert.inventory_id ?? alert.equipment_name}`;
 }
 
-export function buildSmartAlerts(equipmentAlerts, inventoryItems, pmTasks) {
+export function buildSmartAlerts(equipmentAlerts, inventoryItems, pmTasks, pmPlans = []) {
   const assetAlerts = equipmentAlerts.map(alert => ({
     ...alert,
     alert_key: `asset-${alert.equipment_id}`,
     alert_type: "asset"
   }));
-  const pmAlerts = pmTasks.filter(task => task.status === "active" && task.pm_alert && task.pm_alert !== "OK").map(task => {
-    const reasons = [];
-    if (task.hours_until_due !== null && task.hours_until_due !== undefined) {
-      reasons.push(task.hours_until_due <= 0 ? "PM service hours reached" : `${task.hours_until_due} PM hours remaining`);
-    }
-    if (task.days_until_due !== null && task.days_until_due !== undefined) {
-      reasons.push(task.days_until_due <= 0 ? "PM due date reached" : `${task.days_until_due} PM days remaining`);
-    }
-    return {
-      alert_key: `pm-${task.id}`,
-      alert_type: "pm",
-      equipment_id: task.equipment_id,
-      equipment_name: `${task.task_name} - ${task.equipment_name || "Asset"}`,
-      serial_number: "Preventive Maintenance",
-      location: "",
-      alert_level: task.pm_alert,
-      reason: reasons.join("; ") || "Preventive maintenance threshold is approaching",
-      next_maintenance_date: task.next_due_date || null,
-      days_until_maintenance: task.days_until_due,
-      hours_until_maintenance: task.hours_until_due
-    };
-  });
+  const planKeys = new Set(pmPlans.map(plan => maintenanceIdentityKey(plan.equipment_id, plan.name)));
+  const pmPlanAlerts = pmPlans.map(plan => pmPlanToFollowUpTask(plan)).filter(task => String(task.status || "").toLowerCase() === "active" && task.pm_alert && task.pm_alert !== "OK").map(task => buildPmAlert(task, `pm-plan-${task.pm_plan_id}`, "PM Plan"));
+  const pmAlerts = buildUnifiedPmRows(pmTasks, [], []).filter(task => {
+    const key = maintenanceIdentityKey(task.equipment_id, task.task_name);
+    return !planKeys.has(key) && String(task.status || "").toLowerCase() === "active" && task.pm_alert && task.pm_alert !== "OK";
+  }).map(task => buildPmAlert(task, `pm-${task.id}`, "Preventive Maintenance"));
   const stockAlerts = inventoryItems.filter(item => item.stock_alert && item.stock_alert !== "OK").map(item => ({
     alert_key: `stock-${item.id}`,
     alert_type: "inventory",
@@ -451,7 +436,32 @@ export function buildSmartAlerts(equipmentAlerts, inventoryItems, pmTasks) {
     days_until_maintenance: null,
     hours_until_maintenance: null
   }));
-  return [...assetAlerts, ...pmAlerts, ...stockAlerts];
+  return [...assetAlerts, ...pmPlanAlerts, ...pmAlerts, ...stockAlerts];
+}
+
+function buildPmAlert(task, alertKey, sourceLabel) {
+    const reasons = [];
+    if (task.hours_until_due !== null && task.hours_until_due !== undefined) {
+      reasons.push(task.hours_until_due <= 0 ? "PM service hours reached" : `${task.hours_until_due} PM hours remaining`);
+    }
+    if (task.days_until_due !== null && task.days_until_due !== undefined) {
+      reasons.push(task.days_until_due <= 0 ? "PM due date reached" : `${task.days_until_due} PM days remaining`);
+    }
+    return {
+      alert_key: alertKey,
+      alert_type: "pm",
+      pm_plan_id: task.pm_plan_id,
+      pm_id: task.source === "manual" ? task.id : undefined,
+      equipment_id: task.equipment_id,
+      equipment_name: `${task.task_name} - ${task.equipment_name || "Asset"}`,
+      serial_number: sourceLabel,
+      location: task.customer_name || "",
+      alert_level: task.pm_alert,
+      reason: reasons.join("; ") || "Preventive maintenance threshold is approaching",
+      next_maintenance_date: task.next_due_date || null,
+      days_until_maintenance: task.days_until_due,
+      hours_until_maintenance: task.hours_until_due
+    };
 }
 
 export function localizedConfig(resourceKey, language) {
@@ -464,10 +474,18 @@ export function localizedConfig(resourceKey, language) {
       label: tr(language, field.label),
       addPlaceholder: field.addPlaceholder ? tr(language, field.addPlaceholder) : field.addPlaceholder,
       addLabel: field.addLabel ? tr(language, field.addLabel) : field.addLabel,
-      options: Array.isArray(field.options) ? field.options.map(option => ({
-        value: option,
-        label: valueLabel(option, language)
-      })) : field.options
+      options: Array.isArray(field.options) ? field.options.map(option => {
+        if (option && typeof option === "object") {
+          return {
+            ...option,
+            label: tr(language, option.label ?? option.value)
+          };
+        }
+        return {
+          value: option,
+          label: valueLabel(option, language)
+        };
+      }) : field.options
     })),
     columns: config.columns.map(column => {
       const localized = {
