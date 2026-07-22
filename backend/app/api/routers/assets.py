@@ -3,15 +3,36 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 
 from ...core.auth import require_permission
-from ...schemas import AssetDocument, AssetDocumentCreate, AssetEvent, AssetHealth, AssetHistory, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, DowntimeEvent, FailureEvent
-from ...services import AssetHistoryService, AssetLifecycleService, DowntimeService, FailureManagementService
+from ...schemas import AssetDocument, AssetDocumentCreate, AssetEvent, AssetHealth, AssetHistory, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, DowntimeEvent, FailureEvent, MeasurementTemplate, MeasurementTemplateCreate, MeasurementTemplateUpdate
+from ...services import AssetHistoryService, AssetLifecycleService, DowntimeService, FailureManagementService, MeasurementTemplateService
 from ...utils.pagination import ListQuery, get_list_query
 
 router = APIRouter(prefix="/assets", tags=["Asset Lifecycle"])
 service = AssetLifecycleService()
+template_service = MeasurementTemplateService()
 history_service = AssetHistoryService()
 failures = FailureManagementService()
 downtime = DowntimeService()
+
+
+@router.get("/measurement-templates", response_model=list[MeasurementTemplate])
+def measurement_templates(_=Depends(require_permission("measurement_templates:read"))):
+    return template_service.list()
+
+
+@router.post("/measurement-templates", response_model=MeasurementTemplate, status_code=201)
+def create_measurement_template(template: MeasurementTemplateCreate, user=Depends(require_permission("measurement_templates:create"))):
+    return template_service.create(template, user.id)
+
+
+@router.put("/measurement-templates/{template_id}", response_model=MeasurementTemplate)
+def update_measurement_template(template_id: int, template: MeasurementTemplateUpdate, _=Depends(require_permission("measurement_templates:update"))):
+    return template_service.update(template_id, template)
+
+
+@router.delete("/measurement-templates/{template_id}")
+def delete_measurement_template(template_id: int, _=Depends(require_permission("measurement_templates:delete"))):
+    return template_service.delete(template_id)
 
 
 @router.get("/{asset_id}/history", response_model=None)

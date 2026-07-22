@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..core.audit import AuditService
-from ..repositories import AssetLifecycleRepository, CauseCodeRepository, CorrectiveActionRepository, CustomerRepository, DowntimeEventRepository, EngineerRepository, EquipmentRepository, FailureCodeRepository, FailureEventRepository, FailureStatisticsRepository, InventoryRepository, JobTitleRepository, PMPlanRepository, PMPlanTaskRepository, PMPlanWorkOrderRepository, PreventiveMaintenanceRepository, ProblemCodeRepository, RemedyCodeRepository, RootCauseAnalysisRepository, WorkOrderRepository, parse_date
+from ..repositories import AssetLifecycleRepository, CauseCodeRepository, CorrectiveActionRepository, CustomerRepository, DowntimeEventRepository, EngineerRepository, EquipmentRepository, FailureCodeRepository, FailureEventRepository, FailureStatisticsRepository, InventoryRepository, JobTitleRepository, MeasurementTemplateRepository, PMPlanRepository, PMPlanTaskRepository, PMPlanWorkOrderRepository, PreventiveMaintenanceRepository, ProblemCodeRepository, RemedyCodeRepository, RootCauseAnalysisRepository, WorkOrderRepository, parse_date
 from ..core.security import hash_password, is_password_hash
 from .inventory_email_alerts import InventoryEmailAlertService
 
@@ -42,6 +42,19 @@ def utc_timestamp() -> str:
 
 def status_value(value: str | None) -> str:
     return str(value or "new").strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def normalize_json_text(value: Any, default: str = "") -> str:
+    if value in (None, ""):
+        return default
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, default=str)
+    text = str(value)
+    try:
+        json.loads(text)
+        return text
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON format") from exc
 
 
 def minutes_between(start: str | None, end: str | None) -> int:
@@ -140,6 +153,53 @@ class JobTitleService:
     def delete(self, item_id: int): return self.repo.delete(item_id)
 
 
+class MeasurementTemplateService:
+    def __init__(self) -> None:
+        self.repo = MeasurementTemplateRepository()
+        self.engineers = EngineerRepository()
+
+    def list(self):
+        return self.repo.list()
+
+    def get(self, item_id: int):
+        return self.repo.get(item_id)
+
+    def create(self, data, actor_id: int | None = None):
+        item = self._prepare_payload(payload(data), actor_id)
+        self._validate_unique_name(item["name"])
+        return self.repo.create(item)
+
+    def update(self, item_id: int, data):
+        current = self.repo.get(item_id)
+        item = self._prepare_payload({**current, **payload(data)}, current.get("created_by_id"))
+        if item["name"].strip().lower() != str(current.get("name", "")).strip().lower():
+            self._validate_unique_name(item["name"], item_id)
+        return self.repo.update(item_id, item)
+
+    def delete(self, item_id: int):
+        return self.repo.delete(item_id)
+
+    def _prepare_payload(self, item: dict[str, Any], actor_id: int | None = None) -> dict[str, Any]:
+        name = str(item.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Measurement type name is required")
+        item["name"] = name
+        item["status"] = str(item.get("status") or "active").strip().lower()
+        if item["status"] not in {"active", "inactive"}:
+            raise HTTPException(status_code=400, detail="Measurement template status must be active or inactive")
+        item["table_schema"] = normalize_json_text(item.get("table_schema"), "[]")
+        if item.get("created_by_id"):
+            self.engineers.get(int(item["created_by_id"]))
+        elif actor_id:
+            item["created_by_id"] = actor_id
+        return item
+
+    def _validate_unique_name(self, name: str, item_id: int | None = None) -> None:
+        existing = self.repo.find_by_name(name)
+        if existing and int(existing["id"]) != int(item_id or 0):
+            raise HTTPException(status_code=400, detail="Measurement type already exists")
+
+
 class EquipmentService:
     def __init__(self) -> None:
         self.repo = EquipmentRepository()
@@ -211,8 +271,8 @@ class EquipmentService:
             parent_id = None
             item["parent_id"] = None
 
-        if parent_id is None and item["asset_level"] != "Site":
-            raise HTTPException(status_code=400, detail="Only Site assets can be created without a parent")
+        if parent_id is None and item["asset_level"] not in {"Site", "Equipment"}:
+            raise HTTPException(status_code=400, detail="Only Site or main Equipment assets can be created without a parent")
         if parent_id is not None:
             parent_id = int(parent_id)
             if item_id is not None and parent_id == item_id:
@@ -277,6 +337,8 @@ class EquipmentService:
     def _validate_parent_child(self, parent_level: str, child_level: str) -> None:
         levels = ["Site", "Area / Department", "System", "Equipment", "Component"]
         if parent_level not in levels or child_level not in levels:
+            return
+        if parent_level == "Equipment" and child_level == "Equipment":
             return
         if levels.index(child_level) <= levels.index(parent_level):
             raise HTTPException(status_code=400, detail=f"{child_level} cannot be placed under {parent_level}")
@@ -361,6 +423,7 @@ class AssetLifecycleService:
         self.lifecycle = AssetLifecycleRepository()
         self.work_orders = WorkOrderRepository()
         self.pm = PreventiveMaintenanceRepository()
+        self.templates = MeasurementTemplateRepository()
 
     def history(self, asset_id: int):
         self.assets.get(asset_id)
@@ -399,6 +462,13 @@ class AssetLifecycleService:
         item = payload(data)
         if float(item.get("value") or 0) < 0:
             raise HTTPException(status_code=400, detail="Measurement value cannot be negative")
+        if item.get("template_id"):
+            template = self.templates.get(int(item["template_id"]))
+            item["measurement_type"] = item.get("measurement_type") or template["name"]
+            item["unit"] = item.get("unit") or template.get("unit", "")
+            item["table_snapshot"] = item.get("table_snapshot") or json.dumps(template, ensure_ascii=False, default=str)
+        if item.get("measurement_table"):
+            item["measurement_table"] = normalize_json_text(item.get("measurement_table"), "")
         created = self.lifecycle.add_measurement(asset_id, item)
         measurement_type = str(created.get("measurement_type") or "").lower()
         if measurement_type in {"hours", "runtime hours", "meter reading", "running hours"}:

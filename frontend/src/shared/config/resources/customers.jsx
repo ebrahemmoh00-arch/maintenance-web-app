@@ -1,6 +1,6 @@
 
 export const customersResource = {
-  title: "Customers / Locations",
+  title: "Customers / Sites",
   endpoint: "customers",
   blank: {
     name: "",
@@ -11,7 +11,7 @@ export const customersResource = {
   },
   fields: [{
     key: "name",
-    label: "Customer / Location Name"
+    label: "Customer / Site Name"
   }, {
     key: "contact_person",
     label: "Responsible Person"
@@ -28,7 +28,7 @@ export const customersResource = {
   }],
   columns: [{
     key: "name",
-    label: "Customer / Location"
+    label: "Customer / Site"
   }, {
     key: "contact_person",
     label: "Responsible"

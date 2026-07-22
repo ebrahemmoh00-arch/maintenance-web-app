@@ -19,8 +19,8 @@ os.environ.pop("DATABASE_URL", None)
 
 from app import database  # noqa: E402
 from app.core.auth import CurrentUser, has_permission  # noqa: E402
-from app.schemas import AssetMeasurementCreate, EquipmentCreate, WorkOrderCreate, WorkOrderLifecycleAction, WorkOrderUpdate  # noqa: E402
-from app.services import AssetHistoryService, AssetLifecycleService, EquipmentService, WorkOrderService  # noqa: E402
+from app.schemas import AssetMeasurementCreate, EquipmentCreate, MeasurementTemplateCreate, WorkOrderCreate, WorkOrderLifecycleAction, WorkOrderUpdate  # noqa: E402
+from app.services import AssetHistoryService, AssetLifecycleService, EquipmentService, MeasurementTemplateService, WorkOrderService  # noqa: E402
 from app.services.inventory_email_alerts import InventoryEmailAlertService, stock_alert_status  # noqa: E402
 
 
@@ -34,6 +34,7 @@ class AssetLifecycleTest(unittest.TestCase):
         self.assets = EquipmentService()
         self.asset_history = AssetHistoryService()
         self.lifecycle = AssetLifecycleService()
+        self.measurement_templates = MeasurementTemplateService()
         self.work_orders = WorkOrderService()
 
     def tearDown(self) -> None:
@@ -66,6 +67,69 @@ class AssetLifecycleTest(unittest.TestCase):
             )
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("Asset code already exists", context.exception.detail)
+
+    def test_main_equipment_can_be_created_without_parent_but_components_require_parent(self) -> None:
+        generator = self.assets.create(
+            EquipmentCreate(
+                customer_id=1,
+                name="Main Generator",
+                asset_type="Generator",
+                asset_level="Equipment",
+                asset_code="GEN-ROOT-001",
+            )
+        )
+
+        self.assertIsNone(generator["parent_id"])
+        self.assertEqual(generator["asset_level"], "Equipment")
+
+        with self.assertRaises(HTTPException) as context:
+            self.assets.create(
+                EquipmentCreate(
+                    customer_id=1,
+                    name="Bearing Component",
+                    asset_type="Bearing",
+                    asset_level="Component",
+                    asset_code="BRG-NO-PARENT",
+                )
+            )
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("main Equipment", context.exception.detail)
+
+    def test_measurement_template_supports_structured_asset_readings(self) -> None:
+        template = self.measurement_templates.create(
+            MeasurementTemplateCreate(
+                name="Valve Clearance",
+                unit="mm",
+                table_schema=json.dumps([
+                    {"key": "cylinder", "label": "Cylinder", "type": "text"},
+                    {"key": "intake", "label": "Intake", "type": "text"},
+                    {"key": "exhaust", "label": "Exhaust", "type": "text"},
+                ]),
+                guidance_title="Manual guidance",
+                ideal_values="Follow the OEM manual range.",
+            ),
+            actor_id=1,
+        )
+        measurement_table = json.dumps({
+            "columns": json.loads(template["table_schema"]),
+            "rows": [{"cylinder": "1", "intake": "0.30", "exhaust": "0.45"}],
+        })
+
+        measurement = self.lifecycle.add_measurement(
+            1,
+            AssetMeasurementCreate(
+                template_id=template["id"],
+                measurement_type="Valve Clearance",
+                value=0.30,
+                unit="mm",
+                reading_date="2026-07-22",
+                measurement_table=measurement_table,
+            ),
+        )
+
+        self.assertEqual(measurement["template_id"], template["id"])
+        self.assertIn("cylinder", measurement["measurement_table"])
+        self.assertIn("Valve Clearance", measurement["table_snapshot"])
 
     def test_measurement_updates_runtime_and_health(self) -> None:
         measurement = self.lifecycle.add_measurement(

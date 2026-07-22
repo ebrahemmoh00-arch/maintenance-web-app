@@ -293,13 +293,16 @@ class AssetEvent(BaseModel):
 
 
 class AssetMeasurementBase(BaseModel):
+    template_id: int | None = None
     measurement_type: str = Field(min_length=1)
-    value: float = Field(ge=0)
+    value: float = Field(default=0, ge=0)
     unit: str = ""
     reading_date: str = ""
     source_module: str = ""
     source_record_id: str = ""
     notes: str = ""
+    measurement_table: str = ""
+    table_snapshot: str = ""
 
 
 class AssetMeasurementCreate(AssetMeasurementBase):
@@ -311,6 +314,47 @@ class AssetMeasurement(AssetMeasurementBase):
     id: int
     asset_id: int
     created_at: str
+
+
+class MeasurementTemplateBase(BaseModel):
+    name: str = Field(min_length=1)
+    description: str = ""
+    category: str = ""
+    unit: str = ""
+    table_schema: str = ""
+    guidance_title: str = ""
+    guidance_file_name: str = ""
+    guidance_file_url: str = ""
+    guidance_notes: str = ""
+    ideal_values: str = ""
+    created_by_id: int | None = None
+    status: str = "active"
+
+
+class MeasurementTemplateCreate(MeasurementTemplateBase):
+    pass
+
+
+class MeasurementTemplateUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    category: str | None = None
+    unit: str | None = None
+    table_schema: str | None = None
+    guidance_title: str | None = None
+    guidance_file_name: str | None = None
+    guidance_file_url: str | None = None
+    guidance_notes: str | None = None
+    ideal_values: str | None = None
+    created_by_id: int | None = None
+    status: str | None = None
+
+
+class MeasurementTemplate(MeasurementTemplateBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: str
+    updated_at: str
 
 
 class AssetDocumentBase(BaseModel):

@@ -1361,6 +1361,7 @@ def init_db() -> None:
                 "event_icon": "TEXT DEFAULT ''",
             },
         )
+        ensure_measurement_schema(db)
         for statement in [
             "CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name)",
             "CREATE INDEX IF NOT EXISTS idx_engineers_role ON engineers(role)",
@@ -1387,6 +1388,8 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_asset_history_event_type ON asset_history(event_type)",
             "CREATE INDEX IF NOT EXISTS idx_asset_history_work_order_id ON asset_history(work_order_id)",
             "CREATE INDEX IF NOT EXISTS idx_asset_history_pm_plan_id ON asset_history(pm_plan_id)",
+            "CREATE INDEX IF NOT EXISTS idx_asset_measurements_template_id ON asset_measurements(template_id)",
+            "CREATE INDEX IF NOT EXISTS idx_measurement_templates_status ON measurement_templates(status)",
         ]:
             db.execute(statement)
         ensure_columns(
@@ -1468,6 +1471,63 @@ def ensure_columns(db: DatabaseConnection, table: str, columns: dict[str, str]) 
     for name, definition in columns.items():
         if name not in existing:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+
+def ensure_measurement_schema(db: DatabaseConnection) -> None:
+    if db.backend == "postgres":
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS measurement_templates (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT DEFAULT '',
+                category TEXT DEFAULT '',
+                unit TEXT DEFAULT '',
+                table_schema TEXT DEFAULT '',
+                guidance_title TEXT DEFAULT '',
+                guidance_file_name TEXT DEFAULT '',
+                guidance_file_url TEXT DEFAULT '',
+                guidance_notes TEXT DEFAULT '',
+                ideal_values TEXT DEFAULT '',
+                created_by_id INTEGER REFERENCES engineers(id) ON DELETE SET NULL,
+                status TEXT DEFAULT 'active',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    else:
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS measurement_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT DEFAULT '',
+                category TEXT DEFAULT '',
+                unit TEXT DEFAULT '',
+                table_schema TEXT DEFAULT '',
+                guidance_title TEXT DEFAULT '',
+                guidance_file_name TEXT DEFAULT '',
+                guidance_file_url TEXT DEFAULT '',
+                guidance_notes TEXT DEFAULT '',
+                ideal_values TEXT DEFAULT '',
+                created_by_id INTEGER,
+                status TEXT DEFAULT 'active',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(created_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+            )
+            """
+        )
+    ensure_columns(
+        db,
+        "asset_measurements",
+        {
+            "template_id": "INTEGER",
+            "measurement_table": "TEXT DEFAULT ''",
+            "table_snapshot": "TEXT DEFAULT ''",
+        },
+    )
 
 
 def seed_data(db: DatabaseConnection) -> None:

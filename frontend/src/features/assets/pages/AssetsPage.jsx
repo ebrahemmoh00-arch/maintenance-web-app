@@ -39,6 +39,9 @@ export default function AssetsPage() {
       canEditAsset={hasPermission(currentUser, "equipment", "edit")}
       canDeleteAsset={hasPermission(currentUser, "equipment", "delete")}
       canDeleteTimeline={hasPermission(currentUser, "asset-history", "delete")}
+      canCreateMeasurementTemplate={hasPermission(currentUser, "measurement-templates", "add")}
+      canEditMeasurementTemplate={hasPermission(currentUser, "measurement-templates", "edit")}
+      canDeleteMeasurementTemplate={hasPermission(currentUser, "measurement-templates", "delete")}
       canCreateDepartment={hasPermission(currentUser, "customers", "add")}
       canEditDepartment={hasPermission(currentUser, "customers", "edit")}
       canDeleteDepartment={hasPermission(currentUser, "customers", "delete")}

@@ -49,19 +49,24 @@ export const equipmentResource = {
   },
   fields: [{
     key: "customer_id",
-    label: "Customer / Location",
+    label: "Customer / Site",
     type: "select",
     options: "customers",
-    number: true
+    number: true,
+    required: true,
+    hint: "Required. Main equipment can be created without Parent Asset when this site is selected."
   }, {
     key: "parent_id",
     label: "Parent Asset",
     type: "select",
     options: "assetParents",
-    number: true
+    number: true,
+    required: value => value.asset_level === "Component",
+    hint: "Optional for main equipment. Use it only for components or subordinate equipment."
   }, {
     key: "name",
-    label: "Asset Name"
+    label: "Asset Name",
+    required: true
   }, {
     key: "asset_type",
     label: "Asset Type",
@@ -74,7 +79,9 @@ export const equipmentResource = {
     key: "asset_level",
     label: "Hierarchy Level",
     type: "select",
-    options: ["Site", "Area / Department", "System", "Equipment", "Component"]
+    options: ["Site", "Area / Department", "System", "Equipment", "Component"],
+    required: true,
+    hint: "Choose Equipment for a main machine. Choose Component when it is part of another asset."
   }, {
     key: "asset_code",
     label: "Asset Code"

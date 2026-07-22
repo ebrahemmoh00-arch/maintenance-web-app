@@ -51,7 +51,7 @@ export function pathToPage(pathname) {
 export function pageTitle(active, language = "en") {
   const titles = {
     dashboard: "Executive Dashboard",
-    customers: "Customers / Locations",
+    customers: "Customers / Sites",
     equipment: "Assets",
     engineers: "Resources",
     "work-orders": "Work Orders",

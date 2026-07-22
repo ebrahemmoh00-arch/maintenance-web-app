@@ -46,12 +46,16 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
         <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-6 md:grid-cols-2">
           {visibleFields.map((field) => {
             const common = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+            const isRequired = typeof field.required === "function" ? field.required(value) : Boolean(field.required);
             return (
               <label key={field.key} className={field.type === "textarea" ? "md:col-span-2" : ""}>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{field.label}</span>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                  {field.label}
+                  {isRequired ? <span className="text-red-600"> *</span> : null}
+                </span>
                 {field.type === "select" ? (
                   <>
-                    <select className={common} value={value[field.key] ?? ""} onChange={(event) => update(field.key, optionValue(field, event.target.value))} disabled={field.readOnly}>
+                    <select className={common} value={value[field.key] ?? ""} onChange={(event) => update(field.key, optionValue(field, event.target.value))} disabled={field.readOnly} required={isRequired} aria-required={isRequired}>
                       <option value="">{labels.select || "Select"}</option>
                       {selectOptions(field).map((option) => (
                         <option key={option.value} value={option.value}>
@@ -85,7 +89,7 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
                     ) : null}
                   </>
                 ) : field.type === "textarea" ? (
-                  <textarea className={common} rows={4} value={value[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} readOnly={field.readOnly} />
+                  <textarea className={common} rows={4} value={value[field.key] ?? ""} onChange={(event) => update(field.key, event.target.value)} readOnly={field.readOnly} required={isRequired} aria-required={isRequired} />
                 ) : (
                   <input
                     className={`${common} ${field.readOnly ? "bg-slate-50 font-bold text-slate-600" : ""}`}
@@ -93,6 +97,8 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
                     value={value[field.key] ?? ""}
                     onChange={(event) => update(field.key, field.type === "number" ? Number(event.target.value) : event.target.value)}
                     readOnly={field.readOnly}
+                    required={isRequired}
+                    aria-required={isRequired}
                   />
                 )}
                 {field.hint ? <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">{field.hint}</p> : null}

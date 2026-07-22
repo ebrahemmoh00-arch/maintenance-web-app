@@ -1,5 +1,4 @@
 import { api } from "../api.js";
-import { nextAssetLevel } from "../features/assets/utils/assetHierarchy.js";
 import { LoginScreen } from "../features/authentication/components/LoginScreen.jsx";
 import { EMPLOYEE_ROLE_OPTIONS, clearAuthSession, getAuthSession, saveAuthSession } from "../features/authentication/services/authSession.js";
 import { businessEmployees, jobTitleOptions } from "../features/resources/utils/employeeUtils.js";
@@ -521,10 +520,12 @@ export default function CMMSApp({ initialPage = "" }) {
     if (!hasPermission(currentUser, "equipment", "edit")) return;
     try {
       const parent = parentId ? data.equipment.find(item => Number(item.id) === Number(parentId)) : null;
+      const currentLevel = asset.asset_level || "Equipment";
+      const rootLevel = ["Site", "Equipment"].includes(currentLevel) ? currentLevel : "Equipment";
       await api.update("equipment", asset.id, normalizeAssetForm({
         ...asset,
         parent_id: parentId || null,
-        asset_level: parent ? nextAssetLevel(parent.asset_level) : "Site"
+        asset_level: parent ? currentLevel : rootLevel
       }));
       await loadAll({
         silent: true

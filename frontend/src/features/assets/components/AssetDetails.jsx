@@ -3,6 +3,7 @@ import { Panel } from "../../../shared/components/Panel.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
 import { todayIso } from "../../work-orders/utils/workOrderForms.js";
 import { buildAssetBreadcrumb } from "../utils/assetHierarchy.js";
+import { AssetMeasurementManager } from "./AssetMeasurementManager.jsx";
 import { HistoryTimeline } from "./history/HistoryTimeline.jsx";
 import { GitBranch, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -30,6 +31,13 @@ export function AssetDetailsPanel({
   onAddLifecycleItem,
   canDeleteTimeline = false,
   onDeleteTimelineEntry,
+  measurementTemplates = [],
+  canManageMeasurementTemplates = false,
+  canCreateMeasurementTemplate = false,
+  canEditMeasurementTemplate = false,
+  canDeleteMeasurementTemplate = false,
+  onSaveMeasurementTemplate,
+  onDeleteMeasurementTemplate,
   language
 }) {
   const t = text => tr(language, text);
@@ -71,15 +79,20 @@ export function AssetDetailsPanel({
       key: "overview",
       label: "Overview"
     }, {
+      key: "measurements",
+      label: "Measurements"
+    }, {
       key: "history",
       label: "History"
     }].map(tab => <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`rounded-xl px-4 py-2 text-sm font-black transition ${activeTab === tab.key ? "bg-slate-950 text-white shadow-sm" : "bg-white text-slate-600 hover:text-slate-950"}`}>
-            {tab.label}
+            {t(tab.label)}
           </button>)}
       </div>
 
       {activeTab === "history" ? <div className="mt-5">
           <HistoryTimeline history={lifecycle.history} filters={historyFilters} onFiltersChange={onHistoryFiltersChange || (() => {})} onPageChange={onHistoryPageChange || (() => {})} onRefresh={onHistoryRefresh || (() => {})} technicians={historyTechnicians} loading={lifecycleLoading} />
+        </div> : activeTab === "measurements" ? <div className="mt-5">
+          <AssetMeasurementManager measurements={lifecycle.measurements || []} templates={measurementTemplates} onSaveMeasurement={onAddLifecycleItem ? payload => onAddLifecycleItem("measurement", payload) : null} onSaveTemplate={onSaveMeasurementTemplate} onDeleteTemplate={onDeleteMeasurementTemplate} canAddMeasurement={canEdit && Boolean(onAddLifecycleItem)} canManageTemplates={canManageMeasurementTemplates} canCreateTemplate={canCreateMeasurementTemplate} canEditTemplate={canEditMeasurementTemplate} canDeleteTemplate={canDeleteMeasurementTemplate} language={language} />
         </div> : <>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -143,14 +156,12 @@ export function AssetDetailsPanel({
           <AssetRelationList title="Asset Events" rows={(lifecycle.events || []).map(item => `${item.event_type} - ${item.severity} - ${item.status}`)} empty="No asset events" />
           <AssetRelationList title="Failure History" rows={(lifecycle.failures || []).map(item => `${item.failure_id} - ${item.severity} - ${item.status}`)} empty="No failure events" />
           <AssetRelationList title="Downtime History" rows={(lifecycle.downtime || []).map(item => `${item.start_time} - ${Number(item.total_downtime_minutes || 0)} min - ${item.downtime_category || "Downtime"}`)} empty="No downtime events" />
-          <AssetRelationList title="Measurements" rows={(lifecycle.measurements || []).map(item => `${item.reading_date || item.created_at}: ${item.measurement_type} = ${item.value} ${item.unit || ""}`)} empty="No measurements" />
           <AssetRelationList title="Documents" rows={(lifecycle.documents || []).map(item => `${item.document_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No documents" />
           <AssetRelationList title="Photos" rows={(lifecycle.photos || []).map(item => `${item.photo_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No photos" />
         </div>
       </div>
 
-      {canEdit && onAddLifecycleItem ? <div className="mt-5 grid gap-4 xl:grid-cols-3">
-          <AssetLifecycleForm type="measurement" title="Add Measurement" onSubmit={payload => onAddLifecycleItem("measurement", payload)} />
+      {canEdit && onAddLifecycleItem ? <div className="mt-5 grid gap-4 xl:grid-cols-2">
           <AssetLifecycleForm type="document" title="Add Document" onSubmit={payload => onAddLifecycleItem("document", payload)} />
           <AssetLifecycleForm type="photo" title="Add Photo" onSubmit={payload => onAddLifecycleItem("photo", payload)} />
         </div> : null}

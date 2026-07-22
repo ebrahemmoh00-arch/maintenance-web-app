@@ -27,7 +27,7 @@ export const PERMISSION_EXTRA_ACTIONS = {
 
 export const PERMISSION_MODULES = [{
   key: "customers",
-  label: "Locations / Customers",
+  label: "Customers / Sites",
   resourceKey: "customers"
 }, {
   key: "equipment",
@@ -36,6 +36,9 @@ export const PERMISSION_MODULES = [{
 }, {
   key: "asset-history",
   label: "Asset History"
+}, {
+  key: "measurement-templates",
+  label: "Measurement Templates"
 }, {
   key: "engineers",
   label: "Resources / Users",

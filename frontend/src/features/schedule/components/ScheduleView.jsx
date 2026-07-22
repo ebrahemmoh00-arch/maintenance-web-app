@@ -65,10 +65,10 @@ export function Schedule({
     }
   }, [filteredEquipment, selectedEquipmentId]);
   return <div className="space-y-6">
-      <Panel title="Schedule Navigator" subtitle="Select the customer/location first, then choose the equipment type to show its maintenance follow-up tables.">
+      <Panel title="Schedule Navigator" subtitle="Select the customer/site first, then choose the equipment type to show its maintenance follow-up tables.">
         <div className="space-y-5">
           <div>
-            <h3 className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">Customers / Locations</h3>
+              <h3 className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Customers / Sites")}</h3>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {customerOptions.map(customer => {
               const active = Number(customer.id) === Number(selectedCustomerId);
@@ -82,7 +82,7 @@ export function Schedule({
                     <p className="mt-2 text-xs font-semibold text-slate-500">{count} assets</p>
                   </button>;
             })}
-              {!customerOptions.length ? <EmptyState title={t("No customers / locations")} message={t("Add customers or places first, then assign assets to them.")} /> : null}
+              {!customerOptions.length ? <EmptyState title={t("No customers / sites")} message={t("Add customers or sites first, then assign assets to them.")} /> : null}
             </div>
           </div>
 

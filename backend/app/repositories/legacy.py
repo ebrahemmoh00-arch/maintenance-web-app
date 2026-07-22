@@ -156,6 +156,52 @@ class JobTitleRepository(Repository):
         return created
 
 
+class MeasurementTemplateRepository(Repository):
+    table = "measurement_templates"
+    fields = (
+        "name",
+        "description",
+        "category",
+        "unit",
+        "table_schema",
+        "guidance_title",
+        "guidance_file_name",
+        "guidance_file_url",
+        "guidance_notes",
+        "ideal_values",
+        "created_by_id",
+        "status",
+    )
+
+    def list(self) -> list[dict[str, Any]]:
+        with get_connection() as db:
+            rows = db.execute("SELECT * FROM measurement_templates ORDER BY name COLLATE NOCASE ASC").fetchall()
+            return [dict(row) for row in rows]
+
+    def find_by_name(self, name: str) -> dict[str, Any] | None:
+        with get_connection() as db:
+            row = db.execute("SELECT * FROM measurement_templates WHERE lower(name) = lower(?)", (name,)).fetchone()
+            return dict(row) if row else None
+
+    def update(self, item_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        payload = {**payload, "updated_at": datetime.now().replace(microsecond=0).isoformat()}
+        fields = self.fields + ("updated_at",)
+        old_item = self.get(item_id)
+        data = {field: payload[field] for field in fields if field in payload and payload[field] is not None}
+        if not data:
+            return self.get(item_id)
+        assignments = ", ".join([f"{field} = ?" for field in data])
+        with get_connection() as db:
+            db.execute(
+                f"UPDATE {self.table} SET {assignments} WHERE id = ?",
+                (*data.values(), item_id),
+            )
+            db.commit()
+        updated = self.get(item_id)
+        AuditService.log_repository_action(self.table, "UPDATE", old_item, updated, item_id)
+        return updated
+
+
 class EquipmentRepository(Repository):
     table = "equipment"
     fields = (
@@ -396,13 +442,16 @@ class AssetLifecycleRepository:
     def add_measurement(self, asset_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         item = {
             "asset_id": asset_id,
+            "template_id": payload.get("template_id"),
             "measurement_type": payload["measurement_type"],
-            "value": payload["value"],
+            "value": payload.get("value", 0),
             "unit": payload.get("unit", ""),
             "reading_date": payload.get("reading_date") or datetime.now().replace(microsecond=0).isoformat(),
             "source_module": payload.get("source_module", ""),
             "source_record_id": str(payload.get("source_record_id") or ""),
             "notes": payload.get("notes", ""),
+            "measurement_table": payload.get("measurement_table", ""),
+            "table_snapshot": payload.get("table_snapshot", ""),
         }
         created = self._insert_and_get("asset_measurements", item)
         self.add_history(

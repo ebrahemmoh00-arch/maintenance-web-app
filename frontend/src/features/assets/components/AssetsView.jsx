@@ -49,6 +49,9 @@ export function AssetsView({
   canEditAsset = canManage,
   canDeleteAsset = canManage,
   canDeleteTimeline = false,
+  canCreateMeasurementTemplate = false,
+  canEditMeasurementTemplate = false,
+  canDeleteMeasurementTemplate = false,
   canCreateDepartment = canManage,
   canEditDepartment = canManage,
   canDeleteDepartment = canManage,
@@ -80,6 +83,7 @@ export function AssetsView({
   const [assetHistoryFilters, setAssetHistoryFilters] = useState(INITIAL_HISTORY_FILTERS);
   const [assetLifecycleLoading, setAssetLifecycleLoading] = useState(false);
   const [assetLifecycleError, setAssetLifecycleError] = useState("");
+  const [measurementTemplates, setMeasurementTemplates] = useState([]);
   const customerConfig = localizedConfig("customers", language);
   const assetConfig = localizedConfig("equipment", language);
   const selectedDepartment = useMemo(() => departments.find(department => sameId(department.id, selectedDepartmentId)) || null, [departments, selectedDepartmentId]);
@@ -89,9 +93,10 @@ export function AssetsView({
   const selectedAsset = scopedRows.find(asset => Number(asset.id) === Number(selectedAssetId)) || scopedRows[0];
   const scopeLabel = showAllAssets ? t("All Assets") : selectedDepartment?.name || t("No customer / location selected");
   const historyTechnicians = useMemo(() => [...new Set(workOrders.map(order => order.engineer_name || order.technician_name || "").filter(Boolean))].sort(), [workOrders]);
+  const canManageMeasurementTemplates = canCreateMeasurementTemplate || canEditMeasurementTemplate || canDeleteMeasurementTemplate;
   const sections = [{
     key: "customers",
-    title: t("Customers / Locations"),
+    title: t("Customers / Sites"),
     count: departments.length
   }, {
     key: "hierarchy",
@@ -111,6 +116,21 @@ export function AssetsView({
       setSelectedDepartmentId(String(departments[0].id));
     }
   }, [departments, selectedDepartmentId]);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMeasurementTemplates() {
+      try {
+        const templates = await api.list("assets/measurement-templates");
+        if (!cancelled) setMeasurementTemplates(Array.isArray(templates) ? templates : []);
+      } catch {
+        if (!cancelled) setMeasurementTemplates([]);
+      }
+    }
+    loadMeasurementTemplates();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     if (!scopedRows.length) {
       if (selectedAssetId) setSelectedAssetId("");
@@ -212,6 +232,21 @@ export function AssetsView({
       window.alert(error.message || "Failed to save asset lifecycle item");
     }
   }
+  async function saveMeasurementTemplate(payload, templateId = null) {
+    const saved = templateId ? await api.update("assets/measurement-templates", templateId, payload) : await api.create("assets/measurement-templates", payload);
+    const templates = await api.list("assets/measurement-templates");
+    setMeasurementTemplates(Array.isArray(templates) ? templates : []);
+    return saved;
+  }
+  async function deleteMeasurementTemplate(templateId) {
+    if (!templateId) return false;
+    const confirmed = window.confirm("Delete this measurement type?");
+    if (!confirmed) return false;
+    await api.remove("assets/measurement-templates", templateId);
+    const templates = await api.list("assets/measurement-templates");
+    setMeasurementTemplates(Array.isArray(templates) ? templates : []);
+    return true;
+  }
   async function handleAssetTimelineDelete(entryId) {
     if (!selectedAsset?.id || !entryId) return false;
     const confirmed = window.confirm("Delete this timeline entry?");
@@ -255,11 +290,11 @@ export function AssetsView({
       setShowAllAssets(false);
     }} showAllAssets={showAllAssets} onToggleShowAll={() => setShowAllAssets(value => !value)} assetCount={scopedRows.length} scopeLabel={scopeLabel} language={language} /> : null}
 
-      {activeAssetSection === "customers" ? <Panel title={t("Customers / Locations")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateDepartment ? <button onClick={onCreateDepartment} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
+      {activeAssetSection === "customers" ? <Panel title={t("Customers / Sites")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateDepartment ? <button onClick={onCreateDepartment} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
               <Plus className="h-4 w-4" />
               {t("New Record")}
             </button> : null}>
-          <DataTable columns={customerConfig.columns} rows={departments} onEdit={canEditDepartment ? onEditDepartment : null} onDelete={canDeleteDepartment ? onDeleteDepartment : null} emptyMessage={t("No customers / locations")} labels={tableLabels(language)} />
+          <DataTable columns={customerConfig.columns} rows={departments} onEdit={canEditDepartment ? onEditDepartment : null} onDelete={canDeleteDepartment ? onDeleteDepartment : null} emptyMessage={t("No customers / sites")} labels={tableLabels(language)} />
         </Panel> : null}
 
       {activeAssetSection === "hierarchy" ? <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
@@ -301,7 +336,7 @@ export function AssetsView({
             </div>
           </Panel>
 
-          <AssetDetailsPanel asset={selectedAsset} rows={scopedRows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} canDeleteTimeline={canDeleteTimeline} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} onDeleteTimelineEntry={handleAssetTimelineDelete} language={language} />
+          <AssetDetailsPanel asset={selectedAsset} rows={scopedRows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} canDeleteTimeline={canDeleteTimeline} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} onDeleteTimelineEntry={handleAssetTimelineDelete} measurementTemplates={measurementTemplates} canManageMeasurementTemplates={canManageMeasurementTemplates} canCreateMeasurementTemplate={canCreateMeasurementTemplate} canEditMeasurementTemplate={canEditMeasurementTemplate} canDeleteMeasurementTemplate={canDeleteMeasurementTemplate} onSaveMeasurementTemplate={saveMeasurementTemplate} onDeleteMeasurementTemplate={deleteMeasurementTemplate} language={language} />
         </div> : null}
 
       {activeAssetSection === "assets" ? <Panel title={t("Assets")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
@@ -327,9 +362,9 @@ function AssetScopeBar({
   return <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="grid gap-3 lg:grid-cols-[minmax(240px,1fr)_auto_auto] lg:items-end">
         <label className="block">
-          <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{t("Customer / Location")}</span>
+          <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{t("Customer / Site")}</span>
           <select className="w-full rounded-xl border border-slate-200 bg-cyan-50/50 px-3 py-3 text-sm font-black text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white" value={selectedDepartmentId} onChange={event => onSelectedDepartmentChange(event.target.value)} disabled={!departments.length}>
-            {!departments.length ? <option value="">{t("No customers / locations")}</option> : null}
+            {!departments.length ? <option value="">{t("No customers / sites")}</option> : null}
             {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
           </select>
         </label>

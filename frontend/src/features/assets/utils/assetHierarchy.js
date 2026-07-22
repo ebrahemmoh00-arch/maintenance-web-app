@@ -157,12 +157,14 @@ export function assetLevelMeta(level = "Equipment") {
 }
 
 export function canPlaceAssetUnder(asset, parent, rows) {
-  if (!asset || !parent) return asset?.asset_level === "Site";
+  if (!asset || !parent) return ["Site", "Equipment"].includes(asset?.asset_level || "Equipment");
   if (Number(asset.id) === Number(parent.id)) return false;
   if (getDescendantIds(asset.id, rows).has(Number(parent.id))) return false;
   const levels = ["Site", "Area / Department", "System", "Equipment", "Component"];
-  const childLevel = nextAssetLevel(parent.asset_level);
-  return levels.indexOf(childLevel) > levels.indexOf(parent.asset_level);
+  const parentLevel = parent.asset_level || "Site";
+  const childLevel = asset.asset_level || nextAssetLevel(parentLevel);
+  if (parentLevel === "Equipment" && childLevel === "Equipment") return true;
+  return levels.indexOf(childLevel) > levels.indexOf(parentLevel);
 }
 
 export function getDescendantIds(assetId, rows) {

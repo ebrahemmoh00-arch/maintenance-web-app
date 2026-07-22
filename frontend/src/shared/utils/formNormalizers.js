@@ -1,4 +1,4 @@
-import { calculateIntervalDays, classifyAssetLevel } from "../../features/assets/utils/assetHierarchy.js";
+import { calculateIntervalDays } from "../../features/assets/utils/assetHierarchy.js";
 import { todayIso } from "../../features/work-orders/utils/workOrderForms.js";
 import { createRolePermissions, normalizeEmployeeRole, stringifyPermissions } from "../config/appConfig.jsx";
 
@@ -9,7 +9,7 @@ export function normalizeAssetForm(value) {
     ...value,
     parent_id: parentId,
     asset_type: selectedType,
-    asset_level: parentId ? classifyAssetLevel(selectedType, value.name) : "Site",
+    asset_level: value.asset_level || "Equipment",
     status: value.status || "Active",
     criticality: value.criticality || "Medium"
   };

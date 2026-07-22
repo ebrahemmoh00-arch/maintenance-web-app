@@ -107,7 +107,7 @@ export function SiteStatusOverview({
               </div>
             </div>;
       })}
-        {!sites.length ? <EmptyState title="No sites" message="Add customers / locations and link assets to display site status." /> : null}
+        {!sites.length ? <EmptyState title="No sites" message="Add customers / sites and link assets to display site status." /> : null}
       </div>
     </Panel>;
 }
