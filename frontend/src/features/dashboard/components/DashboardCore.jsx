@@ -1,7 +1,7 @@
 import { DonutChart } from "../../../shared/components/Charts.jsx";
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
-import { applyDashboardFilters, buildDashboardFilterOptions, createDashboardFilters } from "../utils/dashboardFilters.js";
+import { applyDashboardFilters, buildDashboardFilterOptions, createDashboardFilters, normalizeChoice } from "../utils/dashboardFilters.js";
 import { buildExecutiveDashboardInsights, hasChartValue } from "../utils/executiveDashboardMetrics.js";
 import { buildMaintenanceDashboardMetrics } from "../utils/maintenanceMetrics.jsx";
 import { buildAssetReliability, engineerWorkloadData, technicianWorkloadData } from "../utils/reliabilityMetrics.js";
@@ -58,6 +58,26 @@ export function DashboardFilterBar({
   language
 }) {
   const t = text => tr(language, text);
+  const scopedCategoryOptions = useMemo(() => {
+    if (filters.location === "all") return options.categories;
+    const categories = new Set(options.equipment.filter(option => optionMatchesLocation(option, filters.location)).flatMap(option => option.categories || []));
+    return options.categories.filter(option => categories.has(normalizeChoice(option.value)));
+  }, [filters.location, options.categories, options.equipment]);
+  const scopedEquipmentOptions = useMemo(() => options.equipment.filter(option => optionMatchesLocation(option, filters.location) && optionMatchesCategory(option, filters.category)), [filters.category, filters.location, options.equipment]);
+  const updateFilter = (key, value) => {
+    setFilters(current => {
+      const next = {
+        ...current,
+        [key]: value
+      };
+      if (key === "location") {
+        next.equipment = "all";
+        if (next.category !== "all" && !categoryAvailableForLocation(options.equipment, value, next.category)) next.category = "all";
+      }
+      if (key === "category") next.equipment = "all";
+      return next;
+    });
+  };
   const fields = [{
     key: "dateFrom",
     label: "From Date",
@@ -73,29 +93,35 @@ export function DashboardFilterBar({
   }, {
     key: "category",
     label: "Asset Category",
-    options: options.categories
+    options: scopedCategoryOptions
   }, {
     key: "equipment",
     label: "Equipment",
-    options: options.equipment
+    options: scopedEquipmentOptions
   }];
   return <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {fields.map(field => <label key={field.key} className="block">
             <span className="mb-2 block text-xs font-black text-slate-800">{t(field.label)}</span>
-            {field.type === "date" ? <input type="date" value={filters[field.key]} onChange={event => setFilters(current => ({
-          ...current,
-          [field.key]: event.target.value
-        }))} className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" /> : <select value={filters[field.key]} onChange={event => setFilters(current => ({
-          ...current,
-          [field.key]: event.target.value
-        }))} className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100">
+            {field.type === "date" ? <input type="date" value={filters[field.key]} onChange={event => updateFilter(field.key, event.target.value)} className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" /> : <select value={filters[field.key]} onChange={event => updateFilter(field.key, event.target.value)} className="w-full rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100">
                 <option value="all">{t("All")}</option>
                 {field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>}
           </label>)}
       </div>
     </div>;
+}
+
+function optionMatchesLocation(option, location) {
+  return location === "all" || (option.locations || []).includes(normalizeChoice(location));
+}
+
+function optionMatchesCategory(option, category) {
+  return category === "all" || (option.categories || []).includes(normalizeChoice(category));
+}
+
+function categoryAvailableForLocation(equipmentOptions, location, category) {
+  return equipmentOptions.some(option => optionMatchesLocation(option, location) && optionMatchesCategory(option, category));
 }
 
 export function DashboardWorkOrderStatusPanel({

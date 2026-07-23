@@ -230,14 +230,102 @@ export function MaintenanceOverviewSection({
 }) {
   return (
     <section className="grid gap-6 xl:grid-cols-2">
-      <Panel title={tr(language, "Asset Health Trend")} subtitle={tr(language, "Health score movement based on reliability and asset health data.")} className="min-h-[360px]">
-        {insights.empty.hasAssetHealthTrend ? <LineChart data={insights.assetHealthTrend} color="#2563eb" /> : <DashboardEmptyState title="No maintenance data available yet." actionLabel="Create First Work Order" onAction={() => openCreate?.("work-orders")} language={language} />}
+      <Panel title={tr(language, "Asset Health Ranking")} subtitle={tr(language, "Assets ordered by calculated health score. Lower score means faster reliability attention.")} className="min-h-[360px]">
+        {metrics.assetHealthRanking?.length ? <AssetHealthRankingChart rows={metrics.assetHealthRanking} language={language} /> : <DashboardEmptyState title="No asset health data available yet." actionLabel="Create First Work Order" onAction={() => openCreate?.("work-orders")} language={language} />}
       </Panel>
       <Panel title={tr(language, "Breakdown Trend")} subtitle={tr(language, "Monthly breakdown incidents during the selected period.")} className="min-h-[360px]">
         {insights.empty.hasBreakdowns ? <LineChart data={metrics.breakdownTrend} color="#dc2626" /> : <DashboardEmptyState title="No breakdown trend data available yet." actionLabel="Report Failure" onAction={() => openCreate?.("work-orders")} language={language} />}
       </Panel>
     </section>
   );
+}
+
+function AssetHealthRankingChart({
+  rows,
+  language
+}) {
+  const t = text => tr(language, text);
+  const visibleRows = [...rows].sort((first, second) => Number(first.health || 0) - Number(second.health || 0) || String(first.name || "").localeCompare(String(second.name || ""))).slice(0, 10);
+  const ticks = [100, 75, 50, 25, 0];
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs font-black">
+        <HealthLegendChip className="bg-red-50 text-red-700 ring-red-100" label={t("Critical")} range="< 60%" />
+        <HealthLegendChip className="bg-orange-50 text-orange-700 ring-orange-100" label={t("Warning")} range="60-74%" />
+        <HealthLegendChip className="bg-green-50 text-green-700 ring-green-100" label={t("Good")} range="75-89%" />
+        <HealthLegendChip className="bg-emerald-50 text-emerald-700 ring-emerald-100" label={t("Excellent")} range="90-100%" />
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3">
+          <div className="flex h-72 flex-col justify-between pb-12 pt-1 text-right text-xs font-black text-slate-500" aria-hidden="true">
+            {ticks.map(tick => <span key={tick}>{tick}%</span>)}
+          </div>
+          <div className="min-w-0 overflow-x-auto pb-1">
+            <div className="min-w-[620px]">
+              <div className="relative h-60 border-b-2 border-slate-500">
+                <div className="absolute inset-0 flex flex-col justify-between">
+                  {ticks.map(tick => <div key={tick} className="border-t border-slate-200" />)}
+                </div>
+                <div className="absolute inset-x-4 bottom-0 top-0 flex items-end justify-around gap-8">
+                  {visibleRows.map(asset => {
+                    const health = Math.max(0, Math.min(100, Math.round(Number(asset.health || 0))));
+                    const tone = assetHealthTone(health);
+                    return (
+                      <div key={asset.id || asset.name} className="flex h-full min-w-20 flex-1 flex-col items-center justify-end">
+                        <span className="mb-2 text-sm font-black text-slate-950">{health}%</span>
+                        <div className={`w-16 rounded-t-md ${tone.bar} shadow-sm transition`} style={{ height: `${Math.max(health, health ? 8 : 4)}%` }} title={`${asset.name || "Asset"}: ${health}%`} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-3 flex justify-around gap-8 px-4">
+                {visibleRows.map(asset => (
+                  <div key={`${asset.id || asset.name}-label`} className="min-w-20 flex-1">
+                    <p className="truncate text-center text-sm font-black text-slate-800" title={asset.name}>{asset.name || `Asset ${asset.id}`}</p>
+                    <p className="mt-1 truncate text-center text-[10px] font-semibold text-slate-500" title={asset.site || asset.location || ""}>{asset.site || asset.location || t("Unassigned site")}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HealthLegendChip({
+  className,
+  label,
+  range
+}) {
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ring-1 ${className}`}>
+      <span>{label}</span>
+      <span className="opacity-70">{range}</span>
+    </span>
+  );
+}
+
+function assetHealthTone(value) {
+  if (value >= 90) return {
+    bar: "bg-emerald-600",
+    chip: "bg-emerald-50 text-emerald-700"
+  };
+  if (value >= 75) return {
+    bar: "bg-green-500",
+    chip: "bg-green-50 text-green-700"
+  };
+  if (value >= 60) return {
+    bar: "bg-orange-500",
+    chip: "bg-orange-50 text-orange-700"
+  };
+  return {
+    bar: "bg-red-600",
+    chip: "bg-red-50 text-red-700"
+  };
 }
 
 export function OperationsKpiSection({

@@ -3,7 +3,7 @@ import { uniqueSorted } from "../../resources/utils/employeeUtils.js";
 import { formatScheduleCell } from "../../schedule/components/MaintenanceFollowUp.jsx";
 import { calculateDuration, formatShortDate, getWorkOrderSavedDate, parseWorkOrderNotes, todayIso } from "../../work-orders/utils/workOrderForms.js";
 import { clampPercent, createMonthBuckets, monthLabel, toMonthKey } from "./dashboardDateUtils.js";
-import { matchesAnyFilterValue, matchesFilterValue } from "./dashboardFilters.js";
+import { assetLocationValues, buildCustomerNameById, matchesAnyFilterValue, matchesFilterValue, normalizeChoice } from "./dashboardFilters.js";
 
 export function buildAssetReliabilityRows(workOrders, equipment, pmTasks) {
   const assetStats = buildAssetFaultStats(workOrders, equipment);
@@ -79,18 +79,42 @@ export function assetHealthCategory(value) {
 }
 
 export function buildSiteSummary(customers, equipment, alerts) {
-  const siteNames = uniqueSorted([...customers.map(customer => customer.name), ...equipment.map(asset => asset.customer_name || asset.location), ...alerts.map(alert => alert.location)]);
-  return siteNames.map(name => {
-    const siteAssets = equipment.filter(asset => matchesAnyFilterValue([asset.customer_name, asset.location], name));
-    const breakdown = siteAssets.filter(asset => ["Breakdown", "Offline"].includes(equipmentIndustrialStatus(asset))).length;
+  const customerNameById = buildCustomerNameById(customers);
+  const customerSites = customers.map(customer => ({
+    id: customer.id,
+    name: customer.name
+  })).filter(site => site.name);
+  const seenSites = new Set(customerSites.map(site => normalizeChoice(site.name)));
+  const extraSites = uniqueSorted([
+    ...equipment.flatMap(asset => assetLocationValues(asset, customerNameById)),
+    ...alerts.map(alert => alert.location)
+  ]).filter(name => !seenSites.has(normalizeChoice(name))).map(name => ({
+    id: null,
+    name
+  }));
+  return [...customerSites, ...extraSites].map(site => {
+    const siteAssets = equipment.filter(asset => assetBelongsToSite(asset, site, customerNameById));
+    const siteAssetIds = new Set(siteAssets.map(asset => Number(asset.id)));
+    const siteAlerts = alerts.filter(alert => {
+      const asset = findAssetForAlert(alert, equipment);
+      if (asset && siteAssetIds.has(Number(asset.id))) return true;
+      return matchesFilterValue(alert.location, site.name);
+    });
+    const downAssets = siteAssets.filter(asset => ["Breakdown", "Offline"].includes(equipmentIndustrialStatus(asset))).length;
+    const activeFaults = downAssets + siteAlerts.filter(alert => alert.alert_level === "DUE NOW").length;
     return {
-      name,
+      name: site.name,
       assets: siteAssets.length,
       running: siteAssets.filter(asset => equipmentIndustrialStatus(asset) === "Running").length,
-      breakdown,
-      operational: siteOperationalPercent(siteAssets, alerts.filter(alert => matchesFilterValue(alert.location, name) && alert.alert_level === "DUE NOW").length + breakdown)
+      breakdown: activeFaults,
+      operational: siteOperationalPercent(siteAssets, activeFaults)
     };
-  }).filter(site => site.assets || alerts.some(alert => matchesFilterValue(alert.location, site.name)));
+  }).filter(site => site.assets || site.breakdown);
+}
+
+function assetBelongsToSite(asset, site, customerNameById) {
+  if (site.id && Number(asset.customer_id) === Number(site.id)) return true;
+  return matchesAnyFilterValue(assetLocationValues(asset, customerNameById), site.name);
 }
 
 export function buildTopDowntimeAssets(workOrders, equipment) {
