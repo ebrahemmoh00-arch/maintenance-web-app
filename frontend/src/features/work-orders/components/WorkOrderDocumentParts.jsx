@@ -20,31 +20,31 @@ export function WorkOrderLifecyclePanel({
     ...current,
     [key]: value
   }));
-  return <Panel title="Work Order Lifecycle Engine" subtitle="Production workflow, assignment, review, timeline, and execution control.">
+  return <Panel title={t("Work Order Lifecycle Engine")} subtitle={t("Production workflow, assignment, review, timeline, and execution control.")} language={language}>
       <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Current Status</p>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">{t("Current Status")}</p>
                 <div className="mt-2"><WorkOrderStatus value={status} priority={order.priority} language={language} /></div>
               </div>
               <PriorityBadge value={order.priority} language={language} />
             </div>
             <div className="mt-4 grid gap-2 text-sm">
-              <LifecycleInfo label="Assigned At" value={formatLifecycleDate(order.assigned_at)} />
-              <LifecycleInfo label="Accepted At" value={formatLifecycleDate(order.accepted_at)} />
-              <LifecycleInfo label="Started At" value={formatLifecycleDate(order.started_at)} />
-              <LifecycleInfo label="Completed At" value={formatLifecycleDate(order.completed_at)} />
-              <LifecycleInfo label="Approved At" value={formatLifecycleDate(order.approved_at)} />
-              <LifecycleInfo label="Closed At" value={formatLifecycleDate(order.closed_at)} />
-              <LifecycleInfo label="Duration" value={order.work_duration_minutes ? `${order.work_duration_minutes} min` : "-"} />
+              <LifecycleInfo label="Assigned At" value={formatLifecycleDate(order.assigned_at)} language={language} />
+              <LifecycleInfo label="Accepted At" value={formatLifecycleDate(order.accepted_at)} language={language} />
+              <LifecycleInfo label="Started At" value={formatLifecycleDate(order.started_at)} language={language} />
+              <LifecycleInfo label="Completed At" value={formatLifecycleDate(order.completed_at)} language={language} />
+              <LifecycleInfo label="Approved At" value={formatLifecycleDate(order.approved_at)} language={language} />
+              <LifecycleInfo label="Closed At" value={formatLifecycleDate(order.closed_at)} language={language} />
+              <LifecycleInfo label="Duration" value={order.work_duration_minutes ? `${order.work_duration_minutes} ${t("min")}` : "-"} language={language} />
             </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="text-sm font-black text-slate-950">Assignment Card</h3>
+            <h3 className="text-sm font-black text-slate-950">{t("Assignment Card")}</h3>
             <label className="mt-3 block">
-              <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Technician / Resource</span>
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Technician / Resource")}</span>
               <select className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" value={draft.engineer_id || order.engineer_id || ""} onChange={event => update("engineer_id", event.target.value)}>
                 <option value=""></option>
                 {engineers.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -52,27 +52,27 @@ export function WorkOrderLifecyclePanel({
             </label>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="text-sm font-black text-slate-950">Execution Details</h3>
+            <h3 className="text-sm font-black text-slate-950">{t("Execution Details")}</h3>
             <div className="mt-3 grid gap-3">
               <label>
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Runtime Reading</span>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Runtime Reading")}</span>
                 <input type="number" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" value={draft.runtime_reading} onChange={event => update("runtime_reading", event.target.value)} placeholder={String(order.service_hours || 0)} />
               </label>
               <label>
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Technician Notes</span>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Technician Notes")}</span>
                 <textarea rows={3} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" value={draft.notes} onChange={event => update("notes", event.target.value)} />
               </label>
               <label>
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Reason</span>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Reason")}</span>
                 <textarea rows={2} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" value={draft.reason} onChange={event => update("reason", event.target.value)} />
               </label>
               <label>
-                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Completion Notes</span>
+                <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Completion Notes")}</span>
                 <textarea rows={3} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" value={draft.completion_notes} onChange={event => update("completion_notes", event.target.value)} />
               </label>
               <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700">
                 <input type="checkbox" checked={draft.checklist_completed} onChange={event => update("checklist_completed", event.target.checked)} />
-                Checklist completed
+                {t("Checklist completed")}
               </label>
             </div>
           </div>
@@ -81,39 +81,39 @@ export function WorkOrderLifecyclePanel({
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-black text-slate-950">Lifecycle Actions</h3>
-                <p className="mt-1 text-xs font-semibold text-slate-500">Only valid state transitions are enabled.</p>
+                <h3 className="text-sm font-black text-slate-950">{t("Lifecycle Actions")}</h3>
+                <p className="mt-1 text-xs font-semibold text-slate-500">{t("Only valid state transitions are enabled.")}</p>
               </div>
               <StatusBadge value={status} language={language} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {actions.map(action => <button key={action.key} type="button" disabled={!canEdit} onClick={() => onAction(action.key)} className={`rounded-lg px-3 py-2 text-xs font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-40 ${action.tone}`}>
-                  {action.label}
+                  {t(action.label)}
                 </button>)}
-              {!actions.length ? <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">No available actions</span> : null}
+              {!actions.length ? <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">{t("No available actions")}</span> : null}
             </div>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <LifecycleCard title="Approval Card" rows={[["Approved By", order.approved_by_name || "-"], ["Supervisor Notes", order.supervisor_notes || "-"], ["Review Status", status === "pending_supervisor_review" ? "Awaiting review" : status]]} />
-            <LifecycleCard title="Parts Panel" rows={[["Waiting Reason", order.waiting_parts_reason || "-"], ["Linked Parts", "Inventory-linked records"], ["Reservation", status === "waiting_for_parts" ? "Required" : "Not active"]]} />
-            <LifecycleCard title="Checklist Panel" rows={[["Checklist", order.checklist_completed ? "Completed" : "Not completed"], ["Completion Notes", order.completion_notes || "-"], ["Runtime End", order.runtime_reading_end || order.service_hours || "-"]]} />
-            <LifecycleCard title="History Panel" rows={[["Created", formatLifecycleDate(order.created_at)], ["Updated", formatLifecycleDate(order.updated_at)], ["Timeline Events", String(order.timeline?.length || 0)]]} />
+            <LifecycleCard title="Approval Card" rows={[["Approved By", order.approved_by_name || "-"], ["Supervisor Notes", order.supervisor_notes || "-"], ["Review Status", status === "pending_supervisor_review" ? t("Awaiting review") : t(status.replaceAll("_", " "))]]} language={language} />
+            <LifecycleCard title="Parts Panel" rows={[["Waiting Reason", order.waiting_parts_reason || "-"], ["Linked Parts", t("Inventory-linked records")], ["Reservation", status === "waiting_for_parts" ? t("Required") : t("Not active")]]} language={language} />
+            <LifecycleCard title="Checklist Panel" rows={[["Checklist", order.checklist_completed ? t("Completed") : t("Not completed")], ["Completion Notes", order.completion_notes || "-"], ["Runtime End", order.runtime_reading_end || order.service_hours || "-"]]} language={language} />
+            <LifecycleCard title="History Panel" rows={[["Created", formatLifecycleDate(order.created_at)], ["Updated", formatLifecycleDate(order.updated_at)], ["Timeline Events", String(order.timeline?.length || 0)]]} language={language} />
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="text-sm font-black text-slate-950">Status Timeline</h3>
+            <h3 className="text-sm font-black text-slate-950">{t("Status Timeline")}</h3>
             <div className="mt-4 space-y-3">
               {(order.timeline || []).map(event => <div key={event.id} className="grid grid-cols-[14px_1fr] gap-3">
                   <span className="mt-1.5 h-3 w-3 rounded-full bg-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.12)]" />
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-black text-slate-950">{event.event_type}</p>
+                      <p className="text-sm font-black text-slate-950">{t(String(event.event_type || "").replaceAll("_", " "))}</p>
                       <span className="text-xs font-bold text-slate-500">{formatLifecycleDate(event.created_at)}</span>
                     </div>
                     <p className="mt-1 text-xs font-semibold text-slate-600">{event.description}</p>
-                    {event.from_status || event.to_status ? <p className="mt-1 text-[11px] font-black uppercase tracking-[0.12em] text-blue-700">{event.from_status || "-"} {"->"} {event.to_status || "-"}</p> : null}
+                    {event.from_status || event.to_status ? <p className="mt-1 text-[11px] font-black uppercase tracking-[0.12em] text-blue-700">{event.from_status ? t(String(event.from_status).replaceAll("_", " ")) : "-"} {"->"} {event.to_status ? t(String(event.to_status).replaceAll("_", " ")) : "-"}</p> : null}
                   </div>
                 </div>)}
-              {!order.timeline?.length ? <EmptyState title="No lifecycle events" message="Timeline entries will appear after lifecycle actions." /> : null}
+              {!order.timeline?.length ? <EmptyState title="No lifecycle events" message="Timeline entries will appear after lifecycle actions." language={language} /> : null}
             </div>
           </div>
         </div>
@@ -122,21 +122,25 @@ export function WorkOrderLifecyclePanel({
 }
 export function LifecycleInfo({
   label,
-  value
+  value,
+  language
 }) {
+  const t = text => tr(language, text);
   return <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
-      <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t(label)}</span>
       <span className="text-right text-xs font-bold text-slate-800">{value || "-"}</span>
     </div>;
 }
 export function LifecycleCard({
   title,
-  rows
+  rows,
+  language
 }) {
+  const t = text => tr(language, text);
   return <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-black text-slate-950">{title}</h3>
+      <h3 className="text-sm font-black text-slate-950">{t(title)}</h3>
       <div className="mt-3 space-y-2">
-        {rows.map(([label, value]) => <LifecycleInfo key={label} label={label} value={value} />)}
+        {rows.map(([label, value]) => <LifecycleInfo key={label} label={label} value={value} language={language} />)}
       </div>
     </div>;
 }
@@ -272,13 +276,14 @@ export function DocStackSelect({
   label,
   value,
   onChange,
-  options
+  options,
+  language
 }) {
   return <div className="border-b-2 border-slate-950">
       <DocBand>{label}</DocBand>
       <select className="h-12 w-full bg-white px-2 text-center text-sm font-black outline-none focus:bg-blue-50" value={value || ""} onChange={event => onChange(event.target.value)}>
         <option value=""></option>
-        {options.map(option => <option key={option} value={option}>{option}</option>)}
+        {options.map(option => <option key={option} value={option}>{tr(language, option)}</option>)}
       </select>
     </div>;
 }

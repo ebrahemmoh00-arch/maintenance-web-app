@@ -34,6 +34,6 @@ export default function SettingsPage() {
           onDeleteSelected={deleteAuditLogs}
         />
       ) : null}
-      {documentBrandingVisible ? <DocumentBrandingSettings /> : null}
+      {documentBrandingVisible ? <DocumentBrandingSettings language={language} /> : null}
     </div>;
 }

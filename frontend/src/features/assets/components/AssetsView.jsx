@@ -229,7 +229,7 @@ export function AssetsView({
       await api.create(`assets/${selectedAsset.id}/${resource}`, payload);
       await reloadAssetLifecycle(selectedAsset.id);
     } catch (error) {
-      window.alert(error.message || "Failed to save asset lifecycle item");
+      window.alert(error.message || t("Failed to save asset lifecycle item"));
     }
   }
   async function saveMeasurementTemplate(payload, templateId = null) {
@@ -240,7 +240,7 @@ export function AssetsView({
   }
   async function deleteMeasurementTemplate(templateId) {
     if (!templateId) return false;
-    const confirmed = window.confirm("Delete this measurement type?");
+    const confirmed = window.confirm(t("Delete this measurement type?"));
     if (!confirmed) return false;
     await api.remove("assets/measurement-templates", templateId);
     const templates = await api.list("assets/measurement-templates");
@@ -249,14 +249,14 @@ export function AssetsView({
   }
   async function handleAssetTimelineDelete(entryId) {
     if (!selectedAsset?.id || !entryId) return false;
-    const confirmed = window.confirm("Delete this timeline entry?");
+    const confirmed = window.confirm(t("Delete this timeline entry?"));
     if (!confirmed) return false;
     try {
       await api.remove(`assets/${selectedAsset.id}/timeline`, entryId);
       await reloadAssetLifecycle(selectedAsset.id);
       return true;
     } catch (error) {
-      window.alert(error.message || "Failed to delete timeline entry");
+      window.alert(error.message || t("Failed to delete timeline entry"));
       return false;
     }
   }
@@ -290,7 +290,7 @@ export function AssetsView({
       setShowAllAssets(false);
     }} showAllAssets={showAllAssets} onToggleShowAll={() => setShowAllAssets(value => !value)} assetCount={scopedRows.length} scopeLabel={scopeLabel} language={language} /> : null}
 
-      {activeAssetSection === "customers" ? <Panel title={t("Customers / Sites")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateDepartment ? <button onClick={onCreateDepartment} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
+      {activeAssetSection === "customers" ? <Panel title={t("Customers / Sites")} subtitle={t("Create, update, and control operational records through the existing REST API.")} language={language} actions={canCreateDepartment ? <button onClick={onCreateDepartment} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
               <Plus className="h-4 w-4" />
               {t("New Record")}
             </button> : null}>
@@ -298,7 +298,7 @@ export function AssetsView({
         </Panel> : null}
 
       {activeAssetSection === "hierarchy" ? <div className="grid gap-5 xl:grid-cols-[430px_1fr]">
-          <Panel title={t("Asset Hierarchy")} subtitle={t("Customer / location to asset structure for fast plant navigation.")} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800">
+          <Panel title={t("Asset Hierarchy")} subtitle={t("Customer / location to asset structure for fast plant navigation.")} language={language} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800">
                 <Plus className="h-4 w-4" />
                 {t("Add Asset")}
               </button> : null}>
@@ -311,15 +311,15 @@ export function AssetsView({
                 <AssetMiniSelect value={assetFilters.status} onChange={value => setAssetFilters(current => ({
               ...current,
               status: value
-            }))} options={["", "Active", "Down", "Maintenance", "operational", "warning", "down"]} label="Status" />
+            }))} options={["", "Active", "Down", "Maintenance", "operational", "warning", "down"]} label="Status" language={language} />
                 <AssetMiniSelect value={assetFilters.level} onChange={value => setAssetFilters(current => ({
               ...current,
               level: value
-            }))} options={["", "Site", "Area / Department", "System", "Equipment", "Component"]} label="Type" />
+            }))} options={["", "Site", "Area / Department", "System", "Equipment", "Component"]} label="Type" language={language} />
                 <AssetMiniSelect value={assetFilters.criticality} onChange={value => setAssetFilters(current => ({
               ...current,
               criticality: value
-            }))} options={["", "Low", "Medium", "High", "Critical"]} label="Criticality" />
+            }))} options={["", "Low", "Medium", "High", "Critical"]} label="Criticality" language={language} />
               </div>
             </div>
 
@@ -332,14 +332,14 @@ export function AssetsView({
           if (dragged) handleDrop(dragged, null);
         }}>
               {companyTrees.map(company => <AssetCompanyNode key={company.id} company={company} rows={rows} selectedId={selectedAsset?.id} expanded={expanded} onToggle={toggleExpanded} onSelect={setSelectedAssetId} onDropAsset={handleDrop} canManage={canEditAsset} language={language} />)}
-              {!companyTrees.some(company => company.children.length) ? <EmptyState title={t("No equipment")} message="Add Site assets first, then attach areas, systems, equipment, and components." /> : null}
+              {!companyTrees.some(company => company.children.length) ? <EmptyState title="No equipment" message="Add Site assets first, then attach areas, systems, equipment, and components." language={language} /> : null}
             </div>
           </Panel>
 
           <AssetDetailsPanel asset={selectedAsset} rows={scopedRows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} canDeleteTimeline={canDeleteTimeline} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} onDeleteTimelineEntry={handleAssetTimelineDelete} measurementTemplates={measurementTemplates} canManageMeasurementTemplates={canManageMeasurementTemplates} canCreateMeasurementTemplate={canCreateMeasurementTemplate} canEditMeasurementTemplate={canEditMeasurementTemplate} canDeleteMeasurementTemplate={canDeleteMeasurementTemplate} onSaveMeasurementTemplate={saveMeasurementTemplate} onDeleteMeasurementTemplate={deleteMeasurementTemplate} language={language} />
         </div> : null}
 
-      {activeAssetSection === "assets" ? <Panel title={t("Assets")} subtitle={t("Create, update, and control operational records through the existing REST API.")} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
+      {activeAssetSection === "assets" ? <Panel title={t("Assets")} subtitle={t("Create, update, and control operational records through the existing REST API.")} language={language} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
               <Plus className="h-4 w-4" />
               {t("New Record")}
             </button> : null}>
@@ -404,6 +404,7 @@ export function AssetCompanyNode({
   canManage,
   language
 }) {
+  const t = text => tr(language, text);
   const isOpen = expanded[`company-${company.id}`] ?? true;
   return <div className="mb-2">
       <div className="mb-1 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-2 py-2" onDragOver={event => {
@@ -422,7 +423,7 @@ export function AssetCompanyNode({
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-black text-slate-950">{company.name}</p>
-          <p className="truncate text-xs font-semibold text-blue-700">Company / Location Root</p>
+          <p className="truncate text-xs font-semibold text-blue-700">{t("Company / Location Root")}</p>
         </div>
       </div>
       {isOpen ? company.children.map(node => <AssetTreeNode key={node.id} node={node} rows={rows} selectedId={selectedId} expanded={expanded} onToggle={onToggle} onSelect={onSelect} onDropAsset={onDropAsset} canManage={canManage} depth={1} language={language} />) : null}
@@ -441,6 +442,7 @@ export function AssetTreeNode({
   depth,
   language
 }) {
+  const t = text => tr(language, text);
   const hasChildren = node.children.length > 0;
   const isOpen = expanded[node.id] ?? depth < 2;
   const selected = Number(selectedId) === Number(node.id);
@@ -467,7 +469,7 @@ export function AssetTreeNode({
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-black text-slate-950">{node.name}</p>
-              <p className="truncate text-xs font-semibold text-slate-500">{node.asset_code || `AST-${node.id}`} - {node.asset_level || "Equipment"}</p>
+              <p className="truncate text-xs font-semibold text-slate-500">{node.asset_code || `AST-${node.id}`} - {t(node.asset_level || "Equipment")}</p>
             </div>
           </div>
         </button>

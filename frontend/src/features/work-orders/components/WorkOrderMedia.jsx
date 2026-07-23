@@ -81,7 +81,8 @@ export function PhotoUploader({
   title,
   photos,
   onChange,
-  uploadLabel
+  uploadLabel,
+  emptyLabel = "No photos uploaded"
 }) {
   async function handleFiles(files) {
     const next = await Promise.all(Array.from(files).map(readFileAsDataUrl));
@@ -101,7 +102,7 @@ export function PhotoUploader({
             <img src={photo} alt="" className="h-24 w-full object-cover" />
             <button type="button" onClick={() => onChange(photos.filter((_, itemIndex) => itemIndex !== index))} className="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-xs font-black text-red-600">x</button>
           </div>)}
-        {!photos.length ? <div className="col-span-3 rounded-lg border border-dashed border-slate-300 bg-white py-8 text-center text-sm font-semibold text-slate-500">No photos uploaded</div> : null}
+        {!photos.length ? <div className="col-span-3 rounded-lg border border-dashed border-slate-300 bg-white py-8 text-center text-sm font-semibold text-slate-500">{emptyLabel}</div> : null}
       </div>
     </div>;
 }

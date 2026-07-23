@@ -70,20 +70,20 @@ export function EmployeesManagementPage({
               <EmployeeFilterSelect label={t("Role")} value={filters.role} onChange={value => setFilters(current => ({
             ...current,
             role: value
-          }))} options={["", ...EMPLOYEE_ROLE_OPTIONS]} />
+          }))} options={["", ...EMPLOYEE_ROLE_OPTIONS]} language={language} />
               <EmployeeFilterSelect label={t("Status")} value={filters.status} onChange={value => setFilters(current => ({
             ...current,
             status: value
-          }))} options={["", "active", "off_duty", "inactive"]} />
+          }))} options={["", "active", "off_duty", "inactive"]} language={language} />
               <EmployeeFilterSelect label={t("Department")} value={filters.department} onChange={value => setFilters(current => ({
             ...current,
             department: value
-          }))} options={["", ...departments]} />
+          }))} options={["", ...departments]} language={language} />
             </div>
 
             <div className="grid gap-4 xl:grid-cols-3 md:grid-cols-2">
               {filteredRows.map(employee => <EmployeeCard key={employee.id} employee={employee} onEdit={canEdit ? onEdit : null} onDelete={canDelete ? onDelete : null} language={language} />)}
-              {!filteredRows.length ? <EmptyState title={t("No employees found")} message={t("Adjust search or filters to view staff records.")} /> : null}
+              {!filteredRows.length ? <EmptyState title={t("No employees found")} message={t("Adjust search or filters to view staff records.")} language={language} /> : null}
             </div>
           </Panel>
 
@@ -102,11 +102,11 @@ export function EmployeesManagementPage({
                         <td className="whitespace-nowrap px-4 py-3 font-black text-slate-900">{employeeCode(employee)}</td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <p className="font-black text-slate-950">{employee.name}</p>
-                          <p className="text-xs font-semibold text-slate-500">@{employee.username || "no-login"}</p>
+                          <p className="text-xs font-semibold text-slate-500">@{employee.username || t("no-login")}</p>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-700">{employeeJobTitle(employee)}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-700">{employeeDepartment(employee)}</td>
-                        <td className="whitespace-nowrap px-4 py-3"><RoleBadge value={employee.role} /></td>
+                        <td className="whitespace-nowrap px-4 py-3"><RoleBadge value={employee.role} language={language} /></td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">{employee.phone || "-"}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">{employee.email || "-"}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">{employeeWorkLocation(employee)}</td>
@@ -193,7 +193,7 @@ export function EmployeeCard({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-        <RoleBadge value={employee.role} />
+        <RoleBadge value={employee.role} language={language} />
         <div className="flex gap-2">
           {onEdit ? <button type="button" onClick={() => onEdit(employee)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-400 hover:text-blue-700">{t("Edit")}</button> : null}
           {onDelete ? <button type="button" onClick={() => onDelete(employee.id)} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50">{t("Delete")}</button> : null}
@@ -216,22 +216,25 @@ export function EmployeeFilterSelect({
   label,
   value,
   onChange,
-  options
+  options,
+  language
 }) {
+  const t = text => tr(language, text);
   return <label className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
       <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
       <select value={value} onChange={event => onChange(event.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none">
-        {options.map(option => <option key={option || "all"} value={option}>{option ? filterOptionLabel(option) : "All"}</option>)}
+        {options.map(option => <option key={option || "all"} value={option}>{option ? filterOptionLabel(option, language) : t("All")}</option>)}
       </select>
     </label>;
 }
 
-export function filterOptionLabel(option) {
-  return EMPLOYEE_ROLE_OPTIONS.includes(option) ? employeeRoleLabel(option) : String(option).replace("_", " ");
+export function filterOptionLabel(option, language) {
+  return tr(language, EMPLOYEE_ROLE_OPTIONS.includes(option) ? employeeRoleLabel(option) : String(option).replaceAll("_", " "));
 }
 
 export function RoleBadge({
-  value
+  value,
+  language
 }) {
   const role = employeeRole(value);
   const tone = {
@@ -240,5 +243,5 @@ export function RoleBadge({
     store_keeper: "border-amber-200 bg-amber-50 text-amber-700",
     viewer: "border-slate-200 bg-slate-100 text-slate-600"
   }[role] || "border-slate-200 bg-slate-100 text-slate-600";
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${tone}`}>{employeeRoleLabel(role)}</span>;
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${tone}`}>{tr(language, employeeRoleLabel(role))}</span>;
 }

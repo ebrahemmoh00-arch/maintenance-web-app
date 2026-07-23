@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { uiText } from "../i18n/index.js";
 
-export default function FormModal({ title, fields, value, setValue, onSubmit, onClose, options = {}, onAddOption, labels = {} }) {
+export default function FormModal({ title, fields, value, setValue, onSubmit, onClose, options = {}, onAddOption, labels = {}, language }) {
   const [optionDrafts, setOptionDrafts] = useState({});
   const update = (key, next) => setValue({ ...value, [key]: next });
   const optionValue = (field, raw) => {
@@ -36,11 +37,11 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
       <form onSubmit={onSubmit} className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-5">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">{labels.record || "Maintenance Record"}</p>
-            <h3 className="mt-1 text-lg font-black text-slate-950">{title}</h3>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">{uiText(labels.record || "Maintenance Record", language)}</p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">{uiText(title, language)}</h3>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-950">
-            {labels.close || "Close"}
+            {uiText(labels.close || "Close", language)}
           </button>
         </div>
         <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-6 md:grid-cols-2">
@@ -50,13 +51,13 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
             return (
               <label key={field.key} className={field.type === "textarea" ? "md:col-span-2" : ""}>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                  {field.label}
+                  {uiText(field.label, language)}
                   {isRequired ? <span className="text-red-600"> *</span> : null}
                 </span>
                 {field.type === "select" ? (
                   <>
                     <select className={common} value={value[field.key] ?? ""} onChange={(event) => update(field.key, optionValue(field, event.target.value))} disabled={field.readOnly} required={isRequired} aria-required={isRequired}>
-                      <option value="">{labels.select || "Select"}</option>
+                      <option value="">{uiText(labels.select || "Select", language)}</option>
                       {selectOptions(field).map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
@@ -69,7 +70,7 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
                           className={common}
                           type="text"
                           value={optionDrafts[field.key] ?? ""}
-                          placeholder={field.addPlaceholder || "Add option"}
+                          placeholder={uiText(field.addPlaceholder || "Add option", language)}
                           onChange={(event) => updateOptionDraft(field.key, event.target.value)}
                           onKeyDown={(event) => {
                             if (event.key === "Enter") {
@@ -83,7 +84,7 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
                           onClick={() => addOption(field)}
                           className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-blue-800"
                         >
-                          {field.addLabel || labels.add || "Add"}
+                          {uiText(field.addLabel || labels.add || "Add", language)}
                         </button>
                       </div>
                     ) : null}
@@ -101,17 +102,17 @@ export default function FormModal({ title, fields, value, setValue, onSubmit, on
                     aria-required={isRequired}
                   />
                 )}
-                {field.hint ? <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">{field.hint}</p> : null}
+                {field.hint ? <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">{uiText(field.hint, language)}</p> : null}
               </label>
             );
           })}
         </div>
         <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-950">
-            {labels.cancel || "Cancel"}
+            {uiText(labels.cancel || "Cancel", language)}
           </button>
           <button type="submit" className="rounded-lg bg-blue-700 px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-800">
-            {labels.save || "Save Changes"}
+            {uiText(labels.save || "Save Changes", language)}
           </button>
         </div>
       </form>

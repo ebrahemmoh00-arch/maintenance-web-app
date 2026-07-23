@@ -130,7 +130,7 @@ export function DashboardWorkOrderStatusPanel({
   language
 }) {
   return <Panel title={tr(language, "Work Order Status")} subtitle={tr(language, "Work orders grouped by current workflow status.")} actions={<button type="button" onClick={() => onNavigate?.("work-orders")} className="text-sm font-black text-blue-700 hover:text-blue-900">{tr(language, "View All")}</button>}>
-      {hasChartValue(metrics.workOrderStatusPie) ? <DonutChart data={metrics.workOrderStatusPie} centerLabel="Orders" /> : <DashboardEmptyState title="No work order status data available yet." actionLabel="Create First Work Order" onAction={() => onNavigate?.("work-orders")} language={language} />}
+      {hasChartValue(metrics.workOrderStatusPie) ? <DonutChart data={metrics.workOrderStatusPie} centerLabel={tr(language, "Orders")} /> : <DashboardEmptyState title="No work order status data available yet." actionLabel="Create First Work Order" onAction={() => onNavigate?.("work-orders")} language={language} />}
     </Panel>;
 }
 
@@ -141,7 +141,7 @@ export function DashboardWorkOrderCountCharts({
   const technicianData = useMemo(() => technicianWorkloadData(workOrders, language, 100), [workOrders, language]);
   const engineerData = useMemo(() => engineerWorkloadData(workOrders, language, 100), [workOrders, language]);
   return <div className="grid gap-6 xl:grid-cols-2">
-      <WorkOrderParticipationPanel title="Technician Work Order Participation" subtitle="Technician name linked to the number of work orders he participated in." filterTitle="Technicians" data={technicianData} color="cyan" />
-      <WorkOrderParticipationPanel title="Engineer Work Order Participation" subtitle="Engineer name linked to the number of work orders assigned or issued." filterTitle="Engineers" data={engineerData} color="blue" />
+      <WorkOrderParticipationPanel title="Technician Work Order Participation" subtitle="Technician name linked to the number of work orders he participated in." filterTitle="Technicians" data={technicianData} color="cyan" language={language} />
+      <WorkOrderParticipationPanel title="Engineer Work Order Participation" subtitle="Engineer name linked to the number of work orders assigned or issued." filterTitle="Engineers" data={engineerData} color="blue" language={language} />
     </div>;
 }

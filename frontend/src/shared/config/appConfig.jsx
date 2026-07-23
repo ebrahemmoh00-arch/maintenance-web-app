@@ -1,6 +1,6 @@
 import { EMPLOYEE_ROLE_OPTIONS } from "../../features/authentication/services/authSession.js";
 import { MaintenanceBadge, PriorityBadge, StatusBadge, StockBadge, WorkOrderStatus, valueLabel } from "../components/StatusBadges.jsx";
-import { translate } from "../i18n/index.js";
+import { formatNumber, translate } from "../i18n/index.js";
 import { buildUnifiedPmRows, maintenanceIdentityKey, pmPlanToFollowUpTask } from "../utils/pmPlanSchedule.js";
 import { resources } from "./resourceRegistry.jsx";
 
@@ -507,6 +507,12 @@ export function localizedConfig(resourceKey, language) {
       }
       if (resourceKey === "work-orders" && column.key === "priority") {
         localized.render = row => <PriorityBadge value={row.priority} language={language} />;
+      }
+      if (resourceKey === "pm-plans" && column.key === "recurrence_type") {
+        localized.render = row => row.recurrence_type === "Runtime Hours" ? tr(language, "Operating Hours") : row.recurrence_type === "Daily" ? tr(language, "Calendar Days") : tr(language, row.recurrence_type);
+      }
+      if (resourceKey === "pm-plans" && column.key === "interval_value") {
+        localized.render = row => <span className="font-black text-slate-800">{formatNumber(row.interval_value, language)} {row.recurrence_type === "Runtime Hours" ? tr(language, "Hours") : row.recurrence_type === "Daily" ? tr(language, "Days") : tr(language, row.recurrence_type)}</span>;
       }
       if (column.key === "status" && resourceKey !== "work-orders") {
         localized.render = row => <StatusBadge value={row.status} language={language} />;

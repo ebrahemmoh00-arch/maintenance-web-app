@@ -1,5 +1,6 @@
 import { ChevronDown, FileText, Printer } from "lucide-react";
 import { useState } from "react";
+import { tr } from "../../../shared/config/appConfig.jsx";
 import { documentTemplates } from "./documentTemplates.js";
 
 export function DocumentCenterMenu({
@@ -7,9 +8,11 @@ export function DocumentCenterMenu({
   onPrint,
   onOpen,
   label = "Export",
-  compact = false
+  compact = false,
+  language
 }) {
   const [open, setOpen] = useState(false);
+  const t = text => tr(language, text);
 
   function choose(templateKey) {
     setOpen(false);
@@ -32,7 +35,7 @@ export function DocumentCenterMenu({
         aria-expanded={open}
       >
         <FileText className="h-4 w-4" />
-        {label}
+        {t(label)}
         <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
@@ -46,7 +49,7 @@ export function DocumentCenterMenu({
               role="menuitem"
             >
               <FileText className="h-4 w-4" />
-              {template.label}
+              {t(template.label)}
             </button>
           ))}
           <div className="my-2 border-t border-slate-100" />
@@ -60,7 +63,7 @@ export function DocumentCenterMenu({
             role="menuitem"
           >
             <Printer className="h-4 w-4" />
-            Print
+            {t("Print")}
           </button>
         </div>
       ) : null}

@@ -2,6 +2,7 @@ import { AlertTriangle, Eye, MoreHorizontal, Plus, QrCode, RotateCcw, Save, Tras
 
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { PriorityBadge, StatusBadge } from "../../../shared/components/StatusBadges.jsx";
+import { tr } from "../../../shared/config/appConfig.jsx";
 import { DocumentCenterMenu } from "../documents/DocumentCenterMenu.jsx";
 import { SavedWorkOrderFilters, SavedWorkOrdersTable } from "./SavedWorkOrders.jsx";
 import {
@@ -124,23 +125,23 @@ export function WorkOrdersWorkspace({ app }) {
                 <PriorityBadge value={form.priority} language={language} />
               </div>
               <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm font-bold text-slate-600">
-                <span>{selectedEquipment?.name || "Asset not selected"}</span>
+                <span>{selectedEquipment?.name || t("Asset not selected")}</span>
                 <span>{quickAssignedTo}</span>
                 {viewingSavedId ? <span className="text-blue-700">{t("Viewing Saved Work Order")}</span> : null}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <WorkOrderActionButton disabled={!canRunAction || !actionKeys.has("pause")} onClick={() => runLifecycle("pause")} label="Pause" />
-              <WorkOrderActionButton disabled={!canRunAction || !actionKeys.has("waiting-parts")} onClick={() => runLifecycle("waiting-parts")} label="Waiting Parts" />
-              <WorkOrderActionButton primary disabled={!canRunAction || !actionKeys.has("complete")} onClick={() => runLifecycle("complete")} label="Complete" />
+              <WorkOrderActionButton disabled={!canRunAction || !actionKeys.has("pause")} onClick={() => runLifecycle("pause")} label={t("Pause")} />
+              <WorkOrderActionButton disabled={!canRunAction || !actionKeys.has("waiting-parts")} onClick={() => runLifecycle("waiting-parts")} label={t("Waiting Parts")} />
+              <WorkOrderActionButton primary disabled={!canRunAction || !actionKeys.has("complete")} onClick={() => runLifecycle("complete")} label={t("Complete")} />
               <div className="relative">
-                <button type="button" onClick={() => setMoreActionsOpen((value) => !value)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700" aria-label="More actions">
+                <button type="button" onClick={() => setMoreActionsOpen((value) => !value)} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-blue-300 hover:text-blue-700" aria-label={t("More actions")}>
                   <MoreHorizontal className="h-5 w-5" />
                 </button>
                 {moreActionsOpen ? (
                   <div className="absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
                     <div className="px-1 py-1">
-                      <DocumentCenterMenu onExport={exportWorkOrderPdf} onPrint={printWorkOrderDocument} onOpen={preloadDocumentCenter} compact />
+                      <DocumentCenterMenu onExport={exportWorkOrderPdf} onPrint={printWorkOrderDocument} onOpen={preloadDocumentCenter} compact language={language} />
                     </div>
                     <button type="button" onClick={qrOpen ? closeQrScanner : openQrScanner} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><QrCode className="h-4 w-4" />{t("Scan Equipment QR")}</button>
                     <button type="button" onClick={onBackToEquipment} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50"><Eye className="h-4 w-4" />{t("Back to Equipment")}</button>
@@ -211,16 +212,16 @@ export function WorkOrdersWorkspace({ app }) {
               </div>
             ) : null}
 
-            <WorkOrderQuickInfo fields={[["Asset", selectedEquipment?.name || "-"], ["Location", selectedCustomer?.name || selectedEquipment?.location || form.location || "-"], ["PM / Corrective", form.maintenance_type || "-"], ["Reporter", form.shift_engineer_name || selectedEngineer?.name || "-"], ["Assigned To", quickAssignedTo], ["Planned Date", form.start_date || "-"], ["Estimated Hours", estimatedHours], ["Current Runtime", `${Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} h`]]} />
+            <WorkOrderQuickInfo fields={[["Asset", selectedEquipment?.name || "-"], ["Location", selectedCustomer?.name || selectedEquipment?.location || form.location || "-"], ["PM / Corrective", form.maintenance_type || "-"], ["Reporter", form.shift_engineer_name || selectedEngineer?.name || "-"], ["Assigned To", quickAssignedTo], ["Planned Date", form.start_date || "-"], ["Estimated Hours", estimatedHours], ["Current Runtime", `${Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} h`]]} language={language} />
 
             {smartAlerts.length ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
                   <div>
-                    <p className="text-sm font-black text-amber-900">Smart Alerts</p>
+                    <p className="text-sm font-black text-amber-900">{t("Smart Alerts")}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {smartAlerts.map((alert) => <span key={alert} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">{alert}</span>)}
+                      {smartAlerts.map((alert) => <span key={alert} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-800 ring-1 ring-amber-200">{t(alert)}</span>)}
                     </div>
                   </div>
                 </div>
@@ -232,19 +233,19 @@ export function WorkOrdersWorkspace({ app }) {
                 {workOrderTabs.map(([key, label, Icon]) => (
                   <button key={key} type="button" onClick={() => setActiveWorkOrderTab(key)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black transition ${activeWorkOrderTab === key ? "bg-blue-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"}`}>
                     <Icon className="h-4 w-4" />
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
 
               <div className="p-5">
                 {activeWorkOrderTab === "overview" ? <WorkOrderOverviewTab form={form} update={update} updateStatus={updateStatus} status={currentStatus} selectedEquipment={selectedEquipment} selectedCustomer={selectedCustomer} photosBefore={form.before_photos} photosAfter={form.after_photos} updatePhotos={updatePhotos} language={language} /> : null}
-                {activeWorkOrderTab === "checklist" ? <WorkOrderChecklistTab draft={lifecycleDraft} setDraft={setLifecycleDraft} checklistProgress={checklistProgress} form={form} /> : null}
-                {activeWorkOrderTab === "labor" ? <WorkOrderLaborTab form={form} update={update} draft={lifecycleDraft} setDraft={setLifecycleDraft} duration={duration} selectedEquipment={selectedEquipment} seniorTeamTechnician={seniorTeamTechnician} /> : null}
-                {activeWorkOrderTab === "parts" ? <WorkOrderPartsTab items={form.spare_parts_items} inventory={inventory} onChange={updateSparePart} onAdd={addSparePart} onRemove={removeSparePart} total={partsTotal} /> : null}
-                {activeWorkOrderTab === "attachments" ? <WorkOrderAttachmentsTab form={form} updateSignature={updateSignature} labels={{ clear: t("Clear Signature") }} /> : null}
-                {activeWorkOrderTab === "history" ? <WorkOrderHistoryTab order={activeSavedOrder} /> : null}
-                {activeWorkOrderTab === "notes" ? <WorkOrderNotesTab form={form} update={update} selectedEngineer={selectedEngineer} /> : null}
+                {activeWorkOrderTab === "checklist" ? <WorkOrderChecklistTab draft={lifecycleDraft} setDraft={setLifecycleDraft} checklistProgress={checklistProgress} form={form} language={language} /> : null}
+                {activeWorkOrderTab === "labor" ? <WorkOrderLaborTab form={form} update={update} draft={lifecycleDraft} setDraft={setLifecycleDraft} duration={duration} selectedEquipment={selectedEquipment} seniorTeamTechnician={seniorTeamTechnician} language={language} /> : null}
+                {activeWorkOrderTab === "parts" ? <WorkOrderPartsTab items={form.spare_parts_items} inventory={inventory} onChange={updateSparePart} onAdd={addSparePart} onRemove={removeSparePart} total={partsTotal} language={language} /> : null}
+                {activeWorkOrderTab === "attachments" ? <WorkOrderAttachmentsTab form={form} updateSignature={updateSignature} labels={{ clear: t("Clear Signature") }} language={language} /> : null}
+                {activeWorkOrderTab === "history" ? <WorkOrderHistoryTab order={activeSavedOrder} language={language} /> : null}
+                {activeWorkOrderTab === "notes" ? <WorkOrderNotesTab form={form} update={update} selectedEngineer={selectedEngineer} language={language} /> : null}
               </div>
             </div>
           </div>
@@ -253,8 +254,8 @@ export function WorkOrdersWorkspace({ app }) {
             <div className="rounded-2xl bg-blue-700 p-4 text-white shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">QR Code</p>
-                  <p className="mt-2 text-sm font-bold text-blue-50">Open this work order from mobile.</p>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">{t("QR Code")}</p>
+                  <p className="mt-2 text-sm font-bold text-blue-50">{t("Open this work order from mobile.")}</p>
                 </div>
                 <div className="grid h-16 w-16 place-items-center rounded-xl bg-white text-blue-700">
                   <QrCode className="h-9 w-9" />
@@ -263,8 +264,8 @@ export function WorkOrdersWorkspace({ app }) {
             </div>
 
             <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-              <p className="text-sm font-black text-slate-950">AI Suggestions</p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">Future assistant area for prior failures, running hours, and suggested actions.</p>
+              <p className="text-sm font-black text-slate-950">{t("AI Suggestions")}</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">{t("Future assistant area for prior failures, running hours, and suggested actions.")}</p>
             </div>
           </aside>
         </div>
@@ -287,7 +288,7 @@ export function WorkOrdersWorkspace({ app }) {
             <button type="button" onClick={openSelected} disabled={!selectedSavedId} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">{t("Open Selected")}</button>
             {canEdit ? <button type="button" onClick={editSelected} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit Selected")}</button> : null}
             {canDelete ? <button type="button" onClick={deleteSelected} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50">{t("Delete Selected")}</button> : null}
-            <DocumentCenterMenu onExport={exportWorkOrderPdf} onPrint={printWorkOrderDocument} onOpen={preloadDocumentCenter} compact />
+            <DocumentCenterMenu onExport={exportWorkOrderPdf} onPrint={printWorkOrderDocument} onOpen={preloadDocumentCenter} compact language={language} />
             {canCreate ? <button type="button" onClick={newWorkOrder} className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">{t("New Work Order")}</button> : null}
           </div>
         }
@@ -319,13 +320,7 @@ function TeamMembersCard({
   onRemove,
   language
 }) {
-  const t = text => language === "ar" ? {
-    "TEAM Members": "أعضاء الفريق",
-    "Add the team members who worked on this work order.": "أضف أعضاء الفريق الذين عملوا على أمر الشغل.",
-    "Team Member": "عضو الفريق",
-    "Add Team Member": "إضافة عضو",
-    "Remove member": "حذف العضو"
-  }[text] || text : text;
+  const t = text => tr(language, text);
   const safeMembers = members?.length ? members : [""];
   return (
     <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -385,6 +380,7 @@ function TeamMembersCard({
 function WorkOrderPrintDocument({ app }) {
   const {
     t,
+    language,
     form,
     update,
     updateMember,
@@ -415,15 +411,15 @@ function WorkOrderPrintDocument({ app }) {
               <DocLabel>{t("Issue Date")}:</DocLabel><DocStatic>{ISSUE_DATE}</DocStatic>
               <DocLabel>{t("W.O No")}:</DocLabel><DocStatic>{form.wo_no}</DocStatic>
             </div>
-            <div className="grid place-items-center border-r-2 border-slate-950 px-4 text-center text-xl font-black">Maintenance Work Order</div>
+            <div className="grid place-items-center border-r-2 border-slate-950 px-4 text-center text-xl font-black">{t("Maintenance Work Order")}</div>
             <div className="grid place-items-center p-4">
               <div className="text-center text-slate-900">
                 <div className="text-3xl font-black tracking-[0.18em]">CMMS</div>
-                <div className="mt-1 text-[11px] font-bold leading-tight">Maintenance<br />Management<br />System</div>
+                <div className="mt-1 text-[11px] font-bold leading-tight">{t("Maintenance Management System")}</div>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>Firstly</DocSectionLabel><div className="bg-white" /></div>
+          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>{t("Firstly")}</DocSectionLabel><div className="bg-white" /></div>
           <div className="grid grid-cols-[340px_1fr] border-b border-slate-950">
             <DocLabel>{t("THE WORK ORDER IS ISSUED BY SHIFT ENGINEER")}:</DocLabel>
             <DocSelect value={form.shift_engineer_name} onChange={(value) => update("shift_engineer_name", value)} options={engineers.map((item) => item.name)} />
@@ -437,7 +433,7 @@ function WorkOrderPrintDocument({ app }) {
             <DocTextarea value={form.task_description} onChange={(value) => update("task_description", value)} rows={8} />
             <div className="border-l-2 border-slate-950">
               <DocBand>{t("RH / Service Hours")}</DocBand>
-              <div className="grid h-16 place-items-center border-b-2 border-slate-950 text-lg font-black">{Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} hours</div>
+              <div className="grid h-16 place-items-center border-b-2 border-slate-950 text-lg font-black">{Number(selectedEquipment?.current_hours ?? form.service_hours ?? 0).toLocaleString()} {t("hours")}</div>
               <div className="grid h-16 place-items-center border-b-2 border-slate-950 text-sm font-bold">S.N: {selectedEquipment?.serial_number || form.serial_number || "-"}</div>
               <DocBand>{t("The Start Of Task")}</DocBand>
               <DocManualTimeRow label={t("Starting Time is")} value={form.start_time} onChange={(value) => update("start_time", value)} />
@@ -451,23 +447,23 @@ function WorkOrderPrintDocument({ app }) {
             <div className="border-l-2 border-slate-950">
               <DocBand>{t("Location")}</DocBand>
               <div className="grid h-[126px] place-items-center border-b-2 border-slate-950 px-3 text-center text-lg font-black">{selectedCustomer?.name || selectedEquipment?.location || "-"}</div>
-              <DocStackSelect label={t("Type of maintenance")} value={form.maintenance_type} onChange={(value) => update("maintenance_type", value)} options={["Preventive Maintenance", "Corrective Maintenance", "Condition Based / Predictive", "Periodic / Time based", "Breakdown", "Inspection", "Service"]} />
-              <DocStackSelect label={t("Priority")} value={form.priority} onChange={(value) => update("priority", value)} options={["low", "medium", "high", "critical"]} />
-              <DocStackSelect label={t("Status")} value={form.status} onChange={(value) => update("status", value)} options={["pending", "in_progress", "completed", "cancelled"]} />
+              <DocStackSelect label={t("Type of maintenance")} value={form.maintenance_type} onChange={(value) => update("maintenance_type", value)} options={["Preventive Maintenance", "Corrective Maintenance", "Condition Based / Predictive", "Periodic / Time based", "Breakdown", "Inspection", "Service"]} language={language} />
+              <DocStackSelect label={t("Priority")} value={form.priority} onChange={(value) => update("priority", value)} options={["low", "medium", "high", "critical"]} language={language} />
+              <DocStackSelect label={t("Status")} value={form.status} onChange={(value) => update("status", value)} options={["pending", "in_progress", "completed", "cancelled"]} language={language} />
             </div>
           </div>
           <div className="grid grid-cols-2 border-b-2 border-slate-950">
             <DocField shaded label={t("Work Order Executor Name")} value={form.executor_name} onChange={(value) => update("executor_name", value)} options={engineers.map((item) => item.name)} />
             <DocField shaded label={t("Job Title")} value={form.executor_job_title} onChange={(value) => update("executor_job_title", value)} options={["Shift Engineer", "Senior Electrical Technician", "Mechanical Technician", "Maintenance Engineer"]} />
           </div>
-          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>Thirdly</DocSectionLabel><div /></div>
+          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>{t("Thirdly")}</DocSectionLabel><div /></div>
           <div className="grid grid-cols-[1fr_420px] border-b-2 border-slate-950">
             <DocBox shadedLabel label={t("The Necessary requirements before starting the mentioned task")} value={form.requirements} onChange={(value) => update("requirements", value)} />
             <InventorySpareParts items={form.spare_parts_items} onChange={updateSparePart} onAdd={addSparePart} labels={{ title: t("Inventory-linked spare parts"), part: t("Part name"), qty: t("Qty"), add: t("Add part") }} />
-            <DocBox shadedLabel label="QHSE INSTRUCTIONS" value={form.qhse_instructions} onChange={(value) => update("qhse_instructions", value)} />
+            <DocBox shadedLabel label={t("QHSE INSTRUCTIONS")} value={form.qhse_instructions} onChange={(value) => update("qhse_instructions", value)} />
             <DocBox shadedLabel label={t("Safety Responsible")} value={form.safety_responsible} onChange={(value) => update("safety_responsible", value)} />
           </div>
-          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>Fourthly</DocSectionLabel><div /></div>
+          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>{t("Fourthly")}</DocSectionLabel><div /></div>
           <DocBox shadedLabel label={t("Site Preparation")} value={form.site_preparation} onChange={(value) => update("site_preparation", value)} wide />
           <div className="grid grid-cols-[1fr_1fr] border-b-2 border-slate-950">
             <DocField shaded label={t("Work Order Holder Name")} value={form.holder_name} onChange={(value) => update("holder_name", value)} options={engineers.map((item) => item.name)} />
@@ -475,8 +471,8 @@ function WorkOrderPrintDocument({ app }) {
             <SignaturePad title={`${t("Signature")}: ${t("Work Order Holder Name")}`} value={form.signature_executor} onChange={(value) => updateSignature("signature_executor", value)} labels={{ clear: t("Clear Signature") }} />
             <SignaturePad title={`${t("Signature")}: ${t("Shift Engineer Name")}`} value={form.signature_shift_engineer} onChange={(value) => updateSignature("signature_shift_engineer", value)} labels={{ clear: t("Clear Signature") }} />
           </div>
-          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>Fifth</DocSectionLabel><DocStatic>Ending the Work Order</DocStatic></div>
-          <DocBand>We have worked to fulfill the assigned task to us in accordance with the work order reference number and now we have finished the task.</DocBand>
+          <div className="grid grid-cols-[170px_1fr] border-b-2 border-slate-950"><DocSectionLabel>{t("Fifth")}</DocSectionLabel><DocStatic>{t("Ending the Work Order")}</DocStatic></div>
+          <DocBand>{t("We have worked to fulfill the assigned task to us in accordance with the work order reference number and now we have finished the task.")}</DocBand>
           <DocBox label={t("Recommendation")} value={form.recommendation} onChange={(value) => update("recommendation", value)} wide />
           <div className="grid grid-cols-2 border-b-2 border-slate-950">
             <DocField shaded label={t("Executive Name")} value={form.executive_name} onChange={(value) => update("executive_name", value)} options={engineers.map((item) => item.name)} />
@@ -485,15 +481,15 @@ function WorkOrderPrintDocument({ app }) {
             <DocStatic>{t("Signature")}:</DocStatic>
           </div>
           <div className="grid grid-cols-[1fr_1fr] border-b-2 border-slate-950">
-            <DocStatic shaded>Manager Signature</DocStatic>
+            <DocStatic shaded>{t("Manager Signature")}</DocStatic>
             <DocSelect value={form.manager_name} onChange={(value) => update("manager_name", value)} options={engineers.map((item) => item.name)} />
           </div>
-          <SignaturePad title={`${t("Digital Signature")}: Manager Signature`} value={form.signature_manager} onChange={(value) => updateSignature("signature_manager", value)} labels={{ clear: t("Clear Signature") }} />
+          <SignaturePad title={`${t("Digital Signature")}: ${t("Manager Signature")}`} value={form.signature_manager} onChange={(value) => updateSignature("signature_manager", value)} labels={{ clear: t("Clear Signature") }} />
         </div>
       </div>
       <div className="hidden gap-4 border-t border-slate-200 bg-white p-4 lg:grid-cols-2">
-        <PhotoUploader title={t("Before Maintenance Photos")} photos={form.before_photos} onChange={(photos) => updatePhotos("before_photos", photos)} uploadLabel={t("Upload Photos")} />
-        <PhotoUploader title={t("After Maintenance Photos")} photos={form.after_photos} onChange={(photos) => updatePhotos("after_photos", photos)} uploadLabel={t("Upload Photos")} />
+        <PhotoUploader title={t("Before Maintenance Photos")} photos={form.before_photos} onChange={(photos) => updatePhotos("before_photos", photos)} uploadLabel={t("Upload Photos")} emptyLabel={t("No photos uploaded")} />
+        <PhotoUploader title={t("After Maintenance Photos")} photos={form.after_photos} onChange={(photos) => updatePhotos("after_photos", photos)} uploadLabel={t("Upload Photos")} emptyLabel={t("No photos uploaded")} />
       </div>
     </>
   );

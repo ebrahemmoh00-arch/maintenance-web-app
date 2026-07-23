@@ -1,26 +1,30 @@
+import { tr } from "../../../shared/config/appConfig.jsx";
 import { useState } from "react";
 
-export function formatInterval(task) {
+export function formatInterval(task, language) {
+  const t = text => tr(language, text);
   if (task.source === "pm-plan") {
     const recurrence = String(task.recurrence_type || "Runtime Hours");
     const value = formatScheduleCell(task.interval_value);
-    if (recurrence === "Runtime Hours") return `${value} HR`;
-    if (recurrence === "Daily") return `${value} Days`;
-    if (recurrence === "Weekly") return `${value} Weeks`;
-    if (recurrence === "Monthly") return `${value} Months`;
-    return `${value} ${recurrence}`;
+    if (recurrence === "Runtime Hours") return `${value} ${t("HR")}`;
+    if (recurrence === "Daily") return `${value} ${t("Days")}`;
+    if (recurrence === "Weekly") return `${value} ${t("Weeks")}`;
+    if (recurrence === "Monthly") return `${value} ${t("Months")}`;
+    return `${value} ${t(recurrence)}`;
   }
   const parts = [];
-  if (Number(task.interval_hours || 0)) parts.push(`${formatScheduleCell(task.interval_hours)} HR`);
-  if (Number(task.interval_days || 0)) parts.push(`${formatScheduleCell(task.interval_days)} Days`);
+  if (Number(task.interval_hours || 0)) parts.push(`${formatScheduleCell(task.interval_hours)} ${t("HR")}`);
+  if (Number(task.interval_days || 0)) parts.push(`${formatScheduleCell(task.interval_days)} ${t("Days")}`);
   return parts.join(" / ") || "-";
 }
 
 export function PreviousRecordsTable({
   records,
   canManage = false,
-  onUpdateRecord
+  onUpdateRecord,
+  language
 }) {
+  const t = text => tr(language, text);
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({
     hours: "",
@@ -55,10 +59,10 @@ export function PreviousRecordsTable({
       <table className="min-w-[640px] w-full border-collapse text-sm">
         <thead className="bg-slate-100">
           <tr>
-            <th className="border border-slate-300 px-3 py-2 text-left">Maintenance Count</th>
-            <th className="border border-slate-300 px-3 py-2 text-left">Previous Records</th>
-            <th className="border border-slate-300 px-3 py-2 text-left">Date</th>
-            {canManage ? <th className="border border-slate-300 px-3 py-2 text-left">Actions</th> : null}
+            <th className="border border-slate-300 px-3 py-2 text-left">{t("Maintenance Count")}</th>
+            <th className="border border-slate-300 px-3 py-2 text-left">{t("Previous Records")}</th>
+            <th className="border border-slate-300 px-3 py-2 text-left">{t("Date")}</th>
+            {canManage ? <th className="border border-slate-300 px-3 py-2 text-left">{t("Actions")}</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -81,19 +85,19 @@ export function PreviousRecordsTable({
                 {canManage ? <td className="border border-slate-300 px-3 py-2">
                     {editing ? <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => saveEdit(record)} disabled={savingId === record.id} className="rounded-md bg-blue-700 px-3 py-1 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-60">
-                          {savingId === record.id ? "Saving" : "Save"}
+                          {savingId === record.id ? t("Saving") : t("Save")}
                         </button>
                         <button type="button" onClick={cancelEdit} className="rounded-md border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 hover:border-slate-300">
-                          Cancel
+                          {t("Cancel")}
                         </button>
                       </div> : record.id ? <button type="button" onClick={() => startEdit(record)} className="rounded-md border border-slate-200 px-3 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">
-                        Edit
+                        {t("Edit")}
                       </button> : "-"}
                   </td> : null}
               </tr>;
         })}
           {!records.length ? <tr>
-              <td colSpan={canManage ? 4 : 3} className="border border-slate-300 px-3 py-6 text-center text-slate-500">No previous readings recorded.</td>
+              <td colSpan={canManage ? 4 : 3} className="border border-slate-300 px-3 py-6 text-center text-slate-500">{t("No previous readings recorded.")}</td>
             </tr> : null}
         </tbody>
       </table>

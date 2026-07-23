@@ -16,18 +16,18 @@ export function AccessControlView({
   const t = text => tr(language, text);
   const activeUsers = users.filter(user => user.username || user.email);
   return <div className="space-y-6">
-      <Panel title={t("Access Control")} subtitle="Admin can assign precise permissions by user email. New users start with view-only permissions until the admin increases access.">
+      <Panel title="Access Control" subtitle="Admin can assign precise permissions by user email. New users start with view-only permissions until the admin increases access." language={language}>
         <div className="grid gap-4 md:grid-cols-3">
-          <InfoTile icon={ShieldCheck} title="Admin Master Access" text="The master admin account always has full permissions." />
-          <InfoTile icon={UsersRound} title="Users Synced Automatically" text={`${activeUsers.length} users from Resources are available here.`} />
-          <InfoTile icon={Lock} title="Default Permission" text="New users receive least privilege: view only, no add/edit/delete." />
+          <InfoTile icon={ShieldCheck} title={t("Admin Master Access")} text={t("The master admin account always has full permissions.")} />
+          <InfoTile icon={UsersRound} title={t("Users Synced Automatically")} text={`${activeUsers.length} ${t("users from Resources are available here.")}`} />
+          <InfoTile icon={Lock} title={t("Default Permission")} text={t("New users receive least privilege: view only, no add/edit/delete.")} />
         </div>
       </Panel>
 
       <div className="space-y-4">
         {activeUsers.map(user => <AccessControlUserCard key={user.id} user={user} currentUser={currentUser} onSave={onSaveUserPermissions} language={language} />)}
-        {!activeUsers.length ? <Panel title="No Users">
-            <EmptyState title="No users found" message="Create users from Resources, then they will appear here automatically." />
+        {!activeUsers.length ? <Panel title="No Users" language={language}>
+            <EmptyState title="No users found" message="Create users from Resources, then they will appear here automatically." language={language} />
           </Panel> : null}
       </div>
     </div>;
@@ -69,13 +69,13 @@ export function AccessControlUserCard({
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
         <div>
           <h3 className="text-base font-black text-slate-950">{user.name}</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{user.email || "No email"} / Username: {user.username || "-"}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{user.email || t("No email")} / {t("Username")}: {user.username || "-"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">{enabledCount} permissions enabled</span>
-          <StatusBadge value={user.status} />
+          <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">{enabledCount} {t("permissions enabled")}</span>
+          <StatusBadge value={user.status} language={language} />
           <button type="button" onClick={() => onSave(user, permissions)} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-black text-white hover:bg-blue-800">
-            Save Permissions
+            {t("Save Permissions")}
           </button>
         </div>
       </div>
@@ -103,7 +103,7 @@ export function AccessControlUserCard({
               return <td key={action.key} className="border border-slate-200 px-4 py-3 text-center">
                       <label className={`mx-auto inline-flex h-9 w-16 cursor-pointer items-center justify-center rounded-full border text-xs font-black transition ${checked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-100 text-slate-400"}`}>
                         <input type="checkbox" className="sr-only" checked={checked} onChange={() => togglePermission(module.key, action.key)} />
-                        {checked ? "ON" : "OFF"}
+                        {checked ? t("ON") : t("OFF")}
                       </label>
                     </td>;
             })}
@@ -138,7 +138,7 @@ export function SettingsSummary({
 }) {
   const t = text => tr(language, text);
   return <div className="space-y-6">
-      <Panel title={t("Settings")} subtitle={t("Presentation-ready system overview. Operational settings can be extended without changing current API contracts.")}>
+      <Panel title="Settings" subtitle="Presentation-ready system overview. Operational settings can be extended without changing current API contracts." language={language}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <InfoTile icon={Activity} title={t("API Health")} text={t("Frontend is connected to the FastAPI maintenance service.")} />
           {canViewAuditLogs ? <InfoTile icon={Lock} title={t("Audit Logs")} text={`${auditLogCount} ${t("security records available for review.")}`} onClick={onAuditLogs} active={auditLogsVisible} /> : null}
@@ -165,7 +165,10 @@ export function InfoTile({
     </Component>;
 }
 
-export function DocumentBrandingSettings() {
+export function DocumentBrandingSettings({
+  language
+}) {
+  const t = text => tr(language, text);
   const [branding, setBranding] = useState(getDocumentBranding);
   const [saved, setSaved] = useState(false);
 
@@ -188,30 +191,30 @@ export function DocumentBrandingSettings() {
     setSaved(true);
   }
 
-  return <Panel title="Document Branding" subtitle="Company information used by the enterprise PDF templates.">
+  return <Panel title="Document Branding" subtitle="Company information used by the enterprise PDF templates." language={language}>
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div className="grid h-32 place-items-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-white">
-            {branding.logo ? <img src={branding.logo} alt="Company logo" className="max-h-28 max-w-full object-contain" /> : <span className="text-sm font-black text-slate-400">Company Logo</span>}
+            {branding.logo ? <img src={branding.logo} alt={t("Company logo")} className="max-h-28 max-w-full object-contain" /> : <span className="text-sm font-black text-slate-400">{t("Company Logo")}</span>}
           </div>
           <label className="mt-3 block rounded-lg bg-blue-700 px-3 py-2 text-center text-xs font-black text-white hover:bg-blue-800">
-            Upload Logo
+            {t("Upload Logo")}
             <input type="file" accept="image/*" className="hidden" onChange={event => uploadLogo(event.target.files)} />
           </label>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <BrandingField label="Company Name" value={branding.companyName} onChange={value => update("companyName", value)} />
-          <BrandingField label="Document Version" value={branding.documentVersion} onChange={value => update("documentVersion", value)} />
-          <BrandingField label="Phone" value={branding.phone} onChange={value => update("phone", value)} />
-          <BrandingField label="Email" value={branding.email} onChange={value => update("email", value)} />
-          <BrandingField label="Website" value={branding.website} onChange={value => update("website", value)} />
+          <BrandingField label="Company Name" value={branding.companyName} onChange={value => update("companyName", value)} language={language} />
+          <BrandingField label="Document Version" value={branding.documentVersion} onChange={value => update("documentVersion", value)} language={language} />
+          <BrandingField label="Phone" value={branding.phone} onChange={value => update("phone", value)} language={language} />
+          <BrandingField label="Email" value={branding.email} onChange={value => update("email", value)} language={language} />
+          <BrandingField label="Website" value={branding.website} onChange={value => update("website", value)} language={language} />
           <label className="md:col-span-2">
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">Company Address</span>
+            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Company Address")}</span>
             <textarea rows={3} value={branding.companyAddress} onChange={event => update("companyAddress", event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" />
           </label>
           <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-            <button type="button" onClick={save} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-800">Save Document Branding</button>
-            {saved ? <span className="text-sm font-black text-emerald-700">Saved</span> : null}
+            <button type="button" onClick={save} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white hover:bg-slate-800">{t("Save Document Branding")}</button>
+            {saved ? <span className="text-sm font-black text-emerald-700">{t("Saved")}</span> : null}
           </div>
         </div>
       </div>
@@ -221,10 +224,12 @@ export function DocumentBrandingSettings() {
 function BrandingField({
   label,
   value,
-  onChange
+  onChange,
+  language
 }) {
+  const t = text => tr(language, text);
   return <label>
-      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t(label)}</span>
       <input value={value || ""} onChange={event => onChange(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500" />
     </label>;
 }

@@ -43,7 +43,7 @@ export function AssetDetailsPanel({
   const t = text => tr(language, text);
   const [activeTab, setActiveTab] = useState("overview");
   if (!asset) {
-    return <Panel title="Asset Details"><EmptyState title={t("No equipment")} message="Select an asset from the tree." /></Panel>;
+    return <Panel title="Asset Details" language={language}><EmptyState title="No equipment" message="Select an asset from the tree." language={language} /></Panel>;
   }
   const parent = rows.find(item => Number(item.id) === Number(asset.parent_id));
   const children = rows.filter(item => Number(item.parent_id) === Number(asset.id));
@@ -57,17 +57,17 @@ export function AssetDetailsPanel({
   const costTotal = Number(health.maintenance_cost ?? Number(asset.total_maintenance_cost || 0) + Number(asset.spare_parts_cost || 0) + Number(asset.labor_cost || 0) + Number(asset.contractor_cost || 0));
   const timelineRows = lifecycle.timeline?.length ? lifecycle.timeline : lifecycle.history?.items || [];
   const statusText = health.health_status || asset.current_condition || "Excellent";
-  return <Panel title="Asset Details" subtitle={breadcrumb.map(item => item.name).join(" / ")} actions={canManage ? <div className="flex gap-2">
-          {canEdit ? <button type="button" onClick={() => onEdit(asset)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">Edit Asset</button> : null}
-          {canDelete ? <button type="button" onClick={() => onDelete(asset.id)} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50">Delete</button> : null}
+  return <Panel title="Asset Details" subtitle={breadcrumb.map(item => item.name).join(" / ")} language={language} actions={canManage ? <div className="flex gap-2">
+          {canEdit ? <button type="button" onClick={() => onEdit(asset)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit Asset")}</button> : null}
+          {canDelete ? <button type="button" onClick={() => onDelete(asset.id)} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50">{t("Delete")}</button> : null}
         </div> : null}>
       <div className="grid gap-4 lg:grid-cols-3">
-        <AssetInfoTile label="Asset Code" value={asset.asset_code || `AST-${asset.id}`} />
-        <AssetInfoTile label="Level" value={asset.asset_level || "Equipment"} />
-        <AssetInfoTile label="Status" value={asset.status || "Active"} badge={<AssetHealthDot value={asset.status} />} />
-        <AssetInfoTile label="Parent" value={parent?.name || (asset.asset_level === "Site" ? "Root Site" : "Not assigned")} />
-        <AssetInfoTile label="Location" value={asset.location || customer?.name || t("Not configured")} />
-        <AssetInfoTile label="Criticality" value={asset.criticality || "Medium"} />
+        <AssetInfoTile label="Asset Code" value={asset.asset_code || `AST-${asset.id}`} language={language} />
+        <AssetInfoTile label="Level" value={t(asset.asset_level || "Equipment")} language={language} />
+        <AssetInfoTile label="Status" value={t(asset.status || "Active")} badge={<AssetHealthDot value={asset.status} />} language={language} />
+        <AssetInfoTile label="Parent" value={parent?.name || (asset.asset_level === "Site" ? t("Root Site") : t("Not assigned"))} language={language} />
+        <AssetInfoTile label="Location" value={asset.location || customer?.name || t("Not configured")} language={language} />
+        <AssetInfoTile label="Criticality" value={t(asset.criticality || "Medium")} language={language} />
       </div>
 
       {lifecycleError ? <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
@@ -90,7 +90,7 @@ export function AssetDetailsPanel({
       </div>
 
       {activeTab === "history" ? <div className="mt-5">
-          <HistoryTimeline history={lifecycle.history} filters={historyFilters} onFiltersChange={onHistoryFiltersChange || (() => {})} onPageChange={onHistoryPageChange || (() => {})} onRefresh={onHistoryRefresh || (() => {})} technicians={historyTechnicians} loading={lifecycleLoading} />
+          <HistoryTimeline history={lifecycle.history} filters={historyFilters} onFiltersChange={onHistoryFiltersChange || (() => {})} onPageChange={onHistoryPageChange || (() => {})} onRefresh={onHistoryRefresh || (() => {})} technicians={historyTechnicians} loading={lifecycleLoading} language={language} />
         </div> : activeTab === "measurements" ? <div className="mt-5">
           <AssetMeasurementManager measurements={lifecycle.measurements || []} templates={measurementTemplates} onSaveMeasurement={onAddLifecycleItem ? payload => onAddLifecycleItem("measurement", payload) : null} onSaveTemplate={onSaveMeasurementTemplate} onDeleteTemplate={onDeleteMeasurementTemplate} canAddMeasurement={canEdit && Boolean(onAddLifecycleItem)} canManageTemplates={canManageMeasurementTemplates} canCreateTemplate={canCreateMeasurementTemplate} canEditTemplate={canEditMeasurementTemplate} canDeleteTemplate={canDeleteMeasurementTemplate} language={language} />
         </div> : <>
@@ -99,7 +99,7 @@ export function AssetDetailsPanel({
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Asset Health Score</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Asset Health Score")}</p>
               <div className="mt-2 flex items-end gap-2">
                 <span className="text-5xl font-black text-slate-950">{healthScore}</span>
                 <span className="pb-2 text-sm font-black uppercase text-slate-500">/ 100</span>
@@ -115,64 +115,64 @@ export function AssetDetailsPanel({
           }} />
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <AssetMiniMetric label="Availability" value={`${Number(health.availability ?? 100).toFixed(1)}%`} />
-            <AssetMiniMetric label="MTBF" value={`${Number(health.mtbf ?? 0).toLocaleString()}h`} />
-            <AssetMiniMetric label="MTTR" value={`${Number(health.mttr ?? 0).toLocaleString()}h`} />
-            <AssetMiniMetric label="Downtime" value={`${Number(health.total_downtime_hours ?? 0).toLocaleString()}h`} />
-            <AssetMiniMetric label="PM Compliance" value={`${Number(health.pm_compliance ?? 100).toFixed(0)}%`} />
-            <AssetMiniMetric label="Open W.O." value={Number(health.open_work_orders ?? linkedOrders.length).toLocaleString()} />
+            <AssetMiniMetric label="Availability" value={`${Number(health.availability ?? 100).toFixed(1)}%`} language={language} />
+            <AssetMiniMetric label="MTBF" value={`${Number(health.mtbf ?? 0).toLocaleString()}h`} language={language} />
+            <AssetMiniMetric label="MTTR" value={`${Number(health.mttr ?? 0).toLocaleString()}h`} language={language} />
+            <AssetMiniMetric label="Downtime" value={`${Number(health.total_downtime_hours ?? 0).toLocaleString()}h`} language={language} />
+            <AssetMiniMetric label="PM Compliance" value={`${Number(health.pm_compliance ?? 100).toFixed(0)}%`} language={language} />
+            <AssetMiniMetric label="Open W.O." value={Number(health.open_work_orders ?? linkedOrders.length).toLocaleString()} language={language} />
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Lifecycle Profile</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Lifecycle Profile")}</p>
           <div className="mt-4 grid gap-3">
-            <AssetDetailLine label="Manufacturer" value={asset.manufacturer} />
-            <AssetDetailLine label="Model" value={asset.model} />
-            <AssetDetailLine label="Serial Number" value={asset.serial_number} />
-            <AssetDetailLine label="Category" value={asset.category || asset.asset_type} />
-            <AssetDetailLine label="Site / Department" value={[asset.site || customer?.name, asset.department].filter(Boolean).join(" / ")} />
-            <AssetDetailLine label="QR / Barcode" value={[asset.qr_code, asset.barcode].filter(Boolean).join(" / ")} />
+            <AssetDetailLine label="Manufacturer" value={asset.manufacturer} language={language} />
+            <AssetDetailLine label="Model" value={asset.model} language={language} />
+            <AssetDetailLine label="Serial Number" value={asset.serial_number} language={language} />
+            <AssetDetailLine label="Category" value={asset.category || asset.asset_type} language={language} />
+            <AssetDetailLine label="Site / Department" value={[asset.site || customer?.name, asset.department].filter(Boolean).join(" / ")} language={language} />
+            <AssetDetailLine label="QR / Barcode" value={[asset.qr_code, asset.barcode].filter(Boolean).join(" / ")} language={language} />
           </div>
         </div>
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-3">
-        <AssetRelationList title="Lifecycle Dates" rows={[`Installed: ${asset.installation_date || "-"}`, `Commissioned: ${asset.commission_date || "-"}`, `Warranty: ${asset.warranty_start || "-"} to ${asset.warranty_end || "-"}`, `Expected Life: ${asset.expected_life_years || 0} years`]} empty="No lifecycle dates" />
-        <AssetRelationList title="Operational Readings" rows={[`Runtime Hours: ${Number(asset.current_hours || 0).toLocaleString()} hrs`, `Last Reading: ${Number(asset.last_reading || 0).toLocaleString()}`, `Current Reading: ${Number(asset.current_reading || 0).toLocaleString()}`, `Last PM: ${asset.last_pm_date || asset.last_maintenance_date || "-"}`]} empty="No readings" />
-        <AssetRelationList title="Cost Summary" rows={[`Purchase Cost: ${Number(asset.purchase_cost || 0).toLocaleString()} EGP`, `Replacement Cost: ${Number(asset.replacement_cost || 0).toLocaleString()} EGP`, `Maintenance Cost: ${costTotal.toLocaleString()} EGP`, `Parts / Labor / Contractors: ${Number(asset.spare_parts_cost || 0).toLocaleString()} / ${Number(asset.labor_cost || 0).toLocaleString()} / ${Number(asset.contractor_cost || 0).toLocaleString()} EGP`]} empty="No cost data" />
+        <AssetRelationList title="Lifecycle Dates" rows={[`${t("Installed")}: ${asset.installation_date || "-"}`, `${t("Commissioned")}: ${asset.commission_date || "-"}`, `${t("Warranty")}: ${asset.warranty_start || "-"} ${t("to")} ${asset.warranty_end || "-"}`, `${t("Expected Life")}: ${asset.expected_life_years || 0} ${t("years")}`]} empty="No lifecycle dates" language={language} />
+        <AssetRelationList title="Operational Readings" rows={[`${t("Runtime Hours")}: ${Number(asset.current_hours || 0).toLocaleString()} ${t("hrs")}`, `${t("Last Reading")}: ${Number(asset.last_reading || 0).toLocaleString()}`, `${t("Current Reading")}: ${Number(asset.current_reading || 0).toLocaleString()}`, `${t("Last PM")}: ${asset.last_pm_date || asset.last_maintenance_date || "-"}`]} empty="No readings" language={language} />
+        <AssetRelationList title="Cost Summary" rows={[`${t("Purchase Cost")}: ${Number(asset.purchase_cost || 0).toLocaleString()} EGP`, `${t("Replacement Cost")}: ${Number(asset.replacement_cost || 0).toLocaleString()} EGP`, `${t("Maintenance Cost")}: ${costTotal.toLocaleString()} EGP`, `${t("Parts / Labor / Contractors")}: ${Number(asset.spare_parts_cost || 0).toLocaleString()} / ${Number(asset.labor_cost || 0).toLocaleString()} / ${Number(asset.contractor_cost || 0).toLocaleString()} EGP`]} empty="No cost data" language={language} />
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
-        <AssetRelationList title="Children" rows={children.map(item => `${item.asset_code || `AST-${item.id}`} - ${item.name}`)} empty="No child assets" />
-        <AssetRelationList title="Linked Work Orders" rows={linkedOrders.map(item => `${item.title} (${item.status})`)} empty="No linked work orders" />
-        <AssetRelationList title="Preventive Maintenance" rows={linkedPm.map(item => `${item.task_name} - ${item.pm_alert || item.status}`)} empty="No PM tasks" />
-        <AssetRelationList title="Spare Parts" rows={linkedParts.map(item => `${item.part_number || "PART"} - ${item.name} (${item.stock_quantity} ${item.unit || "pcs"})`)} empty="No linked spare parts" />
+        <AssetRelationList title="Children" rows={children.map(item => `${item.asset_code || `AST-${item.id}`} - ${item.name}`)} empty="No child assets" language={language} />
+        <AssetRelationList title="Linked Work Orders" rows={linkedOrders.map(item => `${item.title} (${t(item.status)})`)} empty="No linked work orders" language={language} />
+        <AssetRelationList title="Preventive Maintenance" rows={linkedPm.map(item => `${item.task_name} - ${t(item.pm_alert || item.status)}`)} empty="No PM tasks" language={language} />
+        <AssetRelationList title="Spare Parts" rows={linkedParts.map(item => `${item.part_number || "PART"} - ${item.name} (${item.stock_quantity} ${item.unit || t("pcs")})`)} empty="No linked spare parts" language={language} />
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <AssetTimeline rows={timelineRows} loading={lifecycleLoading} canDelete={canDeleteTimeline} onDelete={onDeleteTimelineEntry} />
+        <AssetTimeline rows={timelineRows} loading={lifecycleLoading} canDelete={canDeleteTimeline} onDelete={onDeleteTimelineEntry} language={language} />
         <div className="space-y-4">
-          <AssetRelationList title="Asset Events" rows={(lifecycle.events || []).map(item => `${item.event_type} - ${item.severity} - ${item.status}`)} empty="No asset events" />
-          <AssetRelationList title="Failure History" rows={(lifecycle.failures || []).map(item => `${item.failure_id} - ${item.severity} - ${item.status}`)} empty="No failure events" />
-          <AssetRelationList title="Downtime History" rows={(lifecycle.downtime || []).map(item => `${item.start_time} - ${Number(item.total_downtime_minutes || 0)} min - ${item.downtime_category || "Downtime"}`)} empty="No downtime events" />
-          <AssetRelationList title="Documents" rows={(lifecycle.documents || []).map(item => `${item.document_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No documents" />
-          <AssetRelationList title="Photos" rows={(lifecycle.photos || []).map(item => `${item.photo_type} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No photos" />
+          <AssetRelationList title="Asset Events" rows={(lifecycle.events || []).map(item => `${t(item.event_type)} - ${t(item.severity)} - ${t(item.status)}`)} empty="No asset events" language={language} />
+          <AssetRelationList title="Failure History" rows={(lifecycle.failures || []).map(item => `${item.failure_id} - ${t(item.severity)} - ${t(item.status)}`)} empty="No failure events" language={language} />
+          <AssetRelationList title="Downtime History" rows={(lifecycle.downtime || []).map(item => `${item.start_time} - ${Number(item.total_downtime_minutes || 0)} ${t("min")} - ${t(item.downtime_category || "Downtime")}`)} empty="No downtime events" language={language} />
+          <AssetRelationList title="Documents" rows={(lifecycle.documents || []).map(item => `${t(item.document_type)} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No documents" language={language} />
+          <AssetRelationList title="Photos" rows={(lifecycle.photos || []).map(item => `${t(item.photo_type)} - ${item.title}${item.file_url ? ` (${item.file_url})` : ""}`)} empty="No photos" language={language} />
         </div>
       </div>
 
       {canEdit && onAddLifecycleItem ? <div className="mt-5 grid gap-4 xl:grid-cols-2">
-          <AssetLifecycleForm type="document" title="Add Document" onSubmit={payload => onAddLifecycleItem("document", payload)} />
-          <AssetLifecycleForm type="photo" title="Add Photo" onSubmit={payload => onAddLifecycleItem("photo", payload)} />
+          <AssetLifecycleForm type="document" title="Add Document" onSubmit={payload => onAddLifecycleItem("document", payload)} language={language} />
+          <AssetLifecycleForm type="photo" title="Add Photo" onSubmit={payload => onAddLifecycleItem("photo", payload)} language={language} />
         </div> : null}
 
       <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-950">
           <GitBranch className="h-4 w-4 text-blue-700" />
-          Roll-up Logic
+          {t("Roll-up Logic")}
         </div>
         <p className="text-sm leading-6 text-slate-600">
-          Component failures roll up to parent Equipment, then System. Reports can aggregate work orders, downtime, and PM exposure through this parent-child path.
+          {t("Component failures roll up to parent Equipment, then System. Reports can aggregate work orders, downtime, and PM exposure through this parent-child path.")}
         </p>
       </div>
       </>}
@@ -183,12 +183,14 @@ export function AssetMiniSelect({
   value,
   onChange,
   options,
-  label
+  label,
+  language
 }) {
+  const t = text => tr(language, text);
   return <label>
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{t(label)}</span>
       <select className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500" value={value} onChange={event => onChange(event.target.value)}>
-        {options.map(option => <option key={option || "all"} value={option}>{option || "All"}</option>)}
+        {options.map(option => <option key={option || "all"} value={option}>{t(option || "All")}</option>)}
       </select>
     </label>;
 }
@@ -196,10 +198,12 @@ export function AssetMiniSelect({
 export function AssetInfoTile({
   label,
   value,
-  badge
+  badge,
+  language
 }) {
+  const t = text => tr(language, text);
   return <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t(label)}</p>
       <div className="mt-2 flex items-center gap-2 text-sm font-black text-slate-950">{badge}{value || "-"}</div>
     </div>;
 }
@@ -207,33 +211,39 @@ export function AssetInfoTile({
 export function AssetRelationList({
   title,
   rows,
-  empty
+  empty,
+  language
 }) {
+  const t = text => tr(language, text);
   return <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-black text-slate-950">{title}</h3>
+      <h3 className="text-sm font-black text-slate-950">{t(title)}</h3>
       <div className="mt-3 space-y-2">
         {rows.map((item, index) => <div key={index} className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">{item}</div>)}
-        {!rows.length ? <p className="text-sm font-semibold text-slate-400">{empty}</p> : null}
+        {!rows.length ? <p className="text-sm font-semibold text-slate-400">{t(empty)}</p> : null}
       </div>
     </div>;
 }
 
 export function AssetMiniMetric({
   label,
-  value
+  value,
+  language
 }) {
+  const t = text => tr(language, text);
   return <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">{t(label)}</p>
       <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
     </div>;
 }
 
 export function AssetDetailLine({
   label,
-  value
+  value,
+  language
 }) {
+  const t = text => tr(language, text);
   return <div className="flex items-start justify-between gap-3 rounded-lg bg-white px-3 py-2">
-      <span className="text-xs font-black uppercase tracking-[0.1em] text-slate-500">{label}</span>
+      <span className="text-xs font-black uppercase tracking-[0.1em] text-slate-500">{t(label)}</span>
       <span className="max-w-[58%] text-right text-sm font-bold text-slate-800">{value || "-"}</span>
     </div>;
 }
@@ -242,8 +252,10 @@ export function AssetTimeline({
   rows = [],
   loading = false,
   canDelete = false,
-  onDelete
+  onDelete,
+  language
 }) {
+  const t = text => tr(language, text);
   const [deletingId, setDeletingId] = useState(null);
 
   async function deleteEntry(entryId) {
@@ -255,18 +267,18 @@ export function AssetTimeline({
 
   return <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-black text-slate-950">Asset Timeline</h3>
-        {loading ? <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700">Loading</span> : null}
+        <h3 className="text-sm font-black text-slate-950">{t("Asset Timeline")}</h3>
+        {loading ? <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700">{t("Loading")}</span> : null}
       </div>
       <div className="mt-4 max-h-[420px] space-y-3 overflow-auto pr-1">
         {rows.map(item => <div key={`${item.id}-${item.created_at}`} className="relative rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-black text-slate-950">{item.title || item.event_type}</p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">{item.description || item.source_module || "Asset lifecycle event"}</p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">{item.description || item.source_module || t("Asset lifecycle event")}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-slate-500">{item.event_type || "Event"}</span>
+                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-slate-500">{t(item.event_type || "Event")}</span>
                 {canDelete ? <button type="button" onClick={() => deleteEntry(item.id)} disabled={deletingId === item.id} className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-100 bg-white text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50" title="Delete timeline entry">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button> : null}
@@ -274,7 +286,7 @@ export function AssetTimeline({
             </div>
             <p className="mt-2 text-xs font-bold text-blue-700">{item.created_at}</p>
           </div>)}
-        {!rows.length ? <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-400">No timeline entries recorded yet.</p> : null}
+        {!rows.length ? <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-400">{t("No timeline entries recorded yet.")}</p> : null}
       </div>
     </div>;
 }
@@ -282,8 +294,10 @@ export function AssetTimeline({
 export function AssetLifecycleForm({
   type,
   title,
-  onSubmit
+  onSubmit,
+  language
 }) {
+  const t = text => tr(language, text);
   const initial = type === "measurement" ? {
     measurement_type: "Runtime Hours",
     value: "",
@@ -327,24 +341,24 @@ export function AssetLifecycleForm({
     }
   }
   return <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-black text-slate-950">{title}</h3>
+      <h3 className="text-sm font-black text-slate-950">{t(title)}</h3>
       <div className="mt-3 space-y-2">
         {type === "measurement" ? <>
-            <AssetFormInput label="Type" value={form.measurement_type} onChange={value => update("measurement_type", value)} />
-            <AssetFormInput label="Value" type="number" value={form.value} onChange={value => update("value", value)} />
-            <AssetFormInput label="Unit" value={form.unit} onChange={value => update("unit", value)} />
-            <AssetFormInput label="Reading Date" type="date" value={form.reading_date} onChange={value => update("reading_date", value)} />
-            <AssetFormInput label="Notes" value={form.notes} onChange={value => update("notes", value)} />
+            <AssetFormInput label="Type" value={form.measurement_type} onChange={value => update("measurement_type", value)} language={language} />
+            <AssetFormInput label="Value" type="number" value={form.value} onChange={value => update("value", value)} language={language} />
+            <AssetFormInput label="Unit" value={form.unit} onChange={value => update("unit", value)} language={language} />
+            <AssetFormInput label="Reading Date" type="date" value={form.reading_date} onChange={value => update("reading_date", value)} language={language} />
+            <AssetFormInput label="Notes" value={form.notes} onChange={value => update("notes", value)} language={language} />
           </> : <>
-            <AssetFormInput label={type === "document" ? "Document Type" : "Photo Type"} value={type === "document" ? form.document_type : form.photo_type} onChange={value => update(type === "document" ? "document_type" : "photo_type", value)} />
-            <AssetFormInput label="Title" value={form.title} onChange={value => update("title", value)} />
-            <AssetFormInput label="File Name" value={form.file_name} onChange={value => update("file_name", value)} />
-            <AssetFormInput label="File URL" value={form.file_url} onChange={value => update("file_url", value)} />
-            <AssetFormInput label="Description" value={form.description} onChange={value => update("description", value)} />
+            <AssetFormInput label={type === "document" ? "Document Type" : "Photo Type"} value={type === "document" ? form.document_type : form.photo_type} onChange={value => update(type === "document" ? "document_type" : "photo_type", value)} language={language} />
+            <AssetFormInput label="Title" value={form.title} onChange={value => update("title", value)} language={language} />
+            <AssetFormInput label="File Name" value={form.file_name} onChange={value => update("file_name", value)} language={language} />
+            <AssetFormInput label="File URL" value={form.file_url} onChange={value => update("file_url", value)} language={language} />
+            <AssetFormInput label="Description" value={form.description} onChange={value => update("description", value)} language={language} />
           </>}
       </div>
       <button type="submit" disabled={saving} className="mt-3 w-full rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800 disabled:opacity-60">
-        {saving ? "Saving..." : "Save"}
+        {saving ? t("Saving...") : t("Save")}
       </button>
     </form>;
 }
@@ -353,10 +367,12 @@ export function AssetFormInput({
   label,
   value,
   onChange,
-  type = "text"
+  type = "text",
+  language
 }) {
+  const t = text => tr(language, text);
   return <label className="block">
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">{label}</span>
+      <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">{t(label)}</span>
       <input type={type} value={value} onChange={event => onChange(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white" />
     </label>;
 }

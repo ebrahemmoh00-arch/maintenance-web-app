@@ -1,5 +1,6 @@
 import { EMPLOYEE_ROLE_OPTIONS } from "../../features/authentication/services/authSession.js";
 import { normalizeWorkOrderStatus } from "../../features/work-orders/utils/workOrderStatus.js";
+import { translate } from "../i18n/index.js";
 import { Clock3 } from "lucide-react";
 
 export const VALUE_AR = {
@@ -33,9 +34,10 @@ export function valueLabel(value, language) {
       viewer: "Regular User",
       user: "Regular User"
     };
-    return labels[String(value)] || "Regular User";
+    return translate(language, labels[String(value)] || "Regular User");
   }
-  return language === "ar" ? VALUE_AR[value] || VALUE_AR[String(value).replace("_", " ")] || value : String(value || "unknown").replace("_", " ");
+  const label = String(value || "unknown").replaceAll("_", " ");
+  return language === "ar" ? translate(language, label, VALUE_AR) : label;
 }
 
 export function StatusBadge({

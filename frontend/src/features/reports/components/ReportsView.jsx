@@ -152,12 +152,12 @@ export function AuditLogsPanel({
     await api.auditExport(format).catch(() => null);
     if (format === "csv") exportAuditCsv(filteredLogs);
     if (format === "excel") exportAuditExcel(filteredLogs);
-    if (format === "pdf") exportAuditPdf(filteredLogs);
+    if (format === "pdf") exportAuditPdf(filteredLogs, language);
   }
-  return <Panel title="Audit Logs" subtitle="Security audit trail for login, logout, create, update, delete, role changes, and critical operational actions." actions={<div className="flex flex-wrap gap-2">
+  return <Panel title="Audit Logs" subtitle="Security audit trail for login, logout, create, update, delete, role changes, and critical operational actions." language={language} actions={<div className="flex flex-wrap gap-2">
           {canDelete ? <button type="button" onClick={deleteSelectedLogs} disabled={!selectedIds.length || deleting} className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
               <Trash2 className="h-3.5 w-3.5" />
-              {deleting ? "Deleting..." : `Delete Selected (${selectedIds.length})`}
+              {deleting ? t("Deleting...") : `${t("Delete Selected")} (${selectedIds.length})`}
             </button> : null}
           <button type="button" onClick={() => exportLogs("csv")} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300">CSV</button>
           <button type="button" onClick={() => exportLogs("excel")} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-300">Excel</button>
@@ -168,49 +168,49 @@ export function AuditLogsPanel({
         </div>}>
       <div className="space-y-5">
         <div className="grid gap-3 md:grid-cols-4">
-          <AuditStatCard label="Recent Activity" value={logs.length} tone="blue" />
-          <AuditStatCard label="Failed Login Attempts" value={failedLogins} tone={failedLogins ? "red" : "green"} />
-          <AuditStatCard label="Most Active Users" value={activeUsers} tone="cyan" />
-          <AuditStatCard label="Asset / Work Order Changes" value={`${assetChanges}/${workOrderUpdates}`} tone="amber" />
+          <AuditStatCard label="Recent Activity" value={logs.length} tone="blue" language={language} />
+          <AuditStatCard label="Failed Login Attempts" value={failedLogins} tone={failedLogins ? "red" : "green"} language={language} />
+          <AuditStatCard label="Most Active Users" value={activeUsers} tone="cyan" language={language} />
+          <AuditStatCard label="Asset / Work Order Changes" value={`${assetChanges}/${workOrderUpdates}`} tone="amber" language={language} />
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
             <label className="md:col-span-2">
-              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Search</span>
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">{t("Search")}</span>
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
                 <Search className="h-4 w-4 text-slate-400" />
                 <input value={filters.search} onChange={event => setFilters({
                 ...filters,
                 search: event.target.value
-              })} placeholder="User, asset, work order, inventory item..." className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none" />
+              })} placeholder={t("User, asset, work order, inventory item...")} className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none" />
               </div>
             </label>
             <AuditSelect label="Role" value={filters.role} options={roles} onChange={role => setFilters({
             ...filters,
             role
-          })} />
+          })} language={language} />
             <AuditSelect label="Module" value={filters.module} options={modules} onChange={module => setFilters({
             ...filters,
             module
-          })} />
+          })} language={language} />
             <AuditSelect label="Action" value={filters.action} options={actions} onChange={action => setFilters({
             ...filters,
             action
-          })} />
+          })} language={language} />
             <AuditSelect label="Status" value={filters.status} options={statuses} onChange={status => setFilters({
             ...filters,
             status
-          })} />
+          })} language={language} />
             <label>
-              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">From</span>
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">{t("From")}</span>
               <input type="date" value={filters.from} onChange={event => setFilters({
               ...filters,
               from: event.target.value
             })} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none" />
             </label>
             <label>
-              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">To</span>
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">{t("To")}</span>
               <input type="date" value={filters.to} onChange={event => setFilters({
               ...filters,
               to: event.target.value
@@ -225,9 +225,9 @@ export function AuditLogsPanel({
               <thead className="bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500">
                 <tr>
                   {canDelete ? <th className="whitespace-nowrap px-4 py-3 text-left font-black">
-                      <input type="checkbox" checked={allFilteredSelected} onChange={toggleFilteredSelection} className="h-4 w-4 rounded border-slate-300 text-blue-700" title="Select visible logs" />
+                      <input type="checkbox" checked={allFilteredSelected} onChange={toggleFilteredSelection} className="h-4 w-4 rounded border-slate-300 text-blue-700" title={t("Select visible logs")} />
                     </th> : null}
-                  {["Date & Time", "User", "Role", "Module", "Action", "Description", "IP Address", "Details"].map(heading => <th key={heading} className="whitespace-nowrap px-4 py-3 text-left font-black">{heading}</th>)}
+                  {["Date & Time", "User", "Role", "Module", "Action", "Description", "IP Address", "Details"].map(heading => <th key={heading} className="whitespace-nowrap px-4 py-3 text-left font-black">{t(heading)}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -235,11 +235,11 @@ export function AuditLogsPanel({
                     {canDelete ? <td className="whitespace-nowrap px-4 py-3">
                         <input type="checkbox" checked={selectedIds.includes(Number(log.id))} onChange={() => toggleLogSelection(log.id)} onClick={event => event.stopPropagation()} className="h-4 w-4 rounded border-slate-300 text-blue-700" />
                       </td> : null}
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">{formatAuditTimestamp(log.timestamp)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">{formatAuditTimestamp(log.timestamp, language)}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-black text-slate-900">{log.user_name || "-"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.role || "-"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.module}</td>
-                    <td className="whitespace-nowrap px-4 py-3"><AuditActionBadge action={log.action} status={log.status} /></td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{t(log.role || "-")}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{t(log.module)}</td>
+                    <td className="whitespace-nowrap px-4 py-3"><AuditActionBadge action={log.action} status={log.status} language={language} /></td>
                     <td className="max-w-[320px] truncate px-4 py-3 text-slate-600">{log.description}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.ip_address || "-"}</td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -248,13 +248,13 @@ export function AuditLogsPanel({
                     setSelectedLog(log);
                   }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">
                         <Eye className="h-3.5 w-3.5" />
-                        Open
+                        {t("Open")}
                       </button>
                     </td>
                   </tr>)}
                 {!filteredLogs.length ? <tr>
                     <td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-sm font-semibold text-slate-500">
-                      No audit logs match the current filters.
+                      {t("No audit logs match the current filters.")}
                     </td>
                   </tr> : null}
               </tbody>
@@ -262,7 +262,7 @@ export function AuditLogsPanel({
           </div>
         </div>
 
-        {selectedLog ? <AuditLogDetails log={selectedLog} onClose={() => setSelectedLog(null)} /> : null}
+        {selectedLog ? <AuditLogDetails log={selectedLog} onClose={() => setSelectedLog(null)} language={language} /> : null}
       </div>
     </Panel>;
 }
@@ -270,8 +270,10 @@ export function AuditLogsPanel({
 export function AuditStatCard({
   label,
   value,
-  tone = "blue"
+  tone = "blue",
+  language
 }) {
+  const t = text => tr(language, text);
   const colors = {
     blue: "border-blue-100 bg-blue-50 text-blue-700",
     red: "border-red-100 bg-red-50 text-red-700",
@@ -280,7 +282,7 @@ export function AuditStatCard({
     amber: "border-amber-100 bg-amber-50 text-amber-700"
   };
   return <div className={`rounded-xl border p-4 ${colors[tone] || colors.blue}`}>
-      <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">{label}</p>
+      <p className="text-xs font-black uppercase tracking-[0.16em] opacity-80">{t(label)}</p>
       <p className="mt-3 text-3xl font-black">{value}</p>
     </div>;
 }
@@ -351,59 +353,66 @@ export function AuditSelect({
   label,
   value,
   options,
-  onChange
+  onChange,
+  language
 }) {
+  const t = text => tr(language, text);
   return <label>
-      <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">{t(label)}</span>
       <select value={value} onChange={event => onChange(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none">
-        <option value="">All</option>
-        {options.map(option => <option key={option} value={option}>{option}</option>)}
+        <option value="">{t("All")}</option>
+        {options.map(option => <option key={option} value={option}>{t(option)}</option>)}
       </select>
     </label>;
 }
 
 export function AuditActionBadge({
   action,
-  status
+  status,
+  language
 }) {
   const failed = status === "FAILED";
   const destructive = ["DELETE", "REJECT", "FAILED"].includes(action) || failed;
   const positive = ["CREATE", "LOGIN", "APPROVE", "CLOSE", "EXPORT"].includes(action);
   const style = destructive ? "border-red-200 bg-red-50 text-red-700" : positive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-blue-200 bg-blue-50 text-blue-700";
-  return <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${style}`}>{action}</span>;
+  return <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${style}`}>{tr(language, action)}</span>;
 }
 
 export function AuditLogDetails({
   log,
-  onClose
+  onClose,
+  language
 }) {
+  const t = text => tr(language, text);
   const oldValues = parseAuditJson(log.old_values);
   const newValues = parseAuditJson(log.new_values);
   const fields = auditChangedFields(oldValues, newValues);
-  const summary = auditChangeSummary(log, oldValues, newValues, fields);
+  const summary = auditChangeSummary(log, oldValues, newValues, fields, language);
   return <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-black text-slate-950">Audit Entry #{log.id}</h3>
+          <h3 className="text-lg font-black text-slate-950">{t("Audit Entry")} #{log.id}</h3>
           <p className="mt-1 text-sm font-semibold text-slate-600">{log.description}</p>
         </div>
-        <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">Close</button>
+        <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600">{t("Close")}</button>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <InfoTile icon={ShieldCheck} title="User Details" text={`${log.user_name || "-"} / ${log.role || "-"}`} />
-        <InfoTile icon={Clock3} title="Timestamp" text={formatAuditTimestamp(log.timestamp)} />
-        <InfoTile icon={Activity} title="Action" text={`${log.module} / ${log.action}`} />
-        <InfoTile icon={Filter} title="Changed Fields" text={fields.length ? fields.join(", ") : "Snapshot only"} />
+        <InfoTile icon={ShieldCheck} title={t("User Details")} text={`${log.user_name || "-"} / ${t(log.role || "-")}`} />
+        <InfoTile icon={Clock3} title={t("Timestamp")} text={formatAuditTimestamp(log.timestamp, language)} />
+        <InfoTile icon={Activity} title={t("Action")} text={`${t(log.module)} / ${t(log.action)}`} />
+        <InfoTile icon={Filter} title={t("Changed Fields")} text={fields.length ? fields.map(humanizeAuditField).join(", ") : t("Snapshot only")} />
       </div>
-      <AuditChangeSummary text={summary} />
+      <AuditChangeSummary text={summary} language={language} />
     </div>;
 }
 
 export function AuditChangeSummary({
-  text
+  text,
+  language
 }) {
+  const t = text => tr(language, text);
   return <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-      <h4 className="text-sm font-black text-slate-950">Change Summary</h4>
+      <h4 className="text-sm font-black text-slate-950">{t("Change Summary")}</h4>
       <p className="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">{text}</p>
     </div>;
 }
@@ -448,42 +457,44 @@ export function auditChangedFields(oldValues, newValues) {
   return [...keys].filter(key => JSON.stringify(oldValues?.[key]) !== JSON.stringify(newValues?.[key]));
 }
 
-export function auditChangeSummary(log, oldValues, newValues, fields) {
+export function auditChangeSummary(log, oldValues, newValues, fields, language) {
+  const t = text => tr(language, text);
   const action = String(log.action || "").toUpperCase();
   if (oldValues?.deleted_count) {
-    return `Deleted ${oldValues.deleted_count} selected audit log entries.`;
+    return `${t("Deleted")} ${oldValues.deleted_count} ${t("selected audit log entries.")}`;
   }
   if (fields.length) {
-    const readable = fields.filter(field => field !== "deleted_logs").slice(0, 3).map(field => `${humanizeAuditField(field)} changed from ${formatAuditValue(oldValues?.[field])} to ${formatAuditValue(newValues?.[field])}`);
-    const extra = fields.length > 3 ? `, plus ${fields.length - 3} more field${fields.length - 3 === 1 ? "" : "s"}` : "";
+    const readable = fields.filter(field => field !== "deleted_logs").slice(0, 3).map(field => `${humanizeAuditField(field)} ${t("changed from")} ${formatAuditValue(oldValues?.[field], language)} ${t("to")} ${formatAuditValue(newValues?.[field], language)}`);
+    const extra = fields.length > 3 ? `, ${t("plus")} ${fields.length - 3} ${t("more fields")}` : "";
     return `${readable.join("; ")}${extra}.`;
   }
-  if (action === "LOGIN") return log.status === "FAILED" ? "Login attempt failed." : "User logged in successfully.";
-  if (action === "LOGOUT") return "User logged out.";
-  if (action === "CREATE") return log.description || "A new record was created.";
-  if (action === "DELETE") return log.description || "The selected record was deleted.";
-  if (action === "EXPORT") return log.description || "A report export was completed.";
-  return log.description || "No field-level changes were recorded.";
+  if (action === "LOGIN") return log.status === "FAILED" ? t("Login attempt failed.") : t("User logged in successfully.");
+  if (action === "LOGOUT") return t("User logged out.");
+  if (action === "CREATE") return log.description || t("A new record was created.");
+  if (action === "DELETE") return log.description || t("The selected record was deleted.");
+  if (action === "EXPORT") return log.description || t("A report export was completed.");
+  return log.description || t("No field-level changes were recorded.");
 }
 
 export function humanizeAuditField(field) {
   return String(field || "").replace(/_/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
-export function formatAuditValue(value) {
-  if (value === null || value === undefined || value === "") return "empty";
-  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
-  if (typeof value === "object") return "structured data";
+export function formatAuditValue(value, language) {
+  const t = text => tr(language, text);
+  if (value === null || value === undefined || value === "") return t("empty");
+  if (Array.isArray(value)) return `${value.length} ${value.length === 1 ? t("item") : t("items")}`;
+  if (typeof value === "object") return t("structured data");
   const text = String(value);
   return text.length > 70 ? `${text.slice(0, 70)}...` : text;
 }
 
-export function formatAuditTimestamp(value) {
+export function formatAuditTimestamp(value, language = "en") {
   if (!value) return "-";
   const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(String(value));
   const date = new Date(hasTimezone ? value : `${value}Z`);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(language === "ar" ? "ar-EG" : "en-GB", {
     timeZone: "Africa/Cairo",
     year: "numeric",
     month: "2-digit",
@@ -540,7 +551,7 @@ export function exportAuditExcel(logs) {
   downloadTextFile(`audit-logs-${todayFileStamp()}.xls`, table, "application/vnd.ms-excel;charset=utf-8");
 }
 
-export function exportAuditPdf(logs) {
+export function exportAuditPdf(logs, language = "en") {
   const rows = auditExportRows(logs);
   const headers = Object.keys(rows[0] || {
     "Date & Time": "",
@@ -555,7 +566,8 @@ export function exportAuditPdf(logs) {
   const table = `<table><thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${headers.map(header => `<td>${escapeHtml(row[header])}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   const win = window.open("", "_blank");
   if (!win) return;
-  win.document.write(`<!doctype html><html><head><title>Audit Logs</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}h1{font-size:22px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #cbd5e1;padding:6px;text-align:left}th{background:#e2e8f0}</style></head><body><h1>Audit Logs</h1>${table}<script>window.onload=()=>window.print()</script></body></html>`);
+  const title = tr(language, "Audit Logs");
+  win.document.write(`<!doctype html><html dir="${language === "ar" ? "rtl" : "ltr"}"><head><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}h1{font-size:22px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #cbd5e1;padding:6px;text-align:${language === "ar" ? "right" : "left"}}th{background:#e2e8f0}</style></head><body><h1>${escapeHtml(title)}</h1>${table}<script>window.onload=()=>window.print()</script></body></html>`);
   win.document.close();
 }
 

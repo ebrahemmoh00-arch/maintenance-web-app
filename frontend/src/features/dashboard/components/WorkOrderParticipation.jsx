@@ -1,4 +1,5 @@
 import { Panel } from "../../../shared/components/Panel.jsx";
+import { tr } from "../../../shared/config/appConfig.jsx";
 import { uniqueSorted } from "../../resources/utils/employeeUtils.js";
 import { Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +9,8 @@ export function WorkOrderParticipationPanel({
   subtitle,
   filterTitle,
   data,
-  color
+  color,
+  language
 }) {
   const rows = useMemo(() => data.filter(item => item.value > 0 && item.label !== "No data"), [data]);
   const [selectedNames, setSelectedNames] = useState([]);
@@ -16,8 +18,8 @@ export function WorkOrderParticipationPanel({
   useEffect(() => {
     setSelectedNames(current => current.filter(name => rows.some(item => item.label === name)));
   }, [rows]);
-  return <Panel title={title} subtitle={subtitle} actions={<ParticipantFilterList title={filterTitle} rows={rows} selectedNames={selectedNames} setSelectedNames={setSelectedNames} />}>
-      <ParticipationBarChart rows={visibleRows} color={color} />
+  return <Panel title={title} subtitle={subtitle} actions={<ParticipantFilterList title={filterTitle} rows={rows} selectedNames={selectedNames} setSelectedNames={setSelectedNames} language={language} />} language={language}>
+      <ParticipationBarChart rows={visibleRows} color={color} language={language} />
     </Panel>;
 }
 
@@ -25,11 +27,13 @@ export function ParticipantFilterList({
   title,
   rows,
   selectedNames,
-  setSelectedNames
+  setSelectedNames,
+  language
 }) {
+  const t = text => tr(language, text);
   const [open, setOpen] = useState(false);
   const allSelected = selectedNames.length === 0;
-  const label = allSelected ? "All" : `${selectedNames.length} selected`;
+  const label = allSelected ? t("All") : `${selectedNames.length} ${t("selected")}`;
   function toggleName(name) {
     setSelectedNames(current => {
       if (!current.length) return [name];
@@ -46,12 +50,12 @@ export function ParticipantFilterList({
 
       {open ? <div className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/15">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{title}</p>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{t(title)}</p>
             <button type="button" onClick={() => {
           setSelectedNames([]);
           setOpen(false);
         }} className={`rounded-md px-2 py-1 text-xs font-black ${allSelected ? "bg-blue-700 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"}`}>
-              All
+              {t("All")}
             </button>
           </div>
           <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
@@ -63,7 +67,7 @@ export function ParticipantFilterList({
                   <span className="rounded bg-white px-2 py-0.5 text-xs font-black text-slate-700">{row.value}</span>
                 </label>;
         })}
-            {!rows.length ? <p className="py-8 text-center text-sm font-semibold text-slate-400">No data</p> : null}
+            {!rows.length ? <p className="py-8 text-center text-sm font-semibold text-slate-400">{t("No data")}</p> : null}
           </div>
         </div> : null}
     </div>;
@@ -71,8 +75,10 @@ export function ParticipantFilterList({
 
 export function ParticipationBarChart({
   rows,
-  color
+  color,
+  language
 }) {
+  const t = text => tr(language, text);
   const maxValue = Math.max(...rows.map(item => Number(item.value || 0)), 1);
   const topTick = Math.max(1, Math.ceil(maxValue / 2) * 2);
   const ticks = Array.from({
@@ -90,8 +96,8 @@ export function ParticipationBarChart({
   const labelFontSize = rowCount > 16 ? "10px" : "11px";
   return <div className="min-h-80 rounded-xl border border-slate-200 bg-white p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-sm font-black text-slate-950">Work Orders Count</p>
-        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Name vs Work Orders</p>
+        <p className="text-sm font-black text-slate-950">{t("Work Orders Count")}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{t("Name vs Work Orders")}</p>
       </div>
       {rows.length ? <div className="overflow-x-auto pb-2">
           <div className="grid gap-4" style={{
@@ -104,7 +110,7 @@ export function ParticipationBarChart({
           }}>
                   {tick}
                 </span>)}
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 whitespace-nowrap text-xs font-black text-slate-600">Work Orders</span>
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 whitespace-nowrap text-xs font-black text-slate-600">{t("Work Orders")}</span>
             </div>
 
             <div className="min-w-0">
@@ -141,11 +147,11 @@ export function ParticipationBarChart({
                     {row.label}
                   </p>)}
               </div>
-              <p className="mt-3 text-center text-xs font-black uppercase tracking-[0.12em] text-slate-500">Name</p>
+              <p className="mt-3 text-center text-xs font-black uppercase tracking-[0.12em] text-slate-500">{t("Name")}</p>
             </div>
           </div>
         </div> : <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm font-semibold text-slate-400">
-          No selected names
+          {t("No selected names")}
         </div>}
     </div>;
 }

@@ -106,7 +106,8 @@ export function buildOperationKpis(metrics, reliability, stats, completionRate, 
     key: "completion",
     label: "Work Order Completion Rate",
     value: `${completionRate}%`,
-    comparison: `${stats.closed_today || 0} closed today`,
+    comparisonValue: stats.closed_today || 0,
+    comparisonLabel: "closed today",
     tone: completionRate >= 80 ? "green" : completionRate >= 60 ? "orange" : "red",
     trend: breakdownTrend
   }];

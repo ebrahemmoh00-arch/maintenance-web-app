@@ -84,7 +84,7 @@ export function AppChrome({ app, children }) {
                 </button>
                 {notificationsOpen && typeof document !== "undefined" ? createPortal(
                   <>
-                    <button type="button" aria-label="Close notifications" className="fixed inset-0 z-30 cursor-default bg-transparent" onClick={() => setNotificationsOpen(false)} />
+                    <button type="button" aria-label={t("Close notifications")} className="fixed inset-0 z-30 cursor-default bg-transparent" onClick={() => setNotificationsOpen(false)} />
                     <NotificationMenu
                       alerts={alerts}
                       language={language}
@@ -99,7 +99,7 @@ export function AppChrome({ app, children }) {
                   document.body
                 ) : null}
               </div>
-              <button type="button" onClick={() => setDarkMode(!darkMode)} className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-950" title="Toggle dark frame">
+              <button type="button" onClick={() => setDarkMode(!darkMode)} className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-950" title={t("Toggle dark frame")}>
                 {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
               <button onClick={loadAll} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-700">
@@ -163,7 +163,7 @@ export function AppChrome({ app, children }) {
           </div>
         </header>
 
-        {error ? <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
+        {error ? <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{t(error)}</div> : null}
         <div className="min-w-0 space-y-6 p-3 sm:p-4 lg:p-6">
           {children}
         </div>
@@ -177,6 +177,7 @@ export function AppChrome({ app, children }) {
           onSubmit={saveRecord}
           onClose={() => setModal(null)}
           options={options}
+          language={language}
           onAddOption={async (field, optionName) => {
             if (field.key === "job_title") return addJobTitle(optionName);
             if (field.key === "asset_type") return true;

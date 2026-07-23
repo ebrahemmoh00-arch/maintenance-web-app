@@ -2,6 +2,7 @@ import { LineChart } from "../../../shared/components/Charts.jsx";
 import { Panel } from "../../../shared/components/Panel.jsx";
 import { ProgressBar } from "../../../shared/components/StatusPrimitives.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
+import { formatNumber } from "../../../shared/i18n/index.js";
 import { formatShortDate } from "../../work-orders/utils/workOrderForms.js";
 import { hasChartValue } from "../utils/executiveDashboardMetrics.js";
 import {
@@ -74,7 +75,8 @@ export function ExecutiveKpiSection({
     label: "Total Assets",
     value: data.equipment.length,
     subtitle: "Assets under maintenance control",
-    trend: `${metrics.criticalEquipment.length} need attention`,
+    trendValue: metrics.criticalEquipment.length,
+    trendLabel: "need attention",
     icon: Cpu,
     tone: "blue",
     route: "equipment"
@@ -82,7 +84,8 @@ export function ExecutiveKpiSection({
     label: "Active Work Orders",
     value: insights.activeWorkOrders.length,
     subtitle: "Open execution workload",
-    trend: `${data["work-orders"].length} total orders`,
+    trendValue: data["work-orders"].length,
+    trendLabel: "total orders",
     icon: Wrench,
     tone: insights.activeWorkOrders.length ? "blue" : "green",
     route: "work-orders"
@@ -98,7 +101,8 @@ export function ExecutiveKpiSection({
     label: "Critical Alarms",
     value: insights.criticalAlerts.length,
     subtitle: "Critical alerts in scope",
-    trend: `${Math.max((insights.notifications || []).length - insights.criticalAlerts.length, 0)} non-critical`,
+    trendValue: Math.max((insights.notifications || []).length - insights.criticalAlerts.length, 0),
+    trendLabel: "non-critical",
     icon: ShieldAlert,
     tone: insights.criticalAlerts.length ? "red" : "green",
     route: "reports"
@@ -132,6 +136,8 @@ function ExecutiveKpiCard({
   value,
   subtitle,
   trend,
+  trendValue,
+  trendLabel,
   icon: Icon,
   tone,
   onClick,
@@ -156,7 +162,7 @@ function ExecutiveKpiCard({
       <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-500">{t(subtitle)}</p>
       <div className={`mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black ${style.chip}`}>
         <TrendIcon className="h-3.5 w-3.5" />
-        <span>{t(trend)}</span>
+        {trendLabel ? <span>{formatNumber(trendValue, language)} {t(trendLabel)}</span> : <span>{t(trend)}</span>}
       </div>
     </button>
   );
@@ -344,6 +350,9 @@ function OperationKpiCard({
   language
 }) {
   const style = toneStyles[item.tone] || toneStyles.blue;
+  const comparisonText = item.comparisonLabel
+    ? `${formatNumber(item.comparisonValue, language)} ${tr(language, item.comparisonLabel)}`
+    : tr(language, item.comparison);
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -351,7 +360,7 @@ function OperationKpiCard({
           <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{tr(language, item.label)}</p>
           <p className="mt-3 text-4xl font-black tracking-tight text-slate-950">{item.value}</p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-black ${style.chip}`}>{tr(language, item.comparison)}</span>
+        <span className={`rounded-full px-3 py-1 text-xs font-black ${style.chip}`}>{comparisonText}</span>
       </div>
       <SparkTrend data={item.trend} tone={item.tone} />
     </article>
@@ -643,7 +652,7 @@ export function SiteStatusOverviewStrip({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-base font-black text-slate-950" title={site.name}>{site.name}</p>
-                <p className="mt-1 text-sm font-semibold text-slate-500">{site.assets} {tr(language, "assets")} / {site.breakdown} {tr(language, "faults")}</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">{formatNumber(site.assets, language)} {tr(language, "assets")} / {formatNumber(site.breakdown, language)} {tr(language, "faults")}</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-black ${toneStyles[tone].chip}`}>{site.operational}%</span>
             </div>

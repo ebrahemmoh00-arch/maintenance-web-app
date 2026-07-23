@@ -65,7 +65,7 @@ export function Schedule({
     }
   }, [filteredEquipment, selectedEquipmentId]);
   return <div className="space-y-6">
-      <Panel title="Schedule Navigator" subtitle="Select the customer/site first, then choose the equipment type to show its maintenance follow-up tables.">
+      <Panel title="Schedule Navigator" subtitle="Select the customer/site first, then choose the equipment type to show its maintenance follow-up tables." language={language}>
         <div className="space-y-5">
           <div>
               <h3 className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Customers / Sites")}</h3>
@@ -79,15 +79,15 @@ export function Schedule({
                 setSelectedEquipmentId("");
               }} className={`rounded-xl border p-4 text-left transition ${active ? "border-blue-300 bg-blue-50 shadow-sm ring-2 ring-blue-100" : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"}`}>
                     <p className="text-sm font-black text-slate-950">{customer.name}</p>
-                    <p className="mt-2 text-xs font-semibold text-slate-500">{count} assets</p>
+                    <p className="mt-2 text-xs font-semibold text-slate-500">{count} {t("assets")}</p>
                   </button>;
             })}
-              {!customerOptions.length ? <EmptyState title={t("No customers / sites")} message={t("Add customers or sites first, then assign assets to them.")} /> : null}
+              {!customerOptions.length ? <EmptyState title="No customers / sites" message="Add customers or sites first, then assign assets to them." language={language} /> : null}
             </div>
           </div>
 
           {selectedCustomerId ? <div>
-              <h3 className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">Equipment Type</h3>
+              <h3 className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Equipment Type")}</h3>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {categories.map(category => {
               const active = category.key === selectedCategory;
@@ -95,16 +95,16 @@ export function Schedule({
                 setSelectedCategory(category.key);
                 setSelectedEquipmentId("");
               }} className={`rounded-xl border p-4 text-left transition ${active ? "border-slate-900 bg-slate-950 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"}`}>
-                      <p className={`text-sm font-black ${active ? "text-white" : "text-slate-950"}`}>{category.label}</p>
-                      <p className={`mt-2 text-xs font-semibold ${active ? "text-slate-300" : "text-slate-500"}`}>{category.count} assets</p>
+                      <p className={`text-sm font-black ${active ? "text-white" : "text-slate-950"}`}>{t(category.label)}</p>
+                      <p className={`mt-2 text-xs font-semibold ${active ? "text-slate-300" : "text-slate-500"}`}>{category.count} {t("assets")}</p>
                     </button>;
             })}
-                {!categories.length ? <EmptyState title={t("No equipment")} message="No equipment types are linked to this customer." /> : null}
+                {!categories.length ? <EmptyState title="No equipment" message="No equipment types are linked to this customer." language={language} /> : null}
               </div>
             </div> : null}
 
           {selectedCustomerId && selectedCategory ? <div>
-              <h3 className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">Equipment</h3>
+              <h3 className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">{t("Equipment")}</h3>
               <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
                 {filteredEquipment.map(asset => {
               const active = Number(asset.id) === Number(selectedEquipmentId);
@@ -112,14 +112,14 @@ export function Schedule({
                       {asset.name}
                     </button>;
             })}
-                {!filteredEquipment.length ? <EmptyState title={t("No equipment")} message="No equipment is available under this type." /> : null}
+                {!filteredEquipment.length ? <EmptyState title="No equipment" message="No equipment is available under this type." language={language} /> : null}
               </div>
             </div> : null}
         </div>
       </Panel>
 
-      {selectedCustomerId && selectedCategory && selectedEquipment ? <MaintenanceFollowUpBoard title={`${selectedEquipment.name} - Maintenance Follow-up`} subtitle={`${selectedCustomer?.name || "Customer"} / ${scheduleCategoryLabel(selectedCategory)}. This page shows the selected equipment maintenance table only.`} equipment={[selectedEquipment]} allEquipment={equipment} pmTasks={pmTasks} pmPlans={pmPlans} workOrders={workOrders} onCreatePm={onCreatePm} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} onImportMaintenanceFollowUp={onImportMaintenanceFollowUp} canManage={canManage} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete} language={language} /> : selectedCustomerId && selectedCategory ? <Panel title="Select Equipment" subtitle="Choose an equipment name above to open its preventive maintenance follow-up page.">
-          <EmptyState title="No equipment selected" message="Click one equipment name to show its maintenance table." />
+      {selectedCustomerId && selectedCategory && selectedEquipment ? <MaintenanceFollowUpBoard title={`${selectedEquipment.name} - ${t("Maintenance Follow-up")}`} subtitle={`${selectedCustomer?.name || t("Customer")} / ${t(scheduleCategoryLabel(selectedCategory))}. ${t("This page shows the selected equipment maintenance table only.")}`} equipment={[selectedEquipment]} allEquipment={equipment} pmTasks={pmTasks} pmPlans={pmPlans} workOrders={workOrders} onCreatePm={onCreatePm} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} onImportMaintenanceFollowUp={onImportMaintenanceFollowUp} canManage={canManage} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete} language={language} /> : selectedCustomerId && selectedCategory ? <Panel title="Select Equipment" subtitle="Choose an equipment name above to open its preventive maintenance follow-up page." language={language}>
+          <EmptyState title="No equipment selected" message="Click one equipment name to show its maintenance table." language={language} />
         </Panel> : null}
 
       <Panel title={t("Calendar Schedule")} subtitle={t("Work orders grouped by scheduled date for fast maintenance planning.")}>
@@ -136,7 +136,7 @@ export function Schedule({
                   </div>)}
               </div>
             </div>)}
-          {!days.length ? <EmptyState title={t("No scheduled work orders")} message={t("Scheduled maintenance will appear in this calendar view.")} /> : null}
+          {!days.length ? <EmptyState title="No scheduled work orders" message="Scheduled maintenance will appear in this calendar view." language={language} /> : null}
         </div>
       </Panel>
     </div>;
@@ -164,16 +164,16 @@ export function MaintenanceFollowUpBoard({
   const t = text => tr(language, text);
   const targetAsset = equipment[0] || null;
   const followUpRows = buildUnifiedPmRows(pmTasks, pmPlans, allEquipment);
-  return <Panel title={title} subtitle={subtitle} actions={<div className="flex flex-wrap items-center gap-2">
+  return <Panel title={title} subtitle={subtitle} language={language} actions={<div className="flex flex-wrap items-center gap-2">
         {canAdd && targetAsset ? <MaintenanceImportControl targetAsset={targetAsset} equipment={allEquipment} pmTasks={pmTasks} pmPlans={pmPlans} onImport={onImportMaintenanceFollowUp} language={language} /> : null}
         {canAdd ? <button onClick={onCreatePm} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"><Plus className="h-4 w-4" />{t("New Record")}</button> : null}
       </div>}>
       <div className="space-y-5">
         {sortEquipmentByName(equipment).map(asset => {
           const rows = followUpRows.filter(task => Number(task.equipment_id) === Number(asset.id));
-          return <EquipmentMaintenanceCard key={asset.id} asset={asset} pmTasks={rows} workOrders={workOrders.filter(order => Number(order.equipment_id) === Number(asset.id))} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} canManage={canManage} canEdit={canEdit} canDelete={canDelete} />;
+          return <EquipmentMaintenanceCard key={asset.id} asset={asset} pmTasks={rows} workOrders={workOrders.filter(order => Number(order.equipment_id) === Number(asset.id))} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} canManage={canManage} canEdit={canEdit} canDelete={canDelete} language={language} />;
         })}
-        {!equipment.length ? <EmptyState title={t("No equipment")} message="Add assets first, then create preventive maintenance tasks." /> : null}
+        {!equipment.length ? <EmptyState title="No equipment" message="Add assets first, then create preventive maintenance tasks." language={language} /> : null}
       </div>
     </Panel>;
 }
@@ -231,35 +231,37 @@ export function EquipmentMaintenanceCard({
   onUpdatePmHistory,
   canManage,
   canEdit = canManage,
-  canDelete = canManage
+  canDelete = canManage,
+  language
 }) {
+  const t = text => tr(language, text);
   const [activeRecordsTaskId, setActiveRecordsTaskId] = useState(null);
   return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div>
           <h3 className="text-sm font-black text-slate-950">{asset.name}</h3>
           <p className="mt-1 text-xs font-semibold text-slate-500">
-            Running Hour: <span className="text-slate-950">{formatScheduleCell(asset.current_hours)}</span>
-            {asset.asset_code ? <span> - Code: <span className="text-slate-950">{asset.asset_code}</span></span> : null}
+            {t("Running Hour")}: <span className="text-slate-950">{formatScheduleCell(asset.current_hours)}</span>
+            {asset.asset_code ? <span> - {t("Code")}: <span className="text-slate-950">{asset.asset_code}</span></span> : null}
           </p>
         </div>
-        <MaintenanceBadge value={asset.maintenance_alert} />
+        <MaintenanceBadge value={asset.maintenance_alert} language={language} />
       </div>
 
       <div className="overflow-auto">
         <table className="min-w-[1420px] w-full border-collapse text-center text-sm text-slate-950">
           <thead>
             <tr className="bg-white text-sm font-bold">
-              <th className="border border-slate-950 px-3 py-2">Preventive Maintenance Type</th>
-              <th className="border border-slate-950 px-3 py-2">Interval</th>
-              <th className="border border-slate-950 px-3 py-2">Running Hour</th>
-              <th className="border border-slate-950 px-3 py-2">Operating Hours at Maintenance</th>
-              <th className="border border-slate-950 px-3 py-2">Next Maintenance Hour</th>
-              <th className="border border-slate-950 px-3 py-2">Remaining Hours</th>
-              <th className="border border-slate-950 px-3 py-2">Next Due Date</th>
-              <th className="border border-slate-950 px-3 py-2">Remaining Days</th>
-              <th className="border border-slate-950 px-3 py-2">Status</th>
-              {canEdit || canDelete ? <th className="border border-slate-950 px-3 py-2">Actions</th> : null}
+              <th className="border border-slate-950 px-3 py-2">{t("Preventive Maintenance Type")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Interval")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Running Hour")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Operating Hours at Maintenance")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Next Maintenance Hour")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Remaining Hours")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Next Due Date")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Remaining Days")}</th>
+              <th className="border border-slate-950 px-3 py-2">{t("Status")}</th>
+              {canEdit || canDelete ? <th className="border border-slate-950 px-3 py-2">{t("Actions")}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -279,13 +281,13 @@ export function EquipmentMaintenanceCard({
                     <td className="border border-slate-950 px-3 py-2 font-semibold">
                       <div className="flex flex-col items-center gap-1">
                         <span>{task.task_name}</span>
-                        {isPmPlan ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700">PM Plan</span> : null}
+                        {isPmPlan ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700">{t("PM Plan")}</span> : null}
                       </div>
                     </td>
-                    <td className="border border-slate-950 px-3 py-2">{formatInterval(task)}</td>
+                    <td className="border border-slate-950 px-3 py-2">{formatInterval(task, language)}</td>
                     <td className="border border-slate-950 px-3 py-2">{formatScheduleCell(runningHour)}</td>
                     <td className="border border-slate-950 px-3 py-2">
-                      <button type="button" onClick={() => setActiveRecordsTaskId(recordsOpen ? null : task.id)} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-black text-blue-700 hover:border-blue-400 hover:bg-blue-100" title="Show previous readings">
+                      <button type="button" onClick={() => setActiveRecordsTaskId(recordsOpen ? null : task.id)} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-black text-blue-700 hover:border-blue-400 hover:bg-blue-100" title={t("Show previous readings")}>
                         {formatScheduleCell(task.last_service_hours)}
                         <span className="ml-2 text-[11px] font-bold text-blue-500">({previousRecords.length})</span>
                       </button>
@@ -294,23 +296,23 @@ export function EquipmentMaintenanceCard({
                     <td className={`border border-slate-950 px-3 py-2 font-black ${remainingHoursTone}`}>{formatScheduleCell(remainingHours)}</td>
                     <td className="border border-slate-950 px-3 py-2">{task.next_due_date || "-"}</td>
                     <td className={`border border-slate-950 px-3 py-2 font-black ${remainingDaysTone}`}>{formatScheduleCell(remainingDays)}</td>
-                    <td className="border border-slate-950 px-3 py-2">{task.pm_alert || task.status}</td>
+                    <td className="border border-slate-950 px-3 py-2">{t(task.pm_alert || task.status)}</td>
                     {canEdit || canDelete ? <td className="border border-slate-950 px-3 py-2">
-                        {isPmPlan ? <span className="text-xs font-black text-slate-500">Managed in PM Plans</span> : <>
-                            {canEdit ? <button type="button" onClick={() => onEditPm(task)} className="mr-2 rounded border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">Edit</button> : null}
-                            {canDelete ? <button type="button" onClick={() => onDeletePm(task.id)} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">Delete</button> : null}
+                        {isPmPlan ? <span className="text-xs font-black text-slate-500">{t("Managed in PM Plans")}</span> : <>
+                            {canEdit ? <button type="button" onClick={() => onEditPm(task)} className="mr-2 rounded border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit")}</button> : null}
+                            {canDelete ? <button type="button" onClick={() => onDeletePm(task.id)} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">{t("Delete")}</button> : null}
                           </>}
                       </td> : null}
                   </tr>
                   {recordsOpen ? <tr>
                       <td colSpan={canEdit || canDelete ? 10 : 9} className="border border-slate-950 bg-slate-50 p-3">
-                        <PreviousRecordsTable records={previousRecords} canManage={canEdit && !isPmPlan} onUpdateRecord={onUpdatePmHistory} />
+                        <PreviousRecordsTable records={previousRecords} canManage={canEdit && !isPmPlan} onUpdateRecord={onUpdatePmHistory} language={language} />
                       </td>
                     </tr> : null}
                 </Fragment>;
           })}
             {!pmTasks.length ? <tr>
-                <td colSpan={canEdit || canDelete ? 10 : 9} className="border border-slate-950 px-3 py-8 text-center text-slate-500">No preventive maintenance tasks for this equipment.</td>
+                <td colSpan={canEdit || canDelete ? 10 : 9} className="border border-slate-950 px-3 py-8 text-center text-slate-500">{t("No preventive maintenance tasks for this equipment.")}</td>
               </tr> : null}
           </tbody>
         </table>

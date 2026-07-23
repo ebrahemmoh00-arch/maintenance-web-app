@@ -1,6 +1,7 @@
 import { StatusBadge, valueLabel } from "../../../shared/components/StatusBadges.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
-import { calculateDuration, formatShortDate, getWorkOrderSavedDate, parseWorkOrderNotes } from "../utils/workOrderForms.js";
+import { formatDate } from "../../../shared/i18n/index.js";
+import { calculateDuration, getWorkOrderSavedDate, parseWorkOrderNotes } from "../utils/workOrderForms.js";
 
 export function SavedWorkOrderFilters({
   equipment,
@@ -33,7 +34,7 @@ export function SavedWorkOrderFilters({
           date: event.target.value
         })} disabled={!value.equipmentId}>
             <option value="">{value.equipmentId ? t("All Dates") : t("Select equipment first")}</option>
-            {dates.map(date => <option key={date} value={date}>{formatShortDate(date)}</option>)}
+            {dates.map(date => <option key={date} value={date}>{formatDate(date, language)}</option>)}
           </select>
         </label>
       </div>
@@ -55,13 +56,13 @@ export function SavedWorkOrdersTable({
             <tr className="bg-blue-600 text-white">
               <th className="w-10 border border-slate-600 px-2 py-2"></th>
               <th className="border border-slate-600 px-2 py-2">{t("Date")}</th>
-              <th className="border border-slate-600 px-2 py-2">W.O.</th>
-              <th className="border border-slate-600 px-2 py-2">Asset</th>
-              <th className="border border-slate-600 px-2 py-2">Task Description</th>
-              <th className="border border-slate-600 px-2 py-2">Type of maintenance</th>
-              <th className="border border-slate-600 px-2 py-2">Shift Engineer</th>
+              <th className="border border-slate-600 px-2 py-2">{t("W.O.")}</th>
+              <th className="border border-slate-600 px-2 py-2">{t("Asset")}</th>
+              <th className="border border-slate-600 px-2 py-2">{t("Task Description")}</th>
+              <th className="border border-slate-600 px-2 py-2">{t("Type of maintenance")}</th>
+              <th className="border border-slate-600 px-2 py-2">{t("Shift Engineer")}</th>
               <th className="border border-slate-600 px-2 py-2">{t("Techn.")}</th>
-              <th className="border border-slate-600 px-2 py-2">R.H</th>
+              <th className="border border-slate-600 px-2 py-2">{t("R.H")}</th>
               <th className="border border-slate-600 px-2 py-2">{t("Duration")}</th>
               <th className="border border-slate-600 px-2 py-2">{t("Status")}</th>
             </tr>
@@ -77,7 +78,7 @@ export function SavedWorkOrdersTable({
                   <td className="border border-slate-300 px-2 py-2 text-center">
                     <input type="radio" checked={Number(row.id) === Number(selectedId)} onChange={() => setSelectedId(row.id)} />
                   </td>
-                  <td className="border border-slate-300 px-2 py-2 text-center font-semibold">{formatShortDate(savedDate)}</td>
+                  <td className="border border-slate-300 px-2 py-2 text-center font-semibold">{formatDate(savedDate, language)}</td>
                   <td className="border border-slate-300 px-2 py-2 font-semibold">{reference}</td>
                   <td className="border border-slate-300 px-2 py-2">{row.customer_name} {row.equipment_name}</td>
                   <td className="border border-slate-300 px-2 py-2">{row.description}</td>
