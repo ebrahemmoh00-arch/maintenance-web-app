@@ -29,15 +29,18 @@ export function AssetDetailsPanel({
   onHistoryRefresh,
   historyTechnicians = [],
   onAddLifecycleItem,
+  onDeleteMeasurement,
   canDeleteTimeline = false,
   onDeleteTimelineEntry,
   measurementTemplates = [],
+  importableMeasurementTemplates = [],
   canManageMeasurementTemplates = false,
   canCreateMeasurementTemplate = false,
   canEditMeasurementTemplate = false,
   canDeleteMeasurementTemplate = false,
   onSaveMeasurementTemplate,
   onDeleteMeasurementTemplate,
+  onImportMeasurementTemplate,
   language
 }) {
   const t = text => tr(language, text);
@@ -92,7 +95,7 @@ export function AssetDetailsPanel({
       {activeTab === "history" ? <div className="mt-5">
           <HistoryTimeline history={lifecycle.history} filters={historyFilters} onFiltersChange={onHistoryFiltersChange || (() => {})} onPageChange={onHistoryPageChange || (() => {})} onRefresh={onHistoryRefresh || (() => {})} technicians={historyTechnicians} loading={lifecycleLoading} language={language} />
         </div> : activeTab === "measurements" ? <div className="mt-5">
-          <AssetMeasurementManager measurements={lifecycle.measurements || []} templates={measurementTemplates} onSaveMeasurement={onAddLifecycleItem ? payload => onAddLifecycleItem("measurement", payload) : null} onSaveTemplate={onSaveMeasurementTemplate} onDeleteTemplate={onDeleteMeasurementTemplate} canAddMeasurement={canEdit && Boolean(onAddLifecycleItem)} canManageTemplates={canManageMeasurementTemplates} canCreateTemplate={canCreateMeasurementTemplate} canEditTemplate={canEditMeasurementTemplate} canDeleteTemplate={canDeleteMeasurementTemplate} language={language} />
+          <AssetMeasurementManager measurements={lifecycle.measurements || []} templates={measurementTemplates} importableTemplates={importableMeasurementTemplates} onSaveMeasurement={onAddLifecycleItem ? payload => onAddLifecycleItem("measurement", payload) : null} onDeleteMeasurement={onDeleteMeasurement} onSaveTemplate={onSaveMeasurementTemplate} onDeleteTemplate={onDeleteMeasurementTemplate} onImportTemplate={onImportMeasurementTemplate} canAddMeasurement={canEdit && Boolean(onAddLifecycleItem)} canDeleteMeasurement={canEdit && Boolean(onDeleteMeasurement)} canManageTemplates={canManageMeasurementTemplates} canCreateTemplate={canCreateMeasurementTemplate} canEditTemplate={canEditMeasurementTemplate} canDeleteTemplate={canDeleteMeasurementTemplate} language={language} />
         </div> : <>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">

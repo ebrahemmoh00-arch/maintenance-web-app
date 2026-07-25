@@ -435,9 +435,9 @@ class AssetHistoryService:
                 am.asset_id,
                 'Meter Reading' AS event_type,
                 am.reading_date AS event_time,
-                NULL AS user_id,
-                '' AS user_name,
-                '' AS technician,
+                am.created_by_id AS user_id,
+                COALESCE(NULLIF(am.user_name, ''), eng.name, '') AS user_name,
+                COALESCE(NULLIF(am.user_name, ''), eng.name, '') AS technician,
                 NULL AS work_order_id,
                 '' AS work_order_number,
                 NULL AS pm_plan_id,
@@ -453,6 +453,7 @@ class AssetHistoryService:
                 COALESCE(NULLIF(am.source_record_id, ''), CAST(am.id AS TEXT)) AS reference_id,
                 '' AS metadata
             FROM asset_measurements am
+            LEFT JOIN engineers eng ON eng.id = am.created_by_id
             WHERE am.asset_id = ?
             """,
             (asset_id,),

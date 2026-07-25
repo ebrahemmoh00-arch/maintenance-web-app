@@ -2,7 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 
-from ...core.auth import require_permission
+from ...core.auth import CurrentUser, require_permission
 from ...schemas import AssetDocument, AssetDocumentCreate, AssetEvent, AssetHealth, AssetHistory, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, DowntimeEvent, FailureEvent, MeasurementTemplate, MeasurementTemplateCreate, MeasurementTemplateUpdate
 from ...services import AssetHistoryService, AssetLifecycleService, DowntimeService, FailureManagementService, MeasurementTemplateService
 from ...utils.pagination import ListQuery, get_list_query
@@ -16,8 +16,11 @@ downtime = DowntimeService()
 
 
 @router.get("/measurement-templates", response_model=list[MeasurementTemplate])
-def measurement_templates(_=Depends(require_permission("measurement_templates:read"))):
-    return template_service.list()
+def measurement_templates(
+    asset_id: int | None = Query(default=None),
+    _=Depends(require_permission("measurement_templates:read")),
+):
+    return template_service.list(asset_id)
 
 
 @router.post("/measurement-templates", response_model=MeasurementTemplate, status_code=201)
@@ -98,7 +101,7 @@ def asset_measurements(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(service.measurements(asset_id), search_fields=["measurement_type", "unit", "notes"], date_fields=["recorded_at", "created_at"])
+    return query.apply(service.measurements(asset_id), search_fields=["measurement_type", "unit", "notes", "user_name"], date_fields=["recorded_at", "created_at"])
 
 
 @router.get("/{asset_id}/events", response_model=None)
@@ -157,5 +160,10 @@ def add_asset_photo(asset_id: int, photo: AssetPhotoCreate, _=Depends(require_pe
 
 
 @router.post("/{asset_id}/measurements", response_model=AssetMeasurement, status_code=201)
-def add_asset_measurement(asset_id: int, measurement: AssetMeasurementCreate, _=Depends(require_permission("assets:update"))):
-    return service.add_measurement(asset_id, measurement)
+def add_asset_measurement(asset_id: int, measurement: AssetMeasurementCreate, current_user: CurrentUser = Depends(require_permission("assets:update"))):
+    return service.add_measurement(asset_id, measurement, current_user)
+
+
+@router.delete("/{asset_id}/measurements/{measurement_id}")
+def delete_asset_measurement(asset_id: int, measurement_id: int, _=Depends(require_permission("assets:update"))):
+    return service.delete_measurement(asset_id, measurement_id)

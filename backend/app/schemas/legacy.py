@@ -303,6 +303,8 @@ class AssetMeasurementBase(BaseModel):
     notes: str = ""
     measurement_table: str = ""
     table_snapshot: str = ""
+    created_by_id: int | None = None
+    user_name: str = ""
 
 
 class AssetMeasurementCreate(AssetMeasurementBase):
@@ -317,6 +319,7 @@ class AssetMeasurement(AssetMeasurementBase):
 
 
 class MeasurementTemplateBase(BaseModel):
+    asset_id: int | None = None
     name: str = Field(min_length=1)
     description: str = ""
     category: str = ""
@@ -336,6 +339,7 @@ class MeasurementTemplateCreate(MeasurementTemplateBase):
 
 
 class MeasurementTemplateUpdate(BaseModel):
+    asset_id: int | None = None
     name: str | None = None
     description: str | None = None
     category: str | None = None

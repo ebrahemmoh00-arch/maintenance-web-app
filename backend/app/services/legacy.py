@@ -157,23 +157,27 @@ class MeasurementTemplateService:
     def __init__(self) -> None:
         self.repo = MeasurementTemplateRepository()
         self.engineers = EngineerRepository()
+        self.assets = EquipmentRepository()
 
-    def list(self):
-        return self.repo.list()
+    def list(self, asset_id: int | None = None):
+        return self.repo.list(asset_id)
 
     def get(self, item_id: int):
         return self.repo.get(item_id)
 
     def create(self, data, actor_id: int | None = None):
         item = self._prepare_payload(payload(data), actor_id)
-        self._validate_unique_name(item["name"])
+        self._validate_unique_name(item["name"], asset_id=item.get("asset_id"))
         return self.repo.create(item)
 
     def update(self, item_id: int, data):
         current = self.repo.get(item_id)
         item = self._prepare_payload({**current, **payload(data)}, current.get("created_by_id"))
-        if item["name"].strip().lower() != str(current.get("name", "")).strip().lower():
-            self._validate_unique_name(item["name"], item_id)
+        if (
+            item["name"].strip().lower() != str(current.get("name", "")).strip().lower()
+            or int(item.get("asset_id") or 0) != int(current.get("asset_id") or 0)
+        ):
+            self._validate_unique_name(item["name"], item_id, item.get("asset_id"))
         return self.repo.update(item_id, item)
 
     def delete(self, item_id: int):
@@ -188,14 +192,19 @@ class MeasurementTemplateService:
         if item["status"] not in {"active", "inactive"}:
             raise HTTPException(status_code=400, detail="Measurement template status must be active or inactive")
         item["table_schema"] = normalize_json_text(item.get("table_schema"), "[]")
+        if item.get("asset_id"):
+            self.assets.get(int(item["asset_id"]))
+            item["asset_id"] = int(item["asset_id"])
+        else:
+            item["asset_id"] = None
         if item.get("created_by_id"):
             self.engineers.get(int(item["created_by_id"]))
         elif actor_id:
             item["created_by_id"] = actor_id
         return item
 
-    def _validate_unique_name(self, name: str, item_id: int | None = None) -> None:
-        existing = self.repo.find_by_name(name)
+    def _validate_unique_name(self, name: str, item_id: int | None = None, asset_id: int | None = None) -> None:
+        existing = self.repo.find_by_name(name, asset_id)
         if existing and int(existing["id"]) != int(item_id or 0):
             raise HTTPException(status_code=400, detail="Measurement type already exists")
 
@@ -457,9 +466,12 @@ class AssetLifecycleService:
         self.assets.get(asset_id)
         return self.refresh_health(asset_id)
 
-    def add_measurement(self, asset_id: int, data):
+    def add_measurement(self, asset_id: int, data, actor: Any | None = None):
         self.assets.get(asset_id)
         item = payload(data)
+        if actor:
+            item["created_by_id"] = getattr(actor, "id", None)
+            item["user_name"] = getattr(actor, "name", "") or getattr(actor, "username", "")
         if float(item.get("value") or 0) < 0:
             raise HTTPException(status_code=400, detail="Measurement value cannot be negative")
         if item.get("template_id"):
@@ -477,6 +489,12 @@ class AssetLifecycleService:
             self.assets.update(asset_id, {"current_reading": float(created.get("value") or 0)})
         self.refresh_health(asset_id)
         return created
+
+    def delete_measurement(self, asset_id: int, measurement_id: int):
+        self.assets.get(asset_id)
+        deleted = self.lifecycle.delete_measurement(asset_id, measurement_id)
+        self.refresh_health(asset_id)
+        return deleted
 
     def add_document(self, asset_id: int, data):
         self.assets.get(asset_id)

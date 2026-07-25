@@ -67,7 +67,7 @@ export function AssetsView({
     level: "",
     criticality: ""
   });
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState(departments[0]?.id ? String(departments[0].id) : "");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [showAllAssets, setShowAllAssets] = useState(false);
   const [assetLifecycle, setAssetLifecycle] = useState({
     history: EMPTY_HISTORY_RESPONSE,
@@ -87,11 +87,32 @@ export function AssetsView({
   const customerConfig = localizedConfig("customers", language);
   const assetConfig = localizedConfig("equipment", language);
   const selectedDepartment = useMemo(() => departments.find(department => sameId(department.id, selectedDepartmentId)) || null, [departments, selectedDepartmentId]);
-  const scopedRows = useMemo(() => showAllAssets || !selectedDepartment ? rows : filterAssetsByDepartment(rows, selectedDepartment), [rows, selectedDepartment, showAllAssets]);
+  const scopedRows = useMemo(() => {
+    if (showAllAssets) return rows;
+    if (selectedDepartment) return filterAssetsByDepartment(rows, selectedDepartment);
+    return [];
+  }, [rows, selectedDepartment, showAllAssets]);
   const assetTree = useMemo(() => buildAssetTree(scopedRows, assetSearch, assetFilters), [scopedRows, assetSearch, assetFilters]);
   const companyTrees = useMemo(() => buildCompanyTrees(departments, assetTree, selectedDepartment, showAllAssets), [departments, assetTree, selectedDepartment, showAllAssets]);
   const selectedAsset = scopedRows.find(asset => Number(asset.id) === Number(selectedAssetId)) || scopedRows[0];
-  const scopeLabel = showAllAssets ? t("All Assets") : selectedDepartment?.name || t("No customer / location selected");
+  const assetNameById = useMemo(() => new Map(rows.map(asset => [Number(asset.id), asset.name])), [rows]);
+  const selectedMeasurementTemplateIds = useMemo(() => new Set((assetLifecycle.measurements || []).map(measurement => Number(measurement.template_id || 0)).filter(Boolean)), [assetLifecycle.measurements]);
+  const selectedMeasurementTemplates = useMemo(() => {
+    if (!selectedAsset?.id) return [];
+    return measurementTemplates.filter(template => sameId(template.asset_id, selectedAsset.id) || (!template.asset_id && selectedMeasurementTemplateIds.has(Number(template.id))));
+  }, [measurementTemplates, selectedAsset?.id, selectedMeasurementTemplateIds]);
+  const currentMeasurementTemplateNames = useMemo(() => new Set(selectedMeasurementTemplates.map(template => normalizeTemplateName(template.name))), [selectedMeasurementTemplates]);
+  const importableMeasurementTemplates = useMemo(() => {
+    if (!selectedAsset?.id) return [];
+    return measurementTemplates
+      .filter(template => !sameId(template.asset_id, selectedAsset.id))
+      .filter(template => !currentMeasurementTemplateNames.has(normalizeTemplateName(template.name)))
+      .map(template => ({
+        ...template,
+        source_asset_name: template.asset_id ? assetNameById.get(Number(template.asset_id)) || `${t("Asset")} #${template.asset_id}` : t("Legacy Template")
+      }));
+  }, [assetNameById, currentMeasurementTemplateNames, measurementTemplates, selectedAsset?.id, t]);
+  const scopeLabel = showAllAssets ? t("All Assets") : selectedDepartment?.name || t("No customer / site selected");
   const historyTechnicians = useMemo(() => [...new Set(workOrders.map(order => order.engineer_name || order.technician_name || "").filter(Boolean))].sort(), [workOrders]);
   const canManageMeasurementTemplates = canCreateMeasurementTemplate || canEditMeasurementTemplate || canDeleteMeasurementTemplate;
   const sections = [{
@@ -108,19 +129,15 @@ export function AssetsView({
     count: scopedRows.length
   }];
   useEffect(() => {
-    if (!departments.length) {
+    if (!departments.length || !departments.some(department => sameId(department.id, selectedDepartmentId))) {
       if (selectedDepartmentId) setSelectedDepartmentId("");
-      return;
-    }
-    if (!departments.some(department => sameId(department.id, selectedDepartmentId))) {
-      setSelectedDepartmentId(String(departments[0].id));
     }
   }, [departments, selectedDepartmentId]);
   useEffect(() => {
     let cancelled = false;
     async function loadMeasurementTemplates() {
       try {
-        const templates = await api.list("assets/measurement-templates");
+        const templates = await loadAllMeasurementTemplates();
         if (!cancelled) setMeasurementTemplates(Array.isArray(templates) ? templates : []);
       } catch {
         if (!cancelled) setMeasurementTemplates([]);
@@ -232,9 +249,44 @@ export function AssetsView({
       window.alert(error.message || t("Failed to save asset lifecycle item"));
     }
   }
+  async function handleAssetMeasurementDelete(measurementId) {
+    if (!selectedAsset?.id || !measurementId) return false;
+    const confirmed = window.confirm(t("Delete this measurement reading?"));
+    if (!confirmed) return false;
+    try {
+      await api.remove(`assets/${selectedAsset.id}/measurements`, measurementId);
+      await reloadAssetLifecycle(selectedAsset.id);
+      return true;
+    } catch (error) {
+      window.alert(error.message || t("Failed to delete measurement reading"));
+      return false;
+    }
+  }
   async function saveMeasurementTemplate(payload, templateId = null) {
-    const saved = templateId ? await api.update("assets/measurement-templates", templateId, payload) : await api.create("assets/measurement-templates", payload);
-    const templates = await api.list("assets/measurement-templates");
+    const scopedPayload = { ...payload, asset_id: selectedAsset?.id ? Number(selectedAsset.id) : payload.asset_id || null };
+    const saved = templateId ? await api.update("assets/measurement-templates", templateId, scopedPayload) : await api.create("assets/measurement-templates", scopedPayload);
+    const templates = await loadAllMeasurementTemplates();
+    setMeasurementTemplates(Array.isArray(templates) ? templates : []);
+    return saved;
+  }
+  async function importMeasurementTemplate(template) {
+    if (!selectedAsset?.id || !template) return null;
+    const copy = {
+      asset_id: Number(selectedAsset.id),
+      name: template.name,
+      description: template.description || "",
+      category: template.category || "",
+      unit: template.unit || "",
+      table_schema: template.table_schema || "",
+      guidance_title: template.guidance_title || "",
+      guidance_file_name: template.guidance_file_name || "",
+      guidance_file_url: template.guidance_file_url || "",
+      guidance_notes: template.guidance_notes || "",
+      ideal_values: template.ideal_values || "",
+      status: "active"
+    };
+    const saved = await api.create("assets/measurement-templates", copy);
+    const templates = await loadAllMeasurementTemplates();
     setMeasurementTemplates(Array.isArray(templates) ? templates : []);
     return saved;
   }
@@ -243,9 +295,12 @@ export function AssetsView({
     const confirmed = window.confirm(t("Delete this measurement type?"));
     if (!confirmed) return false;
     await api.remove("assets/measurement-templates", templateId);
-    const templates = await api.list("assets/measurement-templates");
+    const templates = await loadAllMeasurementTemplates();
     setMeasurementTemplates(Array.isArray(templates) ? templates : []);
     return true;
+  }
+  async function loadAllMeasurementTemplates() {
+    return api.list("assets/measurement-templates");
   }
   async function handleAssetTimelineDelete(entryId) {
     if (!selectedAsset?.id || !entryId) return false;
@@ -336,7 +391,7 @@ export function AssetsView({
             </div>
           </Panel>
 
-          <AssetDetailsPanel asset={selectedAsset} rows={scopedRows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} canDeleteTimeline={canDeleteTimeline} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} onDeleteTimelineEntry={handleAssetTimelineDelete} measurementTemplates={measurementTemplates} canManageMeasurementTemplates={canManageMeasurementTemplates} canCreateMeasurementTemplate={canCreateMeasurementTemplate} canEditMeasurementTemplate={canEditMeasurementTemplate} canDeleteMeasurementTemplate={canDeleteMeasurementTemplate} onSaveMeasurementTemplate={saveMeasurementTemplate} onDeleteMeasurementTemplate={deleteMeasurementTemplate} language={language} />
+          <AssetDetailsPanel asset={selectedAsset} rows={scopedRows} departments={departments} workOrders={workOrders} pmTasks={pmTasks} inventory={inventory} onEdit={onEdit} onDelete={onDelete} canManage={canEditAsset || canDeleteAsset} canEdit={canEditAsset} canDelete={canDeleteAsset} canDeleteTimeline={canDeleteTimeline} lifecycle={assetLifecycle} lifecycleLoading={assetLifecycleLoading} lifecycleError={assetLifecycleError} historyFilters={assetHistoryFilters} onHistoryFiltersChange={setAssetHistoryFilters} onHistoryPageChange={page => setAssetHistoryFilters(current => ({ ...current, page }))} onHistoryRefresh={() => reloadAssetLifecycle(selectedAsset?.id)} historyTechnicians={historyTechnicians} onAddLifecycleItem={handleAssetLifecycleCreate} onDeleteMeasurement={handleAssetMeasurementDelete} onDeleteTimelineEntry={handleAssetTimelineDelete} measurementTemplates={selectedMeasurementTemplates} importableMeasurementTemplates={importableMeasurementTemplates} canManageMeasurementTemplates={canManageMeasurementTemplates} canCreateMeasurementTemplate={canCreateMeasurementTemplate} canEditMeasurementTemplate={canEditMeasurementTemplate} canDeleteMeasurementTemplate={canDeleteMeasurementTemplate} onSaveMeasurementTemplate={saveMeasurementTemplate} onDeleteMeasurementTemplate={deleteMeasurementTemplate} onImportMeasurementTemplate={importMeasurementTemplate} language={language} />
         </div> : null}
 
       {activeAssetSection === "assets" ? <Panel title={t("Assets")} subtitle={t("Create, update, and control operational records through the existing REST API.")} language={language} actions={canCreateAsset ? <button onClick={onCreate} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
@@ -364,7 +419,7 @@ function AssetScopeBar({
         <label className="block">
           <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{t("Customer / Site")}</span>
           <select className="w-full rounded-xl border border-slate-200 bg-cyan-50/50 px-3 py-3 text-sm font-black text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white" value={selectedDepartmentId} onChange={event => onSelectedDepartmentChange(event.target.value)} disabled={!departments.length}>
-            {!departments.length ? <option value="">{t("No customers / sites")}</option> : null}
+            <option value="">{departments.length ? t("Select Customer / Site") : t("No customers / sites")}</option>
             {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
           </select>
         </label>
@@ -477,4 +532,8 @@ export function AssetTreeNode({
       </div>
       {hasChildren && isOpen ? node.children.map(child => <AssetTreeNode key={child.id} node={child} rows={rows} selectedId={selectedId} expanded={expanded} onToggle={onToggle} onSelect={onSelect} onDropAsset={onDropAsset} canManage={canManage} depth={depth + 1} language={language} />) : null}
     </div>;
+}
+
+function normalizeTemplateName(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }

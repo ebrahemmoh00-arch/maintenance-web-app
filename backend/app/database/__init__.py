@@ -160,6 +160,8 @@ CREATE TABLE IF NOT EXISTS asset_measurements (
     source_module TEXT DEFAULT '',
     source_record_id TEXT DEFAULT '',
     notes TEXT DEFAULT '',
+    created_by_id INTEGER,
+    user_name TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
@@ -760,6 +762,8 @@ CREATE TABLE IF NOT EXISTS asset_measurements (
     source_module TEXT DEFAULT '',
     source_record_id TEXT DEFAULT '',
     notes TEXT DEFAULT '',
+    created_by_id INTEGER,
+    user_name TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
@@ -1389,6 +1393,7 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_asset_history_work_order_id ON asset_history(work_order_id)",
             "CREATE INDEX IF NOT EXISTS idx_asset_history_pm_plan_id ON asset_history(pm_plan_id)",
             "CREATE INDEX IF NOT EXISTS idx_asset_measurements_template_id ON asset_measurements(template_id)",
+            "CREATE INDEX IF NOT EXISTS idx_measurement_templates_asset_id ON measurement_templates(asset_id)",
             "CREATE INDEX IF NOT EXISTS idx_measurement_templates_status ON measurement_templates(status)",
         ]:
             db.execute(statement)
@@ -1479,7 +1484,8 @@ def ensure_measurement_schema(db: DatabaseConnection) -> None:
             """
             CREATE TABLE IF NOT EXISTS measurement_templates (
                 id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
+                asset_id INTEGER REFERENCES equipment(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
                 description TEXT DEFAULT '',
                 category TEXT DEFAULT '',
                 unit TEXT DEFAULT '',
@@ -1501,7 +1507,8 @@ def ensure_measurement_schema(db: DatabaseConnection) -> None:
             """
             CREATE TABLE IF NOT EXISTS measurement_templates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
+                asset_id INTEGER,
+                name TEXT NOT NULL,
                 description TEXT DEFAULT '',
                 category TEXT DEFAULT '',
                 unit TEXT DEFAULT '',
@@ -1515,10 +1522,13 @@ def ensure_measurement_schema(db: DatabaseConnection) -> None:
                 status TEXT DEFAULT 'active',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
                 FOREIGN KEY(created_by_id) REFERENCES engineers(id) ON DELETE SET NULL
             )
             """
         )
+    ensure_columns(db, "measurement_templates", {"asset_id": "INTEGER"})
+    ensure_measurement_template_name_scope(db)
     ensure_columns(
         db,
         "asset_measurements",
@@ -1526,8 +1536,90 @@ def ensure_measurement_schema(db: DatabaseConnection) -> None:
             "template_id": "INTEGER",
             "measurement_table": "TEXT DEFAULT ''",
             "table_snapshot": "TEXT DEFAULT ''",
+            "created_by_id": "INTEGER",
+            "user_name": "TEXT DEFAULT ''",
         },
     )
+    assign_legacy_measurement_template_assets(db)
+
+
+def ensure_measurement_template_name_scope(db: DatabaseConnection) -> None:
+    if db.backend == "postgres":
+        db.execute("ALTER TABLE measurement_templates DROP CONSTRAINT IF EXISTS measurement_templates_name_key")
+        db.execute("DROP INDEX IF EXISTS measurement_templates_name_key")
+        return
+
+    indexes = db.execute("PRAGMA index_list(measurement_templates)").fetchall()
+    has_unique_name_index = any(int(row["unique"] or 0) == 1 for row in indexes)
+    if not has_unique_name_index:
+        return
+
+    db.execute("PRAGMA foreign_keys = OFF")
+    db.execute("DROP TABLE IF EXISTS measurement_templates_new")
+    db.execute(
+        """
+        CREATE TABLE measurement_templates_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            asset_id INTEGER,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            category TEXT DEFAULT '',
+            unit TEXT DEFAULT '',
+            table_schema TEXT DEFAULT '',
+            guidance_title TEXT DEFAULT '',
+            guidance_file_name TEXT DEFAULT '',
+            guidance_file_url TEXT DEFAULT '',
+            guidance_notes TEXT DEFAULT '',
+            ideal_values TEXT DEFAULT '',
+            created_by_id INTEGER,
+            status TEXT DEFAULT 'active',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+            FOREIGN KEY(created_by_id) REFERENCES engineers(id) ON DELETE SET NULL
+        )
+        """
+    )
+    existing_columns = {row["name"] for row in db.execute("PRAGMA table_info(measurement_templates)").fetchall()}
+    asset_expr = "asset_id" if "asset_id" in existing_columns else "NULL"
+    db.execute(
+        f"""
+        INSERT INTO measurement_templates_new (
+            id, asset_id, name, description, category, unit, table_schema,
+            guidance_title, guidance_file_name, guidance_file_url, guidance_notes,
+            ideal_values, created_by_id, status, created_at, updated_at
+        )
+        SELECT
+            id, {asset_expr}, name, description, category, unit, table_schema,
+            guidance_title, guidance_file_name, guidance_file_url, guidance_notes,
+            ideal_values, created_by_id, status, created_at, updated_at
+        FROM measurement_templates
+        """
+    )
+    db.execute("DROP TABLE measurement_templates")
+    db.execute("ALTER TABLE measurement_templates_new RENAME TO measurement_templates")
+    db.execute("PRAGMA foreign_keys = ON")
+
+
+def assign_legacy_measurement_template_assets(db: DatabaseConnection) -> None:
+    rows = db.execute(
+        """
+        SELECT template_id, MIN(asset_id) AS asset_id
+        FROM asset_measurements
+        WHERE template_id IS NOT NULL
+        GROUP BY template_id
+        HAVING COUNT(DISTINCT asset_id) = 1
+        """
+    ).fetchall()
+    for row in rows:
+        db.execute(
+            """
+            UPDATE measurement_templates
+            SET asset_id = ?
+            WHERE id = ? AND asset_id IS NULL
+            """,
+            (row["asset_id"], row["template_id"]),
+        )
 
 
 def seed_data(db: DatabaseConnection) -> None:

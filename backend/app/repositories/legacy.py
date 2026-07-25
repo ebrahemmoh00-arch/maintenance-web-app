@@ -159,6 +159,7 @@ class JobTitleRepository(Repository):
 class MeasurementTemplateRepository(Repository):
     table = "measurement_templates"
     fields = (
+        "asset_id",
         "name",
         "description",
         "category",
@@ -173,14 +174,29 @@ class MeasurementTemplateRepository(Repository):
         "status",
     )
 
-    def list(self) -> list[dict[str, Any]]:
+    def list(self, asset_id: int | None = None) -> list[dict[str, Any]]:
         with get_connection() as db:
-            rows = db.execute("SELECT * FROM measurement_templates ORDER BY name COLLATE NOCASE ASC").fetchall()
+            if asset_id is None:
+                rows = db.execute("SELECT * FROM measurement_templates ORDER BY name COLLATE NOCASE ASC").fetchall()
+            else:
+                rows = db.execute(
+                    "SELECT * FROM measurement_templates WHERE asset_id = ? ORDER BY name COLLATE NOCASE ASC",
+                    (asset_id,),
+                ).fetchall()
             return [dict(row) for row in rows]
 
-    def find_by_name(self, name: str) -> dict[str, Any] | None:
+    def find_by_name(self, name: str, asset_id: int | None = None) -> dict[str, Any] | None:
         with get_connection() as db:
-            row = db.execute("SELECT * FROM measurement_templates WHERE lower(name) = lower(?)", (name,)).fetchone()
+            if asset_id is None:
+                row = db.execute(
+                    "SELECT * FROM measurement_templates WHERE lower(name) = lower(?) AND asset_id IS NULL",
+                    (name,),
+                ).fetchone()
+            else:
+                row = db.execute(
+                    "SELECT * FROM measurement_templates WHERE lower(name) = lower(?) AND asset_id = ?",
+                    (name, asset_id),
+                ).fetchone()
             return dict(row) if row else None
 
     def update(self, item_id: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -452,6 +468,8 @@ class AssetLifecycleRepository:
             "notes": payload.get("notes", ""),
             "measurement_table": payload.get("measurement_table", ""),
             "table_snapshot": payload.get("table_snapshot", ""),
+            "created_by_id": payload.get("created_by_id"),
+            "user_name": payload.get("user_name", ""),
         }
         created = self._insert_and_get("asset_measurements", item)
         self.add_history(
@@ -463,6 +481,26 @@ class AssetLifecycleRepository:
             created["id"],
         )
         return created
+
+    def delete_measurement(self, asset_id: int, measurement_id: int) -> dict[str, bool]:
+        with get_connection() as db:
+            row = db.execute(
+                "SELECT * FROM asset_measurements WHERE id = ? AND asset_id = ?",
+                (measurement_id, asset_id),
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Measurement reading not found")
+            old_item = dict(row)
+            db.execute("DELETE FROM asset_measurements WHERE id = ? AND asset_id = ?", (measurement_id, asset_id))
+            db.commit()
+        AuditService.log_event(
+            action="DELETE",
+            module="Asset Measurements",
+            record_id=measurement_id,
+            description=f"Deleted measurement reading #{measurement_id} for asset #{asset_id}",
+            old_values=old_item,
+        )
+        return {"ok": True}
 
     def add_document(self, asset_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         item = {

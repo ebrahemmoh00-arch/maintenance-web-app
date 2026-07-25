@@ -98,6 +98,7 @@ class AssetLifecycleTest(unittest.TestCase):
     def test_measurement_template_supports_structured_asset_readings(self) -> None:
         template = self.measurement_templates.create(
             MeasurementTemplateCreate(
+                asset_id=1,
                 name="Valve Clearance",
                 unit="mm",
                 table_schema=json.dumps([
@@ -130,6 +131,37 @@ class AssetLifecycleTest(unittest.TestCase):
         self.assertEqual(measurement["template_id"], template["id"])
         self.assertIn("cylinder", measurement["measurement_table"])
         self.assertIn("Valve Clearance", measurement["table_snapshot"])
+
+    def test_measurement_templates_are_scoped_by_asset(self) -> None:
+        other_asset = self.assets.create(
+            EquipmentCreate(
+                customer_id=1,
+                name="Measurement Scope Asset",
+                asset_type="Generator",
+                asset_level="Equipment",
+                asset_code="AST-MEAS-SCOPE",
+            )
+        )
+
+        first = self.measurement_templates.create(
+            MeasurementTemplateCreate(asset_id=1, name="Vibration", unit="mm/s"),
+            actor_id=1,
+        )
+        second = self.measurement_templates.create(
+            MeasurementTemplateCreate(asset_id=other_asset["id"], name="Vibration", unit="mm/s"),
+            actor_id=1,
+        )
+
+        with self.assertRaises(HTTPException) as context:
+            self.measurement_templates.create(
+                MeasurementTemplateCreate(asset_id=1, name="Vibration", unit="mm/s"),
+                actor_id=1,
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertNotEqual(first["id"], second["id"])
+        self.assertEqual([item["id"] for item in self.measurement_templates.list(1)], [first["id"]])
+        self.assertEqual([item["id"] for item in self.measurement_templates.list(other_asset["id"])], [second["id"]])
 
     def test_measurement_updates_runtime_and_health(self) -> None:
         measurement = self.lifecycle.add_measurement(

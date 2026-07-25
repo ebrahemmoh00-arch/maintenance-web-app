@@ -1,7 +1,9 @@
 import { tr } from "../../../shared/config/appConfig.jsx";
 import { todayIso } from "../../work-orders/utils/workOrderForms.js";
-import { MeasurementPanelCard, MeasurementRecordsPanel, MeasurementTemplateBuilder } from "./AssetMeasurementPanels.jsx";
-import { ClipboardList, Plus } from "lucide-react";
+import { MeasurementPanelCard, MeasurementRecordsPanel, MeasurementTemplateBuilder, MeasurementTemplateImportPanel } from "./AssetMeasurementPanels.jsx";
+import { EMPTY_TABLE_DESIGN, emptyTableRow, normalizeMeasurementTableDesign, parseMeasurementTableDesign, serializeMeasurementTableDesign } from "../utils/measurementTables.js";
+import { guidanceFileNames, parseGuidanceFiles, readGuidanceFiles, serializeGuidanceFiles } from "../utils/guidanceFiles.js";
+import { ClipboardList, Download, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 const EMPTY_TEMPLATE = {
@@ -30,11 +32,15 @@ const EMPTY_MEASUREMENT = {
 export function AssetMeasurementManager({
   measurements = [],
   templates = [],
+  importableTemplates = [],
   onSaveMeasurement,
+  onDeleteMeasurement,
   onSaveTemplate,
   onDeleteTemplate,
+  onImportTemplate,
   canManageTemplates = false,
   canAddMeasurement = true,
+  canDeleteMeasurement = false,
   canCreateTemplate = false,
   canEditTemplate = false,
   canDeleteTemplate = false,
@@ -42,18 +48,22 @@ export function AssetMeasurementManager({
 }) {
   const t = text => tr(language, text);
   const activeTemplates = useMemo(() => templates.filter(template => String(template.status || "active").toLowerCase() === "active"), [templates]);
+  const availableImportTemplates = useMemo(() => importableTemplates.filter(template => String(template.status || "active").toLowerCase() === "active"), [importableTemplates]);
   const measurementGroups = useMemo(() => buildMeasurementGroups(measurements, activeTemplates), [measurements, activeTemplates]);
   const [activePanel, setActivePanel] = useState("records");
   const [selectedTypeKey, setSelectedTypeKey] = useState("");
+  const [activeReadingPanel, setActiveReadingPanel] = useState("");
   const [form, setForm] = useState(EMPTY_MEASUREMENT);
   const [tableRows, setTableRows] = useState([]);
   const [savingMeasurement, setSavingMeasurement] = useState(false);
   const [templateDraft, setTemplateDraft] = useState(EMPTY_TEMPLATE);
-  const [columnsText, setColumnsText] = useState("");
+  const [tableDesign, setTableDesign] = useState(EMPTY_TABLE_DESIGN);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [importingTemplateId, setImportingTemplateId] = useState("");
   const selectedTemplate = activeTemplates.find(template => String(template.id) === String(form.template_id));
-  const selectedGroup = measurementGroups.find(group => group.key === selectedTypeKey) || measurementGroups[0] || null;
-  const templateColumns = useMemo(() => columnsFromTemplate(selectedTemplate), [selectedTemplate]);
+  const selectedGroup = measurementGroups.find(group => group.key === selectedTypeKey) || null;
+  const selectedTemplateDesign = useMemo(() => templateDesignFromTemplate(selectedTemplate), [selectedTemplate]);
+  const templateColumns = selectedTemplateDesign.columns;
 
   useEffect(() => {
     if (!measurementGroups.length) {
@@ -61,9 +71,13 @@ export function AssetMeasurementManager({
       return;
     }
     if (!measurementGroups.some(group => group.key === selectedTypeKey)) {
-      setSelectedTypeKey(measurementGroups[0].key);
+      setSelectedTypeKey("");
     }
   }, [measurementGroups, selectedTypeKey]);
+
+  useEffect(() => {
+    setActiveReadingPanel("");
+  }, [selectedTypeKey]);
 
   useEffect(() => {
     if (!selectedGroup) return;
@@ -86,8 +100,8 @@ export function AssetMeasurementManager({
       unit: selectedTemplate.unit || current.unit || "",
       value: ""
     }));
-    setTableRows(templateColumns.length ? [emptyTableRow(templateColumns)] : []);
-  }, [selectedTemplate, templateColumns]);
+    setTableRows(templateColumns.length ? measurementRowsFromTemplate(selectedTemplateDesign) : []);
+  }, [selectedTemplate, selectedTemplateDesign]);
 
   function updateForm(key, value) {
     setForm(current => ({ ...current, [key]: value }));
@@ -97,12 +111,12 @@ export function AssetMeasurementManager({
     setTableRows(current => current.map((row, index) => index === rowIndex ? { ...row, [columnKey]: value } : row));
   }
 
-  function addTableRow() {
-    setTableRows(current => [...current, emptyTableRow(templateColumns)]);
-  }
-
   function removeTableRow(rowIndex) {
-    setTableRows(current => current.filter((_, index) => index !== rowIndex));
+    const templateRows = measurementRowsFromTemplate(selectedTemplateDesign);
+    setTableRows(current => current.map((row, index) => {
+      if (index !== rowIndex) return row;
+      return templateRows[rowIndex] ? { ...templateRows[rowIndex] } : emptyTableRow(templateColumns);
+    }));
   }
 
   async function submitMeasurement(event) {
@@ -118,7 +132,7 @@ export function AssetMeasurementManager({
         measurement_type: measurementType,
         value: form.value === "" ? 0 : Number(form.value),
         unit: form.unit || selectedTemplate?.unit || "",
-        measurement_table: templateColumns.length ? JSON.stringify({ columns: templateColumns, rows: tableRows }) : "",
+        measurement_table: templateColumns.length ? serializeMeasurementTableDesign({ columns: templateColumns, rows: tableRows }) : "",
         table_snapshot: selectedTemplate ? JSON.stringify(selectedTemplate) : ""
       });
       setForm(current => ({
@@ -127,16 +141,16 @@ export function AssetMeasurementManager({
         measurement_type: selectedGroup?.name || "",
         unit: selectedGroup?.template?.unit || current.unit || ""
       }));
-      setTableRows(templateColumns.length ? [emptyTableRow(templateColumns)] : []);
+      setTableRows(templateColumns.length ? measurementRowsFromTemplate(selectedTemplateDesign) : []);
     } finally {
       setSavingMeasurement(false);
     }
   }
 
   function editTemplate(template) {
-    const columns = columnsFromTemplate(template);
+    const design = templateDesignFromTemplate(template);
     setTemplateDraft({ ...EMPTY_TEMPLATE, ...template });
-    setColumnsText(columns.map(column => column.label).join("\n"));
+    setTableDesign(design);
     setActivePanel("create");
   }
 
@@ -147,10 +161,10 @@ export function AssetMeasurementManager({
     try {
       const saved = await onSaveTemplate({
         ...templateDraft,
-        table_schema: JSON.stringify(columnsTextToSchema(columnsText))
+        table_schema: serializeMeasurementTableDesign(tableDesign)
       }, templateDraft.id || null);
       setTemplateDraft(EMPTY_TEMPLATE);
-      setColumnsText("");
+      setTableDesign(EMPTY_TABLE_DESIGN);
       if (saved?.id) setSelectedTypeKey(`template-${saved.id}`);
       setActivePanel("records");
     } finally {
@@ -167,21 +181,44 @@ export function AssetMeasurementManager({
     }
   }
 
+  async function importTemplate(template) {
+    if (!onImportTemplate || !template?.id) return;
+    setImportingTemplateId(template.id);
+    try {
+      const saved = await onImportTemplate(template);
+      if (saved?.id) setSelectedTypeKey(`template-${saved.id}`);
+      setActivePanel("records");
+    } finally {
+      setImportingTemplateId("");
+    }
+  }
+
   function updateTemplateDraft(key, value) {
     setTemplateDraft(current => ({ ...current, [key]: value }));
   }
 
-  function handleGuidanceFile(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setTemplateDraft(current => ({
+  async function handleGuidanceFiles(fileList) {
+    const uploadedFiles = await readGuidanceFiles(fileList);
+    if (!uploadedFiles.length) return;
+    setTemplateDraft(current => {
+      const files = [...parseGuidanceFiles(current), ...uploadedFiles];
+      return {
         ...current,
-        guidance_file_name: file.name,
-        guidance_file_url: String(reader.result || "")
-      }));
-    };
-    reader.readAsDataURL(file);
+        guidance_file_name: guidanceFileNames(files),
+        guidance_file_url: serializeGuidanceFiles(files)
+      };
+    });
+  }
+
+  function removeGuidanceFile(fileIndex) {
+    setTemplateDraft(current => {
+      const files = parseGuidanceFiles(current).filter((_, index) => index !== fileIndex);
+      return {
+        ...current,
+        guidance_file_name: guidanceFileNames(files),
+        guidance_file_url: files.length ? serializeGuidanceFiles(files) : ""
+      };
+    });
   }
 
   return (
@@ -193,22 +230,25 @@ export function AssetMeasurementManager({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
         <MeasurementPanelCard active={activePanel === "records"} icon={<ClipboardList className="h-5 w-5" />} title={t("Measurement Records")} meta={`${measurementGroups.length} ${t("Measurement Types")}`} description={t("Open old readings and add readings for the selected measurement type.")} onClick={() => setActivePanel("records")} />
         <MeasurementPanelCard active={activePanel === "create"} icon={<Plus className="h-5 w-5" />} title={t("Create New Measurement")} meta={canManageTemplates ? t("Admin controlled") : t("Admin Only")} description={t("Create a reusable measurement type with its own table and guidance.")} disabled={!canManageTemplates} onClick={() => canManageTemplates && setActivePanel("create")} />
+        <MeasurementPanelCard active={activePanel === "import"} icon={<Download className="h-5 w-5" />} title={t("Import Template")} meta={`${availableImportTemplates.length} ${t("Available")}`} description={t("Import a measurement template from any other asset when needed.")} disabled={!canCreateTemplate || !onImportTemplate} onClick={() => canCreateTemplate && onImportTemplate && setActivePanel("import")} />
       </div>
 
-      {activePanel === "create" ? (
+      {activePanel === "import" ? (
+        <MeasurementTemplateImportPanel templates={availableImportTemplates} importingTemplateId={importingTemplateId} onImport={importTemplate} language={language} />
+      ) : activePanel === "create" ? (
         canManageTemplates ? (
-          <MeasurementTemplateBuilder templates={templates} templateDraft={templateDraft} columnsText={columnsText} savingTemplate={savingTemplate} canCreateTemplate={canCreateTemplate} canEditTemplate={canEditTemplate} canDeleteTemplate={canDeleteTemplate} onSubmit={submitTemplate} onDraftChange={updateTemplateDraft} onColumnsChange={setColumnsText} onGuidanceFile={handleGuidanceFile} onNew={() => {
+          <MeasurementTemplateBuilder templates={templates} templateDraft={templateDraft} tableDesign={tableDesign} savingTemplate={savingTemplate} canCreateTemplate={canCreateTemplate} canEditTemplate={canEditTemplate} canDeleteTemplate={canDeleteTemplate} onSubmit={submitTemplate} onDraftChange={updateTemplateDraft} onTableDesignChange={setTableDesign} onGuidanceFile={handleGuidanceFiles} onRemoveGuidanceFile={removeGuidanceFile} onNew={() => {
             setTemplateDraft(EMPTY_TEMPLATE);
-            setColumnsText("");
+            setTableDesign(EMPTY_TABLE_DESIGN);
           }} onEdit={editTemplate} onDelete={deleteTemplate} language={language} />
         ) : (
           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm font-bold text-slate-500">{t("Admin permission is required to create measurement types.")}</div>
         )
       ) : (
-        <MeasurementRecordsPanel groups={measurementGroups} selectedGroup={selectedGroup} selectedTypeKey={selectedTypeKey} onSelect={setSelectedTypeKey} form={form} selectedTemplate={selectedTemplate} templateColumns={templateColumns} tableRows={tableRows} savingMeasurement={savingMeasurement} canAddMeasurement={canAddMeasurement && Boolean(onSaveMeasurement) && Boolean(selectedGroup)} onSubmit={submitMeasurement} onFormChange={updateForm} onCellChange={updateTableCell} onAddRow={addTableRow} onRemoveRow={removeTableRow} language={language} />
+        <MeasurementRecordsPanel groups={measurementGroups} selectedGroup={selectedGroup} selectedTypeKey={selectedTypeKey} activeReadingPanel={activeReadingPanel} onReadingPanelChange={setActiveReadingPanel} onSelect={setSelectedTypeKey} form={form} selectedTemplate={selectedTemplate} templateColumns={templateColumns} tableRows={tableRows} savingMeasurement={savingMeasurement} canAddMeasurement={canAddMeasurement && Boolean(onSaveMeasurement) && Boolean(selectedGroup)} canDeleteMeasurement={canDeleteMeasurement && Boolean(onDeleteMeasurement)} canEditTemplate={canEditTemplate} onSubmit={submitMeasurement} onFormChange={updateForm} onCellChange={updateTableCell} onRemoveRow={removeTableRow} onDeleteMeasurement={onDeleteMeasurement} onEditTemplate={() => selectedTemplate && editTemplate(selectedTemplate)} language={language} />
       )}
     </div>
   );
@@ -254,33 +294,13 @@ function normalizeMeasurementName(value) {
   return String(value || "custom").trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-function columnsFromTemplate(template) {
-  if (!template) return [];
-  const parsed = safeJson(template.table_schema, []);
-  return Array.isArray(parsed) ? parsed.filter(column => column?.key && column?.label) : [];
+function templateDesignFromTemplate(template) {
+  if (!template) return EMPTY_TABLE_DESIGN;
+  return parseMeasurementTableDesign(template.table_schema);
 }
 
-function columnsTextToSchema(text) {
-  return String(text || "").split(/\r?\n/).map(item => item.trim()).filter(Boolean).map((label, index) => ({
-    key: `col_${index + 1}_${slug(label)}`,
-    label,
-    type: "text"
-  }));
-}
-
-function emptyTableRow(columns) {
-  return columns.reduce((row, column) => ({ ...row, [column.key]: "" }), {});
-}
-
-function safeJson(value, fallback) {
-  if (!value) return fallback;
-  try {
-    return typeof value === "string" ? JSON.parse(value) : value;
-  } catch {
-    return fallback;
-  }
-}
-
-function slug(value) {
-  return String(value || "value").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "value";
+function measurementRowsFromTemplate(design) {
+  const normalized = normalizeMeasurementTableDesign(design);
+  if (!normalized.columns.length) return [];
+  return normalized.rows.length ? normalized.rows : [emptyTableRow(normalized.columns)];
 }
