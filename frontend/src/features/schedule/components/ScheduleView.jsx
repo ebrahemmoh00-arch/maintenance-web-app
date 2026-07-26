@@ -16,12 +16,18 @@ export function Schedule({
   onCreatePm,
   onEditPm,
   onDeletePm,
+  onEditPmPlan,
+  onDeletePmPlan,
   onUpdatePmHistory,
+  onCreatePmPlanHistory,
+  onUpdatePmPlanHistory,
   onImportMaintenanceFollowUp,
   canManage = true,
   canAdd = canManage,
   canEdit = canManage,
   canDelete = canManage,
+  canEditPmPlan = canEdit,
+  canDeletePmPlan = canDelete,
   language
 }) {
   const t = text => tr(language, text);
@@ -118,7 +124,7 @@ export function Schedule({
         </div>
       </Panel>
 
-      {selectedCustomerId && selectedCategory && selectedEquipment ? <MaintenanceFollowUpBoard title={`${selectedEquipment.name} - ${t("Maintenance Follow-up")}`} subtitle={`${selectedCustomer?.name || t("Customer")} / ${t(scheduleCategoryLabel(selectedCategory))}. ${t("This page shows the selected equipment maintenance table only.")}`} equipment={[selectedEquipment]} allEquipment={equipment} pmTasks={pmTasks} pmPlans={pmPlans} workOrders={workOrders} onCreatePm={onCreatePm} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} onImportMaintenanceFollowUp={onImportMaintenanceFollowUp} canManage={canManage} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete} language={language} /> : selectedCustomerId && selectedCategory ? <Panel title="Select Equipment" subtitle="Choose an equipment name above to open its preventive maintenance follow-up page." language={language}>
+      {selectedCustomerId && selectedCategory && selectedEquipment ? <MaintenanceFollowUpBoard title={`${selectedEquipment.name} - ${t("Maintenance Follow-up")}`} subtitle={`${selectedCustomer?.name || t("Customer")} / ${t(scheduleCategoryLabel(selectedCategory))}. ${t("This page shows the selected equipment maintenance table only.")}`} equipment={[selectedEquipment]} allEquipment={equipment} pmTasks={pmTasks} pmPlans={pmPlans} workOrders={workOrders} onCreatePm={onCreatePm} onEditPm={onEditPm} onDeletePm={onDeletePm} onEditPmPlan={onEditPmPlan} onDeletePmPlan={onDeletePmPlan} onUpdatePmHistory={onUpdatePmHistory} onCreatePmPlanHistory={onCreatePmPlanHistory} onUpdatePmPlanHistory={onUpdatePmPlanHistory} onImportMaintenanceFollowUp={onImportMaintenanceFollowUp} canManage={canManage} canAdd={canAdd} canEdit={canEdit} canDelete={canDelete} canEditPmPlan={canEditPmPlan} canDeletePmPlan={canDeletePmPlan} language={language} /> : selectedCustomerId && selectedCategory ? <Panel title="Select Equipment" subtitle="Choose an equipment name above to open its preventive maintenance follow-up page." language={language}>
           <EmptyState title="No equipment selected" message="Click one equipment name to show its maintenance table." language={language} />
         </Panel> : null}
 
@@ -153,12 +159,18 @@ export function MaintenanceFollowUpBoard({
   onCreatePm,
   onEditPm,
   onDeletePm,
+  onEditPmPlan,
+  onDeletePmPlan,
   onUpdatePmHistory,
+  onCreatePmPlanHistory,
+  onUpdatePmPlanHistory,
   onImportMaintenanceFollowUp,
   canManage,
   canAdd = canManage,
   canEdit = canManage,
   canDelete = canManage,
+  canEditPmPlan = canEdit,
+  canDeletePmPlan = canDelete,
   language
 }) {
   const t = text => tr(language, text);
@@ -171,7 +183,7 @@ export function MaintenanceFollowUpBoard({
       <div className="space-y-5">
         {sortEquipmentByName(equipment).map(asset => {
           const rows = followUpRows.filter(task => Number(task.equipment_id) === Number(asset.id));
-          return <EquipmentMaintenanceCard key={asset.id} asset={asset} pmTasks={rows} workOrders={workOrders.filter(order => Number(order.equipment_id) === Number(asset.id))} onEditPm={onEditPm} onDeletePm={onDeletePm} onUpdatePmHistory={onUpdatePmHistory} canManage={canManage} canEdit={canEdit} canDelete={canDelete} language={language} />;
+          return <EquipmentMaintenanceCard key={asset.id} asset={asset} pmTasks={rows} workOrders={workOrders.filter(order => Number(order.equipment_id) === Number(asset.id))} onEditPm={onEditPm} onDeletePm={onDeletePm} onEditPmPlan={onEditPmPlan} onDeletePmPlan={onDeletePmPlan} onUpdatePmHistory={onUpdatePmHistory} onCreatePmPlanHistory={onCreatePmPlanHistory} onUpdatePmPlanHistory={onUpdatePmPlanHistory} canManage={canManage} canEdit={canEdit} canDelete={canDelete} canEditPmPlan={canEditPmPlan} canDeletePmPlan={canDeletePmPlan} language={language} />;
         })}
         {!equipment.length ? <EmptyState title="No equipment" message="Add assets first, then create preventive maintenance tasks." language={language} /> : null}
       </div>
@@ -228,14 +240,21 @@ export function EquipmentMaintenanceCard({
   workOrders,
   onEditPm,
   onDeletePm,
+  onEditPmPlan,
+  onDeletePmPlan,
   onUpdatePmHistory,
+  onCreatePmPlanHistory,
+  onUpdatePmPlanHistory,
   canManage,
   canEdit = canManage,
   canDelete = canManage,
+  canEditPmPlan = canEdit,
+  canDeletePmPlan = canDelete,
   language
 }) {
   const t = text => tr(language, text);
   const [activeRecordsTaskId, setActiveRecordsTaskId] = useState(null);
+  const hasActions = canEdit || canDelete || canEditPmPlan || canDeletePmPlan;
   return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div>
@@ -261,7 +280,7 @@ export function EquipmentMaintenanceCard({
               <th className="border border-slate-950 px-3 py-2">{t("Next Due Date")}</th>
               <th className="border border-slate-950 px-3 py-2">{t("Remaining Days")}</th>
               <th className="border border-slate-950 px-3 py-2">{t("Status")}</th>
-              {canEdit || canDelete ? <th className="border border-slate-950 px-3 py-2">{t("Actions")}</th> : null}
+              {hasActions ? <th className="border border-slate-950 px-3 py-2">{t("Actions")}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -276,6 +295,9 @@ export function EquipmentMaintenanceCard({
             const previousRecords = previousRecordsForTask(task);
             const recordsOpen = String(activeRecordsTaskId) === String(task.id);
             const isPmPlan = task.source === "pm-plan";
+            const canManageRecords = isPmPlan ? canEditPmPlan : canEdit;
+            const updateRecord = isPmPlan ? (recordId, payload) => onUpdatePmPlanHistory?.(task, recordId, payload) : onUpdatePmHistory;
+            const createRecord = isPmPlan ? payload => onCreatePmPlanHistory?.(task, payload) : null;
             return <Fragment key={task.id}>
                   <tr className="bg-white">
                     <td className="border border-slate-950 px-3 py-2 font-semibold">
@@ -297,22 +319,29 @@ export function EquipmentMaintenanceCard({
                     <td className="border border-slate-950 px-3 py-2">{task.next_due_date || "-"}</td>
                     <td className={`border border-slate-950 px-3 py-2 font-black ${remainingDaysTone}`}>{formatScheduleCell(remainingDays)}</td>
                     <td className="border border-slate-950 px-3 py-2">{t(task.pm_alert || task.status)}</td>
-                    {canEdit || canDelete ? <td className="border border-slate-950 px-3 py-2">
-                        {isPmPlan ? <span className="text-xs font-black text-slate-500">{t("Managed in PM Plans")}</span> : <>
-                            {canEdit ? <button type="button" onClick={() => onEditPm(task)} className="mr-2 rounded border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit")}</button> : null}
-                            {canDelete ? <button type="button" onClick={() => onDeletePm(task.id)} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">{t("Delete")}</button> : null}
-                          </>}
+                    {hasActions ? <td className="border border-slate-950 px-3 py-2">
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {isPmPlan ? <>
+                              {canEditPmPlan ? <button type="button" onClick={() => onEditPmPlan?.(task)} className="rounded border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit")}</button> : null}
+                              {canDeletePmPlan ? <button type="button" onClick={() => onDeletePmPlan?.(task.pm_plan_id)} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">{t("Delete")}</button> : null}
+                            </> : <>
+                              {canEdit ? <button type="button" onClick={() => onEditPm(task)} className="rounded border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700">{t("Edit")}</button> : null}
+                              {canDelete ? <button type="button" onClick={() => onDeletePm(task.id)} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50">{t("Delete")}</button> : null}
+                            </>}
+                          {isPmPlan && !canEditPmPlan && !canDeletePmPlan ? <span className="text-xs font-black text-slate-500">{t("No permission")}</span> : null}
+                          {!isPmPlan && !canEdit && !canDelete ? <span className="text-xs font-black text-slate-500">{t("No permission")}</span> : null}
+                        </div>
                       </td> : null}
                   </tr>
                   {recordsOpen ? <tr>
-                      <td colSpan={canEdit || canDelete ? 10 : 9} className="border border-slate-950 bg-slate-50 p-3">
-                        <PreviousRecordsTable records={previousRecords} canManage={canEdit && !isPmPlan} onUpdateRecord={onUpdatePmHistory} language={language} />
+                      <td colSpan={hasActions ? 10 : 9} className="border border-slate-950 bg-slate-50 p-3">
+                        <PreviousRecordsTable records={previousRecords} canManage={canManageRecords} onCreateRecord={createRecord} onUpdateRecord={updateRecord} language={language} />
                       </td>
                     </tr> : null}
                 </Fragment>;
           })}
             {!pmTasks.length ? <tr>
-                <td colSpan={canEdit || canDelete ? 10 : 9} className="border border-slate-950 px-3 py-8 text-center text-slate-500">{t("No preventive maintenance tasks for this equipment.")}</td>
+                <td colSpan={hasActions ? 10 : 9} className="border border-slate-950 px-3 py-8 text-center text-slate-500">{t("No preventive maintenance tasks for this equipment.")}</td>
               </tr> : null}
           </tbody>
         </table>

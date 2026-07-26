@@ -16,7 +16,7 @@ if str(BACKEND_DIR) not in sys.path:
 os.environ.pop("DATABASE_URL", None)
 
 from app import database  # noqa: E402
-from app.schemas import PMPlanCreate, WorkOrderLifecycleAction  # noqa: E402
+from app.schemas import PMPlanCreate, PMPlanHistoryCreate, WorkOrderLifecycleAction  # noqa: E402
 from app.services import PMPlanService, WorkOrderService  # noqa: E402
 
 
@@ -94,6 +94,48 @@ class PMPlanEngineTest(unittest.TestCase):
         self.assertEqual(plan["last_runtime"], 4500)
         self.assertEqual(plan["next_due_runtime"], 5500)
         self.assertEqual(plan["last_service_date"], date.today().isoformat())
+
+    def test_manual_pm_plan_history_recalculates_runtime_next_due(self) -> None:
+        plan = self.pm_plans.create(
+            PMPlanCreate(
+                equipment_id=1,
+                name="M01 Oil Sample",
+                recurrence_type="Runtime Hours",
+                interval_value=500,
+                start_date="2026-07-02",
+                next_due_runtime=1000,
+            )
+        )
+
+        updated = self.pm_plans.create_history_record(
+            plan["id"],
+            PMPlanHistoryCreate(service_hours=4427, service_date="2026-07-20"),
+        )
+
+        self.assertEqual(updated["last_runtime"], 4427)
+        self.assertEqual(updated["last_service_date"], "2026-07-20")
+        self.assertEqual(updated["next_due_runtime"], 4927)
+        self.assertEqual(len(updated["previous_records"]), 1)
+
+    def test_manual_pm_plan_history_recalculates_calendar_next_due(self) -> None:
+        plan = self.pm_plans.create(
+            PMPlanCreate(
+                equipment_id=1,
+                name="M01 Monthly Inspection",
+                recurrence_type="Daily",
+                interval_value=30,
+                start_date="2026-07-01",
+            )
+        )
+
+        updated = self.pm_plans.create_history_record(
+            plan["id"],
+            PMPlanHistoryCreate(service_hours=0, service_date="2026-07-10"),
+        )
+
+        self.assertEqual(updated["last_service_date"], "2026-07-10")
+        self.assertEqual(updated["next_due_date"], "2026-08-09")
+        self.assertEqual(updated["next_due_runtime"], 0)
 
 
 if __name__ == "__main__":

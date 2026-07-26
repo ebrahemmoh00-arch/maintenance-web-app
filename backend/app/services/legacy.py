@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..core.audit import AuditService
-from ..repositories import AssetLifecycleRepository, CauseCodeRepository, CorrectiveActionRepository, CustomerRepository, DowntimeEventRepository, EngineerRepository, EquipmentRepository, FailureCodeRepository, FailureEventRepository, FailureStatisticsRepository, InventoryRepository, JobTitleRepository, MeasurementTemplateRepository, PMPlanRepository, PMPlanTaskRepository, PMPlanWorkOrderRepository, PreventiveMaintenanceRepository, ProblemCodeRepository, RemedyCodeRepository, RootCauseAnalysisRepository, WorkOrderRepository, parse_date
+from ..repositories import AssetLifecycleRepository, CauseCodeRepository, CorrectiveActionRepository, CustomerRepository, DowntimeEventRepository, EngineerRepository, EquipmentRepository, FailureCodeRepository, FailureEventRepository, FailureStatisticsRepository, InventoryRepository, JobTitleRepository, MeasurementTemplateRepository, OperationalPerformanceReportRepository, OperationalReportItemRepository, PMPlanHistoryRepository, PMPlanRepository, PMPlanTaskRepository, PMPlanWorkOrderRepository, PreventiveMaintenanceRepository, ProblemCodeRepository, RemedyCodeRepository, RootCauseAnalysisRepository, WorkOrderRepository, parse_date
 from ..core.security import hash_password, is_password_hash
 from .inventory_email_alerts import InventoryEmailAlertService
 
@@ -151,6 +151,114 @@ class JobTitleService:
     def create(self, data): return self.repo.create(payload(data))
     def update(self, item_id: int, data): return self.repo.update(item_id, payload(data))
     def delete(self, item_id: int): return self.repo.delete(item_id)
+
+
+class OperationalPerformanceReportService:
+    json_fields = ("asset_ids", "readings", "summary", "table_rows", "charts")
+
+    def __init__(self) -> None:
+        self.repo = OperationalPerformanceReportRepository()
+
+    def list(self):
+        return self.repo.list()
+
+    def get(self, item_id: int):
+        return self.repo.get(item_id)
+
+    def create(self, data, created_by: str = ""):
+        item = payload(data)
+        self._prepare_payload(item)
+        item["created_by"] = created_by or item.get("created_by") or ""
+        created = self.repo.create(item)
+        AuditService.log_event(
+            action="CREATE",
+            module="Reports",
+            record_id=created.get("id"),
+            description=f"Operational performance report saved: {created.get('report_name') or created.get('id')}",
+            new_values=created,
+        )
+        return created
+
+    def update(self, item_id: int, data):
+        item = payload(data)
+        self._prepare_payload(item, partial=True)
+        updated = self.repo.update(item_id, item)
+        AuditService.log_event(
+            action="UPDATE",
+            module="Reports",
+            record_id=item_id,
+            description=f"Operational performance report updated: {updated.get('report_name') or item_id}",
+            new_values=updated,
+        )
+        return updated
+
+    def delete(self, item_id: int):
+        return self.repo.delete(item_id)
+
+    def _prepare_payload(self, item: dict[str, Any], partial: bool = False) -> None:
+        if not partial and not str(item.get("report_type") or "").strip():
+            raise HTTPException(status_code=400, detail="Report type is required")
+        for field in self.json_fields:
+            if field in item:
+                default = "[]" if field in {"asset_ids", "table_rows"} else "{}"
+                item[field] = normalize_json_text(item.get(field), default)
+        if "year" in item:
+            item["year"] = int(item.get("year") or 0)
+        if "month" in item:
+            item["month"] = int(item.get("month") or 0)
+        if "site_id" in item and item.get("site_id") in {"", 0}:
+            item["site_id"] = None
+
+
+class OperationalReportItemService:
+    def __init__(self) -> None:
+        self.repo = OperationalReportItemRepository()
+
+    def list(self):
+        return [self._normalize_row(item) for item in self.repo.list()]
+
+    def get(self, item_id: int):
+        return self._normalize_row(self.repo.get(item_id))
+
+    def create(self, data):
+        item = self._prepare_payload(payload(data))
+        return self._normalize_row(self.repo.create(item))
+
+    def update(self, item_id: int, data):
+        item = self._prepare_payload(payload(data), partial=True)
+        return self._normalize_row(self.repo.update(item_id, item))
+
+    def delete(self, item_id: int):
+        return self.repo.delete(item_id)
+
+    def _prepare_payload(self, item: dict[str, Any], partial: bool = False) -> dict[str, Any]:
+        if "label" in item:
+            item["label"] = str(item.get("label") or "").strip()
+        if not partial and not item.get("label"):
+            raise HTTPException(status_code=400, detail="Operational item label is required")
+        if "key" in item:
+            item["key"] = self._normalize_key(item.get("key") or item.get("label"))
+        elif not partial:
+            item["key"] = self._normalize_key(item.get("label"))
+        if "unit" in item:
+            item["unit"] = str(item.get("unit") or "").strip()
+        if "sort_order" in item:
+            item["sort_order"] = int(item.get("sort_order") or 0)
+        if "is_active" in item:
+            item["is_active"] = 1 if bool(item.get("is_active")) else 0
+        return item
+
+    def _normalize_key(self, value: Any) -> str:
+        key = "".join(ch if ch.isalnum() else "_" for ch in str(value or "").strip().lower()).strip("_")
+        key = "_".join(part for part in key.split("_") if part)
+        if not key:
+            raise HTTPException(status_code=400, detail="Operational item key is required")
+        return key[:80]
+
+    def _normalize_row(self, item: dict[str, Any]) -> dict[str, Any]:
+        row = dict(item)
+        row["is_active"] = bool(row.get("is_active"))
+        return row
 
 
 class MeasurementTemplateService:
@@ -1749,6 +1857,7 @@ class PMPlanService:
     def __init__(self) -> None:
         self.repo = PMPlanRepository()
         self.tasks = PMPlanTaskRepository()
+        self.history = PMPlanHistoryRepository()
         self.equipment = EquipmentRepository()
 
     def list(self): return self.repo.list()
@@ -1773,7 +1882,10 @@ class PMPlanService:
         updated = self.repo.update(item_id, update_payload)
         if tasks is not None:
             self.tasks.replace_for_plan(item_id, tasks)
-        return self.repo.get(updated["id"])
+        result = self.repo.get(updated["id"])
+        if result.get("previous_records") and any(key in item for key in {"recurrence_type", "interval_value", "start_date", "last_service_date", "last_runtime"}):
+            result = self._recalculate_from_history(item_id)
+        return result
 
     def delete(self, item_id: int): return self.repo.delete(item_id)
 
@@ -1792,8 +1904,103 @@ class PMPlanService:
 
     def delete_task(self, task_id: int): return self.tasks.delete(task_id)
 
+    def create_history_record(self, plan_id: int, data):
+        plan = self.repo.get(plan_id)
+        record = self.history.create_for_plan(plan, payload(data))
+        updated_plan = self._recalculate_from_history(plan_id)
+        AuditService.log_event(
+            action="UPDATE",
+            module="PM Plans",
+            record_id=plan_id,
+            description=f"Added previous maintenance record #{record['id']} for PM Plan #{plan_id}",
+            old_values=plan,
+            new_values=updated_plan,
+        )
+        AssetLifecycleRepository().add_history(
+            updated_plan["equipment_id"],
+            "Preventive Maintenance",
+            updated_plan.get("name", "PM Plan"),
+            f"PM plan maintenance recorded at {record.get('service_hours') or 0} operating hours",
+            "PM Plans",
+            updated_plan["id"],
+            metadata={
+                "status": updated_plan.get("status"),
+                "summary": updated_plan.get("name", ""),
+                "event_time": record.get("service_date") or date.today().isoformat(),
+            },
+        )
+        return updated_plan
+
+    def update_history_record(self, record_id: int, data):
+        record = self.history.get(record_id)
+        plan = self.repo.get(record["pm_plan_id"])
+        updated_record = self.history.update(record_id, payload(data))
+        updated_plan = self._recalculate_from_history(record["pm_plan_id"])
+        AuditService.log_event(
+            action="UPDATE",
+            module="PM Plans",
+            record_id=record["pm_plan_id"],
+            description=f"Updated previous maintenance record #{record_id} for PM Plan #{record['pm_plan_id']}",
+            old_values={"plan": plan, "record": record},
+            new_values={"plan": updated_plan, "record": updated_record},
+        )
+        return updated_plan
+
     def run_scheduler(self):
         return PMPlanEngineService().run_due_plans()
+
+    def _recalculate_from_history(self, plan_id: int) -> dict[str, Any]:
+        plan = self.repo.get(plan_id)
+        records = plan.get("previous_records") or []
+        latest = self._latest_history_record(plan, records)
+        if not latest:
+            return plan
+
+        recurrence = recurrence_key(plan.get("recurrence_type"))
+        interval = max(int(plan.get("interval_value") or 1), 1)
+        service_hours = int(latest.get("service_hours") or 0)
+        service_date = latest.get("service_date") or date.today().isoformat()
+        updates: dict[str, Any] = {
+            "last_runtime": service_hours,
+            "last_service_date": service_date,
+        }
+
+        if recurrence == "runtime hours":
+            updates["next_due_runtime"] = service_hours + interval
+            updates["next_due_date"] = ""
+        else:
+            base = parse_date(service_date) or parse_date(plan.get("start_date")) or date.today()
+            if recurrence == "weekly":
+                next_due = base + timedelta(weeks=interval)
+            elif recurrence == "monthly":
+                next_due = add_months(base, interval)
+            else:
+                next_due = base + timedelta(days=interval)
+            updates["next_due_date"] = next_due.isoformat()
+            updates["next_due_runtime"] = 0
+
+        return self.repo.update(plan_id, updates)
+
+    def _latest_history_record(self, plan: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, Any] | None:
+        if not records:
+            return None
+        recurrence = recurrence_key(plan.get("recurrence_type"))
+        if recurrence == "runtime hours":
+            return max(
+                records,
+                key=lambda record: (
+                    int(record.get("service_hours") or 0),
+                    str(record.get("service_date") or ""),
+                    int(record.get("id") or 0),
+                ),
+            )
+        return max(
+            records,
+            key=lambda record: (
+                parse_date(record.get("service_date")) or date.min,
+                int(record.get("id") or 0),
+            ),
+        )
 
     def _prepare_payload(self, item: dict[str, Any]) -> None:
         equipment = self.equipment.get(int(item["equipment_id"]))
@@ -1811,7 +2018,14 @@ class PMPlanService:
             item["next_due_date"] = item.get("next_due_date") or ""
         else:
             if not item.get("next_due_date"):
-                item["next_due_date"] = item["start_date"]
+                base = parse_date(item.get("last_service_date")) or parse_date(item["start_date"]) or date.today()
+                recurrence = recurrence_key(item.get("recurrence_type"))
+                if recurrence == "weekly":
+                    item["next_due_date"] = (base + timedelta(weeks=item["interval_value"])).isoformat()
+                elif recurrence == "monthly":
+                    item["next_due_date"] = add_months(base, item["interval_value"]).isoformat()
+                else:
+                    item["next_due_date"] = (base + timedelta(days=item["interval_value"])).isoformat()
             item["next_due_runtime"] = int(item.get("next_due_runtime") or 0)
 
 

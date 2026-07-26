@@ -529,6 +529,18 @@ CREATE TABLE IF NOT EXISTS pm_plan_tasks (
     FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS pm_plan_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pm_plan_id INTEGER NOT NULL,
+    equipment_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    service_hours INTEGER DEFAULT 0,
+    service_date TEXT DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pm_plan_id INTEGER NOT NULL,
@@ -539,6 +551,39 @@ CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
     FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
     FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
     UNIQUE(pm_plan_id, cycle_key)
+);
+
+CREATE TABLE IF NOT EXISTS operational_performance_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_name TEXT DEFAULT '',
+    report_type TEXT NOT NULL,
+    site_id INTEGER,
+    site_name TEXT DEFAULT '',
+    equipment_type TEXT DEFAULT '',
+    asset_ids TEXT DEFAULT '[]',
+    asset_names TEXT DEFAULT '',
+    year INTEGER DEFAULT 0,
+    month INTEGER DEFAULT 0,
+    period_from TEXT DEFAULT '',
+    period_to TEXT DEFAULT '',
+    readings TEXT DEFAULT '{}',
+    summary TEXT DEFAULT '{}',
+    table_rows TEXT DEFAULT '[]',
+    charts TEXT DEFAULT '{}',
+    created_by TEXT DEFAULT '',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(site_id) REFERENCES customers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS operational_report_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL UNIQUE,
+    unit TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -619,8 +664,17 @@ CREATE INDEX IF NOT EXISTS idx_pm_plans_status ON pm_plans(status);
 CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_date ON pm_plans(next_due_date);
 CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_runtime ON pm_plans(next_due_runtime);
 CREATE INDEX IF NOT EXISTS idx_pm_plan_tasks_plan_id ON pm_plan_tasks(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_history_plan_id ON pm_plan_history(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_history_equipment_id ON pm_plan_history(equipment_id);
 CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_plan_id ON pm_plan_work_orders(pm_plan_id);
 CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_work_order_id ON pm_plan_work_orders(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_site_id ON operational_performance_reports(site_id);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_year ON operational_performance_reports(year);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_month ON operational_performance_reports(month);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_created_at ON operational_performance_reports(created_at);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_report_type ON operational_performance_reports(report_type);
+CREATE INDEX IF NOT EXISTS idx_operational_report_items_sort_order ON operational_report_items(sort_order);
+CREATE INDEX IF NOT EXISTS idx_operational_report_items_is_active ON operational_report_items(is_active);
 """
 
 
@@ -1131,6 +1185,18 @@ CREATE TABLE IF NOT EXISTS pm_plan_tasks (
     FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS pm_plan_history (
+    id SERIAL PRIMARY KEY,
+    pm_plan_id INTEGER NOT NULL,
+    equipment_id INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    service_hours INTEGER DEFAULT 0,
+    service_date TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
     id SERIAL PRIMARY KEY,
     pm_plan_id INTEGER NOT NULL,
@@ -1141,6 +1207,39 @@ CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
     FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
     FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
     UNIQUE(pm_plan_id, cycle_key)
+);
+
+CREATE TABLE IF NOT EXISTS operational_performance_reports (
+    id SERIAL PRIMARY KEY,
+    report_name TEXT DEFAULT '',
+    report_type TEXT NOT NULL,
+    site_id INTEGER,
+    site_name TEXT DEFAULT '',
+    equipment_type TEXT DEFAULT '',
+    asset_ids TEXT DEFAULT '[]',
+    asset_names TEXT DEFAULT '',
+    year INTEGER DEFAULT 0,
+    month INTEGER DEFAULT 0,
+    period_from TEXT DEFAULT '',
+    period_to TEXT DEFAULT '',
+    readings TEXT DEFAULT '{}',
+    summary TEXT DEFAULT '{}',
+    table_rows TEXT DEFAULT '[]',
+    charts TEXT DEFAULT '{}',
+    created_by TEXT DEFAULT '',
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    FOREIGN KEY(site_id) REFERENCES customers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS operational_report_items (
+    id SERIAL PRIMARY KEY,
+    key TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL UNIQUE,
+    unit TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
+    updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text)
 );
 
 CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -1221,8 +1320,17 @@ CREATE INDEX IF NOT EXISTS idx_pm_plans_status ON pm_plans(status);
 CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_date ON pm_plans(next_due_date);
 CREATE INDEX IF NOT EXISTS idx_pm_plans_next_due_runtime ON pm_plans(next_due_runtime);
 CREATE INDEX IF NOT EXISTS idx_pm_plan_tasks_plan_id ON pm_plan_tasks(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_history_plan_id ON pm_plan_history(pm_plan_id);
+CREATE INDEX IF NOT EXISTS idx_pm_plan_history_equipment_id ON pm_plan_history(equipment_id);
 CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_plan_id ON pm_plan_work_orders(pm_plan_id);
 CREATE INDEX IF NOT EXISTS idx_pm_plan_work_orders_work_order_id ON pm_plan_work_orders(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_site_id ON operational_performance_reports(site_id);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_year ON operational_performance_reports(year);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_month ON operational_performance_reports(month);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_created_at ON operational_performance_reports(created_at);
+CREATE INDEX IF NOT EXISTS idx_operational_reports_report_type ON operational_performance_reports(report_type);
+CREATE INDEX IF NOT EXISTS idx_operational_report_items_sort_order ON operational_report_items(sort_order);
+CREATE INDEX IF NOT EXISTS idx_operational_report_items_is_active ON operational_report_items(is_active);
 """
 
 
@@ -1388,6 +1496,15 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_inventory_items_stock_quantity ON inventory_items(stock_quantity)",
             "CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_equipment_id ON preventive_maintenance(equipment_id)",
             "CREATE INDEX IF NOT EXISTS idx_preventive_maintenance_status ON preventive_maintenance(status)",
+            "CREATE INDEX IF NOT EXISTS idx_pm_plan_history_plan_id ON pm_plan_history(pm_plan_id)",
+            "CREATE INDEX IF NOT EXISTS idx_pm_plan_history_equipment_id ON pm_plan_history(equipment_id)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_reports_site_id ON operational_performance_reports(site_id)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_reports_year ON operational_performance_reports(year)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_reports_month ON operational_performance_reports(month)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_reports_created_at ON operational_performance_reports(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_reports_report_type ON operational_performance_reports(report_type)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_report_items_sort_order ON operational_report_items(sort_order)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_report_items_is_active ON operational_report_items(is_active)",
             "CREATE INDEX IF NOT EXISTS idx_asset_history_event_time ON asset_history(event_time)",
             "CREATE INDEX IF NOT EXISTS idx_asset_history_event_type ON asset_history(event_type)",
             "CREATE INDEX IF NOT EXISTS idx_asset_history_work_order_id ON asset_history(work_order_id)",

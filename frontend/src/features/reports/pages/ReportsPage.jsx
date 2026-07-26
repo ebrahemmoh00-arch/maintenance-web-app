@@ -7,6 +7,7 @@ export default function ReportsPage() {
     alerts,
     stats,
     language,
+    currentUser,
     page
   } = useCMMS();
 
@@ -16,6 +17,7 @@ export default function ReportsPage() {
       alerts={alerts}
       stats={stats}
       language={language}
+      currentUser={currentUser}
       mode={page === "kpis" ? "kpis" : "reports"}
     />
   );

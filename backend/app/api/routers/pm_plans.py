@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from ...core.auth import require_permission
-from ...schemas import PMPlan, PMPlanCreate, PMPlanTask, PMPlanTaskCreate, PMPlanTaskUpdate, PMPlanUpdate, PMSchedulerRunResult
+from ...schemas import PMPlan, PMPlanCreate, PMPlanHistoryCreate, PMPlanHistoryUpdate, PMPlanTask, PMPlanTaskCreate, PMPlanTaskUpdate, PMPlanUpdate, PMSchedulerRunResult
 from ...services import PMPlanService
 from ...utils.pagination import ListQuery, get_list_query
 
@@ -32,6 +32,15 @@ def run_pm_scheduler(_=Depends(require_permission("pm_plans:run"))):
     return service.run_scheduler()
 
 
+@router.put("/history/{record_id}", response_model=PMPlan)
+def update_pm_plan_history_record(
+    record_id: int,
+    record: PMPlanHistoryUpdate,
+    _=Depends(require_permission("pm_plans:update")),
+):
+    return service.update_history_record(record_id, record)
+
+
 @router.get("/{plan_id}", response_model=PMPlan)
 def get_pm_plan(plan_id: int, _=Depends(require_permission("pm_plans:read"))):
     return service.get(plan_id)
@@ -40,6 +49,15 @@ def get_pm_plan(plan_id: int, _=Depends(require_permission("pm_plans:read"))):
 @router.post("", response_model=PMPlan, status_code=201)
 def create_pm_plan(plan: PMPlanCreate, _=Depends(require_permission("pm_plans:create"))):
     return service.create(plan)
+
+
+@router.post("/{plan_id}/history", response_model=PMPlan, status_code=201)
+def create_pm_plan_history_record(
+    plan_id: int,
+    record: PMPlanHistoryCreate,
+    _=Depends(require_permission("pm_plans:update")),
+):
+    return service.create_history_record(plan_id, record)
 
 
 @router.put("/{plan_id}", response_model=PMPlan)

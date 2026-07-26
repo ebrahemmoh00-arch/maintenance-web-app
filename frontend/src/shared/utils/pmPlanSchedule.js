@@ -27,6 +27,7 @@ export function buildUnifiedPmRows(pmTasks = [], pmPlans = [], equipment = []) {
 
 export function pmPlanToFollowUpTask(plan, asset = null) {
   const due = calculatePmPlanDue(plan, asset);
+  const previousRecords = normalizePlanHistory(plan.previous_records);
   return {
     ...plan,
     id: `pm-plan-${plan.id}`,
@@ -41,7 +42,7 @@ export function pmPlanToFollowUpTask(plan, asset = null) {
     interval_hours: due.isRuntime ? due.interval_value : 0,
     interval_days: due.isRuntime ? 0 : due.interval_value,
     last_service_hours: due.last_runtime,
-    last_service_date: plan.last_service_date || "",
+    last_service_date: due.last_service_date,
     next_due_date: due.next_due_date,
     next_due_runtime: due.next_due_runtime,
     hours_until_due: due.hours_until_due,
@@ -49,7 +50,7 @@ export function pmPlanToFollowUpTask(plan, asset = null) {
     pm_alert: due.pm_alert,
     required_maintenance: plan.name,
     maintenance_type: plan.description || plan.name,
-    previous_records: Array.isArray(plan.previous_records) ? plan.previous_records : []
+    previous_records: previousRecords
   };
 }
 
@@ -58,11 +59,14 @@ export function calculatePmPlanDue(plan, asset = null) {
   const isRuntime = recurrence.toLowerCase() === "runtime hours";
   const intervalValue = Math.max(Number(plan.interval_value || 0), 0);
   const currentHours = Number(plan.current_hours ?? asset?.current_hours ?? 0);
-  const lastRuntime = Number(plan.last_runtime || 0);
+  const previousRecords = normalizePlanHistory(plan.previous_records);
+  const latestRecord = latestPlanHistoryRecord(previousRecords, isRuntime);
+  const lastRuntime = latestRecord ? Number(latestRecord.service_hours || 0) : Number(plan.last_runtime || 0);
+  const lastServiceDate = latestRecord?.service_date || plan.last_service_date || "";
   const status = String(plan.status || "active").toLowerCase();
 
   if (isRuntime) {
-    const nextDueRuntime = Number(plan.next_due_runtime || 0) || lastRuntime + intervalValue;
+    const nextDueRuntime = latestRecord || !Number(plan.next_due_runtime || 0) ? lastRuntime + intervalValue : Number(plan.next_due_runtime || 0);
     const hoursUntilDue = nextDueRuntime - currentHours;
     return {
       recurrence_type: recurrence,
@@ -70,6 +74,7 @@ export function calculatePmPlanDue(plan, asset = null) {
       isRuntime,
       current_hours: currentHours,
       last_runtime: lastRuntime,
+      last_service_date: lastServiceDate,
       next_due_runtime: nextDueRuntime,
       next_due_date: "",
       hours_until_due: hoursUntilDue,
@@ -78,7 +83,8 @@ export function calculatePmPlanDue(plan, asset = null) {
     };
   }
 
-  const nextDueDate = plan.next_due_date || calculateCalendarNextDueDate(plan.start_date, intervalValue, recurrence);
+  const baseDate = lastServiceDate || plan.start_date;
+  const nextDueDate = latestRecord || !plan.next_due_date ? calculateCalendarNextDueDate(baseDate, intervalValue, recurrence) : plan.next_due_date;
   const daysUntilDue = daysUntilDate(nextDueDate);
   return {
     recurrence_type: recurrence,
@@ -86,12 +92,38 @@ export function calculatePmPlanDue(plan, asset = null) {
     isRuntime,
     current_hours: currentHours,
     last_runtime: lastRuntime,
+    last_service_date: lastServiceDate,
     next_due_runtime: 0,
     next_due_date: nextDueDate,
     hours_until_due: null,
     days_until_due: daysUntilDue,
     pm_alert: status === "active" ? alertFromRemaining(daysUntilDue, UPCOMING_DAYS_THRESHOLD) : "OK"
   };
+}
+
+export function normalizePlanHistory(records) {
+  return Array.isArray(records) ? records.map(record => ({
+    ...record,
+    service_hours: Number(record.service_hours ?? record.hours ?? 0),
+    service_date: record.service_date || record.date || ""
+  })) : [];
+}
+
+export function latestPlanHistoryRecord(records, isRuntime = true) {
+  const normalized = normalizePlanHistory(records);
+  if (!normalized.length) return null;
+  if (isRuntime) {
+    return normalized.reduce((latest, record) => {
+      const latestKey = [Number(latest.service_hours || 0), latest.service_date || "", Number(latest.id || 0)];
+      const recordKey = [Number(record.service_hours || 0), record.service_date || "", Number(record.id || 0)];
+      return recordKey[0] > latestKey[0] || recordKey[0] === latestKey[0] && `${recordKey[1]}-${recordKey[2]}` > `${latestKey[1]}-${latestKey[2]}` ? record : latest;
+    }, normalized[0]);
+  }
+  return normalized.reduce((latest, record) => {
+    const latestKey = `${latest.service_date || ""}-${Number(latest.id || 0)}`;
+    const recordKey = `${record.service_date || ""}-${Number(record.id || 0)}`;
+    return recordKey > latestKey ? record : latest;
+  }, normalized[0]);
 }
 
 export function calculateCalendarNextDueDate(startDate, intervalValue, recurrenceType) {

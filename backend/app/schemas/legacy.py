@@ -144,6 +144,80 @@ class AuditDeleteRequest(BaseModel):
     ids: list[int] = Field(default_factory=list)
 
 
+class OperationalPerformanceReportBase(BaseModel):
+    report_name: str = ""
+    report_type: str = Field(min_length=1)
+    site_id: int | None = None
+    site_name: str = ""
+    equipment_type: str = ""
+    asset_ids: str = "[]"
+    asset_names: str = ""
+    year: int = Field(default=0, ge=0)
+    month: int = Field(default=0, ge=0, le=12)
+    period_from: str = ""
+    period_to: str = ""
+    readings: str = "{}"
+    summary: str = "{}"
+    table_rows: str = "[]"
+    charts: str = "{}"
+
+
+class OperationalPerformanceReportCreate(OperationalPerformanceReportBase):
+    pass
+
+
+class OperationalPerformanceReportUpdate(BaseModel):
+    report_name: str | None = None
+    report_type: str | None = None
+    site_id: int | None = None
+    site_name: str | None = None
+    equipment_type: str | None = None
+    asset_ids: str | None = None
+    asset_names: str | None = None
+    year: int | None = Field(default=None, ge=0)
+    month: int | None = Field(default=None, ge=0, le=12)
+    period_from: str | None = None
+    period_to: str | None = None
+    readings: str | None = None
+    summary: str | None = None
+    table_rows: str | None = None
+    charts: str | None = None
+
+
+class OperationalPerformanceReport(OperationalPerformanceReportBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_by: str = ""
+    created_at: str
+
+
+class OperationalReportItemBase(BaseModel):
+    key: str = ""
+    label: str = Field(min_length=1)
+    unit: str = ""
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class OperationalReportItemCreate(OperationalReportItemBase):
+    pass
+
+
+class OperationalReportItemUpdate(BaseModel):
+    key: str | None = None
+    label: str | None = None
+    unit: str | None = None
+    sort_order: int | None = None
+    is_active: bool | None = None
+
+
+class OperationalReportItem(OperationalReportItemBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: str = ""
+    updated_at: str = ""
+
+
 class JobTitleBase(BaseModel):
     name: str = Field(min_length=1)
 
@@ -870,6 +944,29 @@ class PMPlanTask(PMPlanTaskBase):
     created_at: str
 
 
+class PMPlanHistoryBase(BaseModel):
+    service_hours: int = Field(default=0, ge=0)
+    service_date: str = ""
+
+
+class PMPlanHistoryCreate(PMPlanHistoryBase):
+    pass
+
+
+class PMPlanHistoryUpdate(BaseModel):
+    service_hours: int | None = Field(default=None, ge=0)
+    service_date: str | None = None
+
+
+class PMPlanHistory(PMPlanHistoryBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    pm_plan_id: int
+    equipment_id: int
+    task_name: str
+    created_at: str
+
+
 class PMPlanBase(BaseModel):
     equipment_id: int
     name: str = Field(min_length=1)
@@ -923,6 +1020,7 @@ class PMPlan(PMPlanBase):
     customer_name: str | None = None
     current_hours: int | None = None
     tasks: list[PMPlanTask] = Field(default_factory=list)
+    previous_records: list[PMPlanHistory] = Field(default_factory=list)
 
 
 class PMSchedulerRunResult(BaseModel):

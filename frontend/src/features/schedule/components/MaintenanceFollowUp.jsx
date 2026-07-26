@@ -21,16 +21,23 @@ export function formatInterval(task, language) {
 export function PreviousRecordsTable({
   records,
   canManage = false,
+  onCreateRecord,
   onUpdateRecord,
   language
 }) {
   const t = text => tr(language, text);
   const [editingId, setEditingId] = useState(null);
+  const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({
     hours: "",
     date: ""
   });
+  const [newDraft, setNewDraft] = useState({
+    hours: "",
+    date: new Date().toISOString().slice(0, 10)
+  });
   const [savingId, setSavingId] = useState(null);
+  const [creating, setCreating] = useState(false);
   const startEdit = record => {
     setEditingId(record.id);
     setDraft({
@@ -45,6 +52,13 @@ export function PreviousRecordsTable({
       date: ""
     });
   };
+  const cancelAdd = () => {
+    setAdding(false);
+    setNewDraft({
+      hours: "",
+      date: new Date().toISOString().slice(0, 10)
+    });
+  };
   const saveEdit = async record => {
     if (!record.id || !onUpdateRecord) return;
     setSavingId(record.id);
@@ -55,7 +69,27 @@ export function PreviousRecordsTable({
     setSavingId(null);
     cancelEdit();
   };
-  return <div className="overflow-auto rounded-lg border border-slate-200 bg-white">
+  const saveNew = async () => {
+    if (!onCreateRecord) return;
+    setCreating(true);
+    await onCreateRecord({
+      service_hours: Number(newDraft.hours || 0),
+      service_date: newDraft.date || ""
+    });
+    setCreating(false);
+    cancelAdd();
+  };
+  return <div className="space-y-3">
+    {canManage && onCreateRecord ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">{t("Previous Maintenance History")}</p>
+          <p className="text-xs font-semibold text-slate-600">{t("Add the last completed maintenance record to calculate the next due automatically.")}</p>
+        </div>
+        <button type="button" onClick={() => setAdding(true)} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800">
+          {t("Add Maintenance Record")}
+        </button>
+      </div> : null}
+    <div className="overflow-auto rounded-lg border border-slate-200 bg-white">
       <table className="min-w-[640px] w-full border-collapse text-sm">
         <thead className="bg-slate-100">
           <tr>
@@ -66,6 +100,31 @@ export function PreviousRecordsTable({
           </tr>
         </thead>
         <tbody>
+          {adding ? <tr className="bg-blue-50">
+              <td className="border border-slate-300 px-3 py-2 font-black text-blue-700">{records.length + 1}</td>
+              <td className="border border-slate-300 px-3 py-2">
+                <input type="number" min="0" value={newDraft.hours} onChange={event => setNewDraft({
+              ...newDraft,
+              hours: event.target.value
+            })} className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder={t("Service Hours")} />
+              </td>
+              <td className="border border-slate-300 px-3 py-2">
+                <input type="date" value={newDraft.date} onChange={event => setNewDraft({
+              ...newDraft,
+              date: event.target.value
+            })} className="rounded-md border border-slate-200 px-2 py-1 text-sm font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </td>
+              <td className="border border-slate-300 px-3 py-2">
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={saveNew} disabled={creating} className="rounded-md bg-blue-700 px-3 py-1 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-60">
+                    {creating ? t("Saving") : t("Save")}
+                  </button>
+                  <button type="button" onClick={cancelAdd} className="rounded-md border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 hover:border-slate-300">
+                    {t("Cancel")}
+                  </button>
+                </div>
+              </td>
+            </tr> : null}
           {records.map(record => {
           const editing = record.id && Number(editingId) === Number(record.id);
           return <tr key={`${record.id || record.count}-${record.hours}-${record.date}`}>
@@ -101,7 +160,8 @@ export function PreviousRecordsTable({
             </tr> : null}
         </tbody>
       </table>
-    </div>;
+    </div>
+  </div>;
 }
 
 export function buildScheduleCategories(equipment) {
@@ -234,7 +294,7 @@ export function previousRecordsForTask(task) {
       source: "Previous Records"
     }));
   }
-  if (Number(task.last_service_hours || 0)) {
+  if (Number(task.last_service_hours || 0) || task.last_service_date) {
     return [{
       date: task.last_service_date || "",
       type: task.task_name,

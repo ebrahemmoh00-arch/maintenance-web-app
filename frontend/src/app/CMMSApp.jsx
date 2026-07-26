@@ -339,6 +339,35 @@ export default function CMMSApp({ initialPage = "" }) {
       setError(err.message);
     }
   }
+  async function createPmPlanHistoryRecord(planRow, payload) {
+    if (!hasPermission(currentUser, "pm-plans", "edit")) return false;
+    const planId = Number(planRow?.pm_plan_id || planRow?.id || 0);
+    if (!planId) return false;
+    try {
+      await api.create(`pm-plans/${planId}/history`, payload);
+      await loadAll({
+        silent: true
+      });
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }
+  async function updatePmPlanHistoryRecord(planRow, recordId, payload) {
+    if (!hasPermission(currentUser, "pm-plans", "edit")) return false;
+    if (!recordId) return false;
+    try {
+      await api.update("pm-plans/history", recordId, payload);
+      await loadAll({
+        silent: true
+      });
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }
   async function importMaintenanceFollowUp(sourceEquipmentId, targetEquipmentId) {
     if (!hasPermission(currentUser, "preventive-maintenance", "add")) return { created: 0, skipped: 0 };
     const targetAsset = data.equipment.find(asset => Number(asset.id) === Number(targetEquipmentId));
@@ -586,6 +615,8 @@ export default function CMMSApp({ initialPage = "" }) {
     addJobTitle,
     deleteJobTitle,
     updatePreventiveMaintenanceHistory,
+    createPmPlanHistoryRecord,
+    updatePmPlanHistoryRecord,
     importMaintenanceFollowUp,
     runPMScheduler,
     deleteAuditLogs,
