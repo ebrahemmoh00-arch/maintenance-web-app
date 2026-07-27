@@ -7,9 +7,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$FrontendUrl = "http://localhost:5173"
-$BackendHealthUrl = "http://localhost:8000/health"
-$SwaggerUrl = "http://localhost:8000/docs"
 $BackupsDir = Join-Path $ProjectRoot "backups"
 $LogsDir = Join-Path $ProjectRoot "logs"
 $BackupLogPath = Join-Path $LogsDir "backup.log"
@@ -19,6 +16,53 @@ $Containers = [ordered]@{
     "Backend" = "cmms-backend"
     "Frontend" = "cmms-frontend"
 }
+
+function Get-EnvFileValue {
+    param([string]$Name)
+    $envPath = Join-Path $ProjectRoot ".env"
+    if (-not (Test-Path $envPath)) {
+        return ""
+    }
+    foreach ($rawLine in Get-Content -Path $envPath) {
+        $line = $rawLine.Trim()
+        if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {
+            continue
+        }
+        $key, $value = $line.Split("=", 2)
+        if ($key.Trim() -eq $Name) {
+            $cleanValue = $value.Trim()
+            if ($cleanValue.Length -ge 2 -and (($cleanValue.StartsWith('"') -and $cleanValue.EndsWith('"')) -or ($cleanValue.StartsWith("'") -and $cleanValue.EndsWith("'")))) {
+                return $cleanValue.Substring(1, $cleanValue.Length - 2)
+            }
+            return $cleanValue
+        }
+    }
+    return ""
+}
+
+function Get-ConfigValue {
+    param(
+        [string]$Name,
+        [string]$Default = ""
+    )
+    $processValue = [Environment]::GetEnvironmentVariable($Name)
+    if (-not [string]::IsNullOrWhiteSpace($processValue)) {
+        return $processValue
+    }
+    $envFileValue = Get-EnvFileValue $Name
+    if (-not [string]::IsNullOrWhiteSpace($envFileValue)) {
+        return $envFileValue
+    }
+    return $Default
+}
+
+$LocalFrontendHost = Get-ConfigValue "LOCAL_FRONTEND_HOST" "localhost"
+$LocalBackendHost = Get-ConfigValue "LOCAL_BACKEND_HOST" "localhost"
+$FrontendPort = Get-ConfigValue "FRONTEND_PORT" "5173"
+$BackendPort = Get-ConfigValue "BACKEND_PORT" "8000"
+$FrontendUrl = Get-ConfigValue "FRONTEND_URL" "http://$LocalFrontendHost`:$FrontendPort"
+$BackendHealthUrl = Get-ConfigValue "BACKEND_HEALTH_URL" "http://$LocalBackendHost`:$BackendPort/health"
+$SwaggerUrl = Get-ConfigValue "SWAGGER_URL" "http://$LocalBackendHost`:$BackendPort/docs"
 
 function Set-ProjectLocation {
     Set-Location $ProjectRoot
@@ -78,29 +122,6 @@ function Assert-EnvFile {
     if (-not (Test-Path $envPath)) {
         throw ".env was not found. Copy .env.example to .env and update the values first."
     }
-}
-
-function Get-EnvFileValue {
-    param([string]$Name)
-    $envPath = Join-Path $ProjectRoot ".env"
-    if (-not (Test-Path $envPath)) {
-        return ""
-    }
-    foreach ($rawLine in Get-Content -Path $envPath) {
-        $line = $rawLine.Trim()
-        if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {
-            continue
-        }
-        $key, $value = $line.Split("=", 2)
-        if ($key.Trim() -eq $Name) {
-            $cleanValue = $value.Trim()
-            if ($cleanValue.Length -ge 2 -and (($cleanValue.StartsWith('"') -and $cleanValue.EndsWith('"')) -or ($cleanValue.StartsWith("'") -and $cleanValue.EndsWith("'")))) {
-                return $cleanValue.Substring(1, $cleanValue.Length - 2)
-            }
-            return $cleanValue
-        }
-    }
-    return ""
 }
 
 function ConvertTo-ShSingleQuoted {
@@ -234,6 +255,7 @@ function Invoke-Restart {
     Invoke-Compose @("down")
     Invoke-Compose @("up", "-d")
     Wait-AllServicesHealthy -TimeoutSeconds 120
+    Open-CMMSUrls
     Write-Ok "CMMS restarted successfully."
 }
 

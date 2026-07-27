@@ -6,7 +6,39 @@ $frontendDir = Join-Path $appDir "frontend"
 $pythonExe = Join-Path $backendDir ".venv\Scripts\python.exe"
 $nodeDir = Join-Path $appDir ".tools\node-v20.11.1-win-x64"
 $npmExe = Join-Path $nodeDir "npm.cmd"
-$appUrl = "http://127.0.0.1:5173/?page=dashboard"
+
+function Get-ConfigValue {
+    param(
+        [string]$Name,
+        [string]$Default = ""
+    )
+    $processValue = [Environment]::GetEnvironmentVariable($Name)
+    if (-not [string]::IsNullOrWhiteSpace($processValue)) {
+        return $processValue
+    }
+    $envPath = Join-Path $appDir ".env"
+    if (Test-Path $envPath) {
+        foreach ($rawLine in Get-Content -Path $envPath) {
+            $line = $rawLine.Trim()
+            if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {
+                continue
+            }
+            $key, $value = $line.Split("=", 2)
+            if ($key.Trim() -eq $Name) {
+                return $value.Trim().Trim('"').Trim("'")
+            }
+        }
+    }
+    return $Default
+}
+
+$backendHost = Get-ConfigValue "LOCAL_BACKEND_HOST" "127.0.0.1"
+$frontendHost = Get-ConfigValue "LOCAL_FRONTEND_HOST" "127.0.0.1"
+$backendPort = Get-ConfigValue "BACKEND_PORT" "8000"
+$frontendPort = Get-ConfigValue "FRONTEND_PORT" "5173"
+$appUrl = Get-ConfigValue "FRONTEND_URL" "http://$frontendHost`:$frontendPort/?page=dashboard"
+$backendHealthUrl = Get-ConfigValue "BACKEND_HEALTH_URL" "http://$backendHost`:$backendPort/api/health"
+$frontendHealthUrl = Get-ConfigValue "FRONTEND_HEALTH_URL" "http://$frontendHost`:$frontendPort/"
 
 function Stop-PortListeners {
     param([int[]]$Ports)
@@ -54,13 +86,13 @@ Remove-Item `
 
 Start-Process `
     -FilePath $pythonExe `
-    -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000") `
+    -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", $backendHost, "--port", $backendPort) `
     -WorkingDirectory $backendDir `
     -WindowStyle Hidden `
     -RedirectStandardOutput (Join-Path $appDir "backend-out.log") `
     -RedirectStandardError (Join-Path $appDir "backend-err.log")
 
-$frontendCommand = "/c set PATH=$nodeDir;%PATH% && `"$npmExe`" run dev -- --host 127.0.0.1 --port 5173"
+$frontendCommand = "/c set PATH=$nodeDir;%PATH% && `"$npmExe`" run dev -- --host $frontendHost --port $frontendPort"
 Start-Process `
     -FilePath "cmd.exe" `
     -ArgumentList $frontendCommand `
@@ -73,7 +105,7 @@ Write-Host "Starting Maintenance Management System..."
 
 $ready = $false
 for ($i = 0; $i -lt 30; $i++) {
-    if ((Test-Url "http://127.0.0.1:8000/api/health") -and (Test-Url "http://127.0.0.1:5173/")) {
+    if ((Test-Url $backendHealthUrl) -and (Test-Url $frontendHealthUrl)) {
         $ready = $true
         break
     }

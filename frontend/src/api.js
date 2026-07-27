@@ -1,4 +1,3 @@
-const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const ACTIVE_API_BASE_KEY = "maintenance-active-api-base";
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 60000);
 
@@ -6,16 +5,30 @@ function normalizeApiBase(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
+function envValue(...names) {
+  for (const name of names) {
+    const value = normalizeApiBase(import.meta.env[name]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function envList(name) {
+  return String(import.meta.env[name] || "")
+    .split(",")
+    .map(normalizeApiBase)
+    .filter(Boolean);
+}
+
 function uniqueValues(values) {
   return [...new Set(values.map(normalizeApiBase).filter(Boolean))];
 }
 
-const configuredApiBase = normalizeApiBase(import.meta.env.VITE_API_BASE);
-export const API_BASE = configuredApiBase || (isLocalHost ? "http://127.0.0.1:8000/api" : "https://cmms-system.onrender.com/api");
+const configuredApiBase = envValue("VITE_API_BASE_URL", "VITE_API_BASE");
+export const API_BASE = configuredApiBase || normalizeApiBase(import.meta.env.VITE_API_RELATIVE_BASE || "/api");
 const API_BASE_CANDIDATES = uniqueValues([
   API_BASE,
-  isLocalHost ? "" : "https://cmms-system.onrender.com/api",
-  isLocalHost ? "" : "https://maintenance-backend.onrender.com/api"
+  ...envList("VITE_API_FALLBACK_BASES")
 ]);
 
 const ACCESS_TOKEN_KEY = "maintenance-access-token";

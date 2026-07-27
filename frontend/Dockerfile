@@ -9,17 +9,17 @@ FROM dependencies AS development
 
 WORKDIR /app
 
-ENV HOST=0.0.0.0 \
-    PORT=5173
+ENV VITE_DEV_HOST=0.0.0.0 \
+    FRONTEND_CONTAINER_PORT=5173
 
 COPY frontend/ ./
 
-EXPOSE 5173
+EXPOSE ${FRONTEND_CONTAINER_PORT}
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget -q --spider http://127.0.0.1:5173 || exit 1
+    CMD wget -q --spider "http://127.0.0.1:${FRONTEND_CONTAINER_PORT:-5173}" || exit 1
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+CMD sh -c 'npm run dev -- --host "${VITE_DEV_HOST:-0.0.0.0}" --port "${FRONTEND_CONTAINER_PORT:-5173}"'
 
 FROM dependencies AS build
 
@@ -32,7 +32,9 @@ FROM nginx:1.27-alpine AS production
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+ENV NGINX_CONTAINER_PORT=80
+
+EXPOSE ${NGINX_CONTAINER_PORT}
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget -q --spider http://127.0.0.1 || exit 1
+    CMD wget -q --spider "http://127.0.0.1:${NGINX_CONTAINER_PORT:-80}" || exit 1

@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.auth import require_permission
-from .core.config import validate_startup_configuration
+from .core.config import frontend_origins, validate_startup_configuration
 from .database import init_db
 from .middleware.authentication import protect_api_routes
 from .api.routers import assets, audit_logs, auth, customers, dashboard, downtime_events, engineers, equipment, failure_events, inventory, job_titles, maintenance_alerts, pm_plans, preventive_maintenance, reports, schedule, work_orders
@@ -22,20 +22,9 @@ app = FastAPI(
     description="REST API for departments, assets, resources, work orders, inventory, preventive maintenance, schedule, and dashboard metrics.",
 )
 
-frontend_origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://cmms-system-1.onrender.com",
-    "https://cmms-system.onrender.com",
-    "https://maintenance-frontend.onrender.com",
-]
-frontend_origin_env = os.getenv("FRONTEND_ORIGINS", "")
-if frontend_origin_env:
-    frontend_origins.extend(origin.strip() for origin in frontend_origin_env.split(",") if origin.strip())
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=frontend_origins,
+    allow_origins=frontend_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

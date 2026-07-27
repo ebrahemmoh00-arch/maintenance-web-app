@@ -91,6 +91,14 @@ def database_url() -> str:
     return os.getenv("DATABASE_URL", "").strip()
 
 
+def comma_separated_env(name: str) -> list[str]:
+    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
+
+
+def frontend_origins() -> list[str]:
+    return comma_separated_env("FRONTEND_ORIGINS")
+
+
 def smtp_host() -> str:
     return os.getenv("SMTP_HOST", "").strip()
 

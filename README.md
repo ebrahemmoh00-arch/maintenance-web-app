@@ -72,7 +72,7 @@ For Docker Compose, keep:
 ```text
 DATABASE_URL=postgresql://cmms_user:replace-with-local-db-password@127.0.0.1:5432/cmms_dev
 DOCKER_DATABASE_URL=postgresql://cmms_user:replace-with-local-db-password@postgres:5432/cmms_dev
-VITE_API_BASE=http://127.0.0.1:8000/api
+VITE_API_BASE_URL=http://127.0.0.1:8000/api
 ```
 
 Start the complete platform:
@@ -81,19 +81,19 @@ Start the complete platform:
 docker compose up --build
 ```
 
-Frontend URL:
+Frontend URL is controlled by `FRONTEND_URL`.
 
 ```text
 http://127.0.0.1:5173
 ```
 
-Backend health check:
+Backend health check is controlled by `BACKEND_HEALTH_URL`.
 
 ```text
 http://127.0.0.1:8000/health
 ```
 
-API docs:
+API docs are controlled by `SWAGGER_URL`.
 
 ```text
 http://127.0.0.1:8000/docs
@@ -225,7 +225,7 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host $env:LOCAL_BACKEND_HOST --port $env:BACKEND_PORT
 ```
 
 API docs:
@@ -260,6 +260,8 @@ POSTGRES_PASSWORD
 ADMIN_USERNAME
 ADMIN_PASSWORD
 JWT_SECRET_KEY
+FRONTEND_ORIGINS
+VITE_API_BASE_URL
 ```
 
 If `DATABASE_URL` is set, the backend uses PostgreSQL.
