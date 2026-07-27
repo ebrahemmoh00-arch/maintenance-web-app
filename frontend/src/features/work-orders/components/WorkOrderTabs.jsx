@@ -3,8 +3,7 @@ import { StatusBadge } from "../../../shared/components/StatusBadges.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
 import { joinTime12, readFileAsDataUrl, splitTime12 } from "../utils/workOrderForms.js";
 import { formatLifecycleDate } from "./WorkOrderDocumentParts.jsx";
-import { SignaturePad } from "./WorkOrderMedia.jsx";
-import { Trash2, UploadCloud } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Fragment } from "react";
 
 export function WorkOrderActionButton({
@@ -328,34 +327,6 @@ export function WorkOrderPartsTab({
         <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-950">{t("Total Parts Cost")}: {total.toLocaleString()} EGP</div>
       </div>
       <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">{t("Inventory integration status: linked to spare parts workflow.")}</div>
-    </div>;
-}
-
-export function WorkOrderAttachmentsTab({
-  form,
-  updateSignature,
-  labels,
-  language
-}) {
-  const t = text => tr(language, text);
-  const cards = ["PDF", "Excel", "Photos", "Manuals", "Videos", "Inspection Reports"];
-  return <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map(card => <div key={card} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-black text-slate-950">{t(card)}</p>
-                <p className="mt-1 text-xs font-bold text-slate-500">{t("Attachment card")}</p>
-              </div>
-              <UploadCloud className="h-5 w-5 text-blue-700" />
-            </div>
-          </div>)}
-      </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <SignaturePad title={t("Technician Signature")} value={form.signature_executor} onChange={value => updateSignature("signature_executor", value)} labels={labels} />
-        <SignaturePad title={t("Supervisor Signature")} value={form.signature_shift_engineer} onChange={value => updateSignature("signature_shift_engineer", value)} labels={labels} />
-        <SignaturePad title={t("Manager Signature")} value={form.signature_manager} onChange={value => updateSignature("signature_manager", value)} labels={labels} />
-      </div>
     </div>;
 }
 

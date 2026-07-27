@@ -5,7 +5,7 @@ import { hasPermission, tr } from "../../../shared/config/appConfig.jsx";
 import { InfoTile } from "../../settings/components/SettingsViews.jsx";
 import { calculateDuration, parseWorkOrderNotes } from "../../work-orders/utils/workOrderForms.js";
 import { Activity, ArrowLeft, BarChart3, Bell, CheckCircle2, Clock3, Eye, Factory, Filter, Gauge, Printer, Search, ShieldCheck, TimerReset, Trash2, Wrench, Zap } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 export function Reports({
   data,
@@ -1657,27 +1657,37 @@ export function AuditLogsPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredLogs.map(log => <tr key={log.id} onClick={canDelete ? () => toggleLogSelection(log.id) : undefined} className={`transition ${canDelete ? "cursor-pointer" : ""} ${selectedIds.includes(Number(log.id)) ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : "hover:bg-cyan-50/50"}`}>
-                    {canDelete ? <td className="whitespace-nowrap px-4 py-3">
-                        <input type="checkbox" checked={selectedIds.includes(Number(log.id))} onChange={() => toggleLogSelection(log.id)} onClick={event => event.stopPropagation()} className="h-4 w-4 rounded border-slate-300 text-blue-700" />
-                      </td> : null}
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">{formatAuditTimestamp(log.timestamp, language)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-black text-slate-900">{log.user_name || "-"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{t(log.role || "-")}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{t(log.module)}</td>
-                    <td className="whitespace-nowrap px-4 py-3"><AuditActionBadge action={log.action} status={log.status} language={language} /></td>
-                    <td className="max-w-[320px] truncate px-4 py-3 text-slate-600">{log.description}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.ip_address || "-"}</td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <button type="button" onClick={event => {
-                    event.stopPropagation();
-                    setSelectedLog(log);
-                  }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">
-                        <Eye className="h-3.5 w-3.5" />
-                        {t("Open")}
-                      </button>
-                    </td>
-                  </tr>)}
+                {filteredLogs.map(log => {
+                const isOpen = Number(selectedLog?.id) === Number(log.id);
+                return <Fragment key={log.id}>
+                    <tr onClick={canDelete ? () => toggleLogSelection(log.id) : undefined} className={`transition ${canDelete ? "cursor-pointer" : ""} ${isOpen ? "bg-blue-50" : ""} ${selectedIds.includes(Number(log.id)) ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : "hover:bg-cyan-50/50"}`}>
+                      {canDelete ? <td className="whitespace-nowrap px-4 py-3">
+                          <input type="checkbox" checked={selectedIds.includes(Number(log.id))} onChange={() => toggleLogSelection(log.id)} onClick={event => event.stopPropagation()} className="h-4 w-4 rounded border-slate-300 text-blue-700" />
+                        </td> : null}
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">{formatAuditTimestamp(log.timestamp, language)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-black text-slate-900">{log.user_name || "-"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{t(log.role || "-")}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{t(log.module)}</td>
+                      <td className="whitespace-nowrap px-4 py-3"><AuditActionBadge action={log.action} status={log.status} language={language} /></td>
+                      <td className="max-w-[320px] truncate px-4 py-3 text-slate-600">{log.description}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{log.ip_address || "-"}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <button type="button" onClick={event => {
+                      event.stopPropagation();
+                      setSelectedLog(isOpen ? null : log);
+                    }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:border-blue-300 hover:text-blue-700">
+                          <Eye className="h-3.5 w-3.5" />
+                          {t(isOpen ? "Close" : "Open")}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen ? <tr className="bg-blue-50/30">
+                        <td colSpan={canDelete ? 9 : 8} className="px-4 py-4">
+                          <AuditLogDetails log={log} onClose={() => setSelectedLog(null)} language={language} />
+                        </td>
+                      </tr> : null}
+                  </Fragment>;
+              })}
                 {!filteredLogs.length ? <tr>
                     <td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-sm font-semibold text-slate-500">
                       {t("No audit logs match the current filters.")}
@@ -1688,7 +1698,6 @@ export function AuditLogsPanel({
           </div>
         </div>
 
-        {selectedLog ? <AuditLogDetails log={selectedLog} onClose={() => setSelectedLog(null)} language={language} /> : null}
       </div>
     </Panel>;
 }

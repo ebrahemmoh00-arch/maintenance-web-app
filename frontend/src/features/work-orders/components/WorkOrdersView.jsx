@@ -4,7 +4,7 @@ import { buildWorkOrderReference, calculateDuration, createWorkOrderForm, formFr
 import { normalizeWorkOrderStatus } from "../utils/workOrderStatus.js";
 import { lifecycleActionsForStatus } from "./WorkOrderDocumentParts.jsx";
 import { WorkOrdersWorkspace } from "./WorkOrdersWorkspace.jsx";
-import { Activity, Box, CheckCircle2, Clock3, MessageSquare, Paperclip, TimerReset } from "lucide-react";
+import { Activity, Box, CheckCircle2, Clock3, MessageSquare, TimerReset } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export const DOCUMENT_CODE = "WO-GEN-F-001";
@@ -494,7 +494,7 @@ export function WorkOrdersView({
   const partsTotal = (form.spare_parts_items || []).reduce((total, item) => total + Number(item.total || Number(item.qty || 0) * Number(item.unit_cost || item.cost || 0)), 0);
   const estimatedHours = duration && duration !== "0:00" ? duration : form.estimated_hours || "-";
   const smartAlerts = [!form.after_photos?.length ? "No after-maintenance photos" : "", checklistProgress < 100 ? "Checklist is not complete" : "", !form.signature_executor ? "Technician signature is missing" : "", !(form.spare_parts_items || []).some(item => item.name) ? "No spare parts recorded" : ""].filter(Boolean);
-  const workOrderTabs = [["overview", "Overview", Activity], ["checklist", "Checklist", CheckCircle2], ["labor", "Labor & Time", Clock3], ["parts", "Parts", Box], ["attachments", "Attachments", Paperclip], ["history", "History", TimerReset], ["notes", "Notes", MessageSquare]];
+  const workOrderTabs = [["overview", "Overview", Activity], ["checklist", "Checklist", CheckCircle2], ["labor", "Labor & Time", Clock3], ["parts", "Parts", Box], ["history", "History", TimerReset], ["notes", "Notes", MessageSquare]];
   const app = {
     t,
     workOrderSectionRef,

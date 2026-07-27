@@ -38,7 +38,7 @@ const sidebarSections = [
     key: "maintenance",
     label: "Maintenance",
     items: [
-      { key: "failures", target: "reports", label: "Failures", icon: AlertTriangle },
+      { key: "failures", label: "Failures", icon: AlertTriangle },
       { key: "downtime", target: "reports", label: "Downtime", icon: TimerReset },
       { key: "inventory", label: "Inventory", icon: Boxes }
     ]

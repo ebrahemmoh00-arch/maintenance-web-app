@@ -198,6 +198,7 @@ export function isVisiblePageForUser(user, page) {
   if (page === "engineers") return hasPermission(user, "engineers", "view");
   if (page === "work-orders") return hasPermission(user, "work-orders", "view");
   if (page === "pm-plans") return hasPermission(user, "pm-plans", "view");
+  if (page === "failures") return hasPermission(user, "work-orders", "view") || hasPermission(user, "equipment", "view");
   if (page === "inventory") return hasPermission(user, "inventory", "view");
   if (["reports", "kpis"].includes(page)) return hasPermission(user, "reports", "view");
   if (page === "settings") return hasPermission(user, "settings", "view");

@@ -23,7 +23,6 @@ import {
 import { PhotoUploader, SignaturePad } from "./WorkOrderMedia.jsx";
 import {
   WorkOrderActionButton,
-  WorkOrderAttachmentsTab,
   WorkOrderChecklistTab,
   WorkOrderHistoryTab,
   WorkOrderLaborTab,
@@ -111,6 +110,7 @@ export function WorkOrdersWorkspace({ app }) {
     ISSUE_NO,
     ISSUE_DATE
   } = app;
+  const visibleWorkOrderTab = workOrderTabs.some(([key]) => key === activeWorkOrderTab) ? activeWorkOrderTab : "overview";
 
   return (
     <div className="space-y-5">
@@ -231,7 +231,7 @@ export function WorkOrdersWorkspace({ app }) {
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
               <div className="flex gap-1 overflow-x-auto border-b border-slate-200 px-3 py-3">
                 {workOrderTabs.map(([key, label, Icon]) => (
-                  <button key={key} type="button" onClick={() => setActiveWorkOrderTab(key)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black transition ${activeWorkOrderTab === key ? "bg-blue-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"}`}>
+                  <button key={key} type="button" onClick={() => setActiveWorkOrderTab(key)} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black transition ${visibleWorkOrderTab === key ? "bg-blue-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"}`}>
                     <Icon className="h-4 w-4" />
                     {t(label)}
                   </button>
@@ -239,13 +239,12 @@ export function WorkOrdersWorkspace({ app }) {
               </div>
 
               <div className="p-5">
-                {activeWorkOrderTab === "overview" ? <WorkOrderOverviewTab form={form} update={update} updateStatus={updateStatus} status={currentStatus} selectedEquipment={selectedEquipment} selectedCustomer={selectedCustomer} photosBefore={form.before_photos} photosAfter={form.after_photos} updatePhotos={updatePhotos} language={language} /> : null}
-                {activeWorkOrderTab === "checklist" ? <WorkOrderChecklistTab draft={lifecycleDraft} setDraft={setLifecycleDraft} checklistProgress={checklistProgress} form={form} language={language} /> : null}
-                {activeWorkOrderTab === "labor" ? <WorkOrderLaborTab form={form} update={update} draft={lifecycleDraft} setDraft={setLifecycleDraft} duration={duration} selectedEquipment={selectedEquipment} seniorTeamTechnician={seniorTeamTechnician} language={language} /> : null}
-                {activeWorkOrderTab === "parts" ? <WorkOrderPartsTab items={form.spare_parts_items} inventory={inventory} onChange={updateSparePart} onAdd={addSparePart} onRemove={removeSparePart} total={partsTotal} language={language} /> : null}
-                {activeWorkOrderTab === "attachments" ? <WorkOrderAttachmentsTab form={form} updateSignature={updateSignature} labels={{ clear: t("Clear Signature") }} language={language} /> : null}
-                {activeWorkOrderTab === "history" ? <WorkOrderHistoryTab order={activeSavedOrder} language={language} /> : null}
-                {activeWorkOrderTab === "notes" ? <WorkOrderNotesTab form={form} update={update} selectedEngineer={selectedEngineer} language={language} /> : null}
+                {visibleWorkOrderTab === "overview" ? <WorkOrderOverviewTab form={form} update={update} updateStatus={updateStatus} status={currentStatus} selectedEquipment={selectedEquipment} selectedCustomer={selectedCustomer} photosBefore={form.before_photos} photosAfter={form.after_photos} updatePhotos={updatePhotos} language={language} /> : null}
+                {visibleWorkOrderTab === "checklist" ? <WorkOrderChecklistTab draft={lifecycleDraft} setDraft={setLifecycleDraft} checklistProgress={checklistProgress} form={form} language={language} /> : null}
+                {visibleWorkOrderTab === "labor" ? <WorkOrderLaborTab form={form} update={update} draft={lifecycleDraft} setDraft={setLifecycleDraft} duration={duration} selectedEquipment={selectedEquipment} seniorTeamTechnician={seniorTeamTechnician} language={language} /> : null}
+                {visibleWorkOrderTab === "parts" ? <WorkOrderPartsTab items={form.spare_parts_items} inventory={inventory} onChange={updateSparePart} onAdd={addSparePart} onRemove={removeSparePart} total={partsTotal} language={language} /> : null}
+                {visibleWorkOrderTab === "history" ? <WorkOrderHistoryTab order={activeSavedOrder} language={language} /> : null}
+                {visibleWorkOrderTab === "notes" ? <WorkOrderNotesTab form={form} update={update} selectedEngineer={selectedEngineer} language={language} /> : null}
               </div>
             </div>
           </div>

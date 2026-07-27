@@ -7,6 +7,7 @@ const AssetsPage = lazy(() => import("../features/assets/pages/AssetsPage.jsx"))
 const WorkOrdersPage = lazy(() => import("../features/work-orders/pages/WorkOrdersPage.jsx"));
 const PMPlansPage = lazy(() => import("../features/pm/pages/PMPlansPage.jsx"));
 const SchedulePage = lazy(() => import("../features/schedule/pages/SchedulePage.jsx"));
+const FailuresPage = lazy(() => import("../features/failures/pages/FailuresPage.jsx"));
 const InventoryPage = lazy(() => import("../features/inventory/pages/InventoryPage.jsx"));
 const ResourcesPage = lazy(() => import("../features/resources/pages/ResourcesPage.jsx"));
 const ReportsPage = lazy(() => import("../features/reports/pages/ReportsPage.jsx"));
@@ -22,6 +23,7 @@ const routePages = [
   { path: "/preventive-maintenance", element: <SchedulePage /> },
   { path: "/calendar", element: <SchedulePage /> },
   { path: "/schedule", element: <SchedulePage /> },
+  { path: "/failures", element: <FailuresPage /> },
   { path: "/inventory", element: <InventoryPage /> },
   { path: "/resources", element: <ResourcesPage /> },
   { path: "/technicians", element: <ResourcesPage /> },
