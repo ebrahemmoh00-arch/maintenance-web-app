@@ -49,8 +49,8 @@ def list_operational_performance_reports(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("reports:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.repo.list_query(
+        query,
         search_fields=["report_name", "site_name", "equipment_type", "asset_names", "created_by"],
         filter_aliases={
             "site": ["site_id", "site_name"],

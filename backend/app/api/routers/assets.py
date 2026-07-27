@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
@@ -78,7 +79,15 @@ def asset_timeline(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(service.timeline(asset_id), search_fields=["event_type", "description", "user_name"], date_fields=["created_at", "timestamp"])
+    service.assets.get(asset_id)
+    return service.lifecycle.list_for_asset_query(
+        "asset_history",
+        asset_id,
+        query,
+        search_fields=["event_type", "description", "summary", "details", "technician_name"],
+        date_fields=["created_at", "event_time"],
+        default_sort=[("created_at", "ASC"), ("id", "ASC")],
+    )
 
 
 @router.delete("/{asset_id}/timeline/{entry_id}")
@@ -101,7 +110,15 @@ def asset_measurements(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(service.measurements(asset_id), search_fields=["measurement_type", "unit", "notes", "user_name"], date_fields=["recorded_at", "created_at"])
+    service.assets.get(asset_id)
+    return service.lifecycle.list_for_asset_query(
+        "asset_measurements",
+        asset_id,
+        query,
+        search_fields=["measurement_type", "unit", "notes", "user_name"],
+        date_fields=["reading_date", "created_at"],
+        default_sort=[("reading_date", "DESC"), ("id", "DESC")],
+    )
 
 
 @router.get("/{asset_id}/events", response_model=None)
@@ -110,7 +127,15 @@ def asset_events(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(service.events(asset_id), search_fields=["event_type", "severity", "description"], filter_aliases={"status": ["status"], "priority": ["severity"]}, date_fields=["event_date", "created_at"])
+    service.assets.get(asset_id)
+    return service.lifecycle.list_for_asset_query(
+        "asset_events",
+        asset_id,
+        query,
+        search_fields=["event_type", "severity", "description"],
+        filter_aliases={"status": ["status"], "priority": ["severity"]},
+        date_fields=["due_date", "created_at"],
+    )
 
 
 @router.get("/{asset_id}/failures", response_model=None)
@@ -119,7 +144,14 @@ def asset_failures(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(failures.list_asset_failures(asset_id), search_fields=["failure_code", "description", "root_cause"], filter_aliases={"status": ["status"], "priority": ["priority", "severity"]}, date_fields=["failure_date", "created_at"])
+    failures.assets.get(asset_id)
+    asset_query = replace(query, asset=str(asset_id))
+    return failures.failures.list_query(
+        asset_query,
+        search_fields=["failure_code", "description", "root_cause"],
+        filter_aliases={"status": ["status"], "priority": ["priority", "severity"], "asset": ["asset_id"]},
+        date_fields=["failure_date", "created_at"],
+    )
 
 
 @router.get("/{asset_id}/downtime", response_model=None)
@@ -128,7 +160,14 @@ def asset_downtime(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(downtime.list_asset_downtime(asset_id), search_fields=["reason", "description", "failure_code"], filter_aliases={"status": ["status"]}, date_fields=["start_time", "end_time", "created_at"])
+    downtime.assets.get(asset_id)
+    asset_query = replace(query, asset=str(asset_id))
+    return downtime.downtime.list_query(
+        asset_query,
+        search_fields=["reason", "description", "failure_code"],
+        filter_aliases={"status": ["status"], "asset": ["asset_id"]},
+        date_fields=["start_time", "end_time", "created_at"],
+    )
 
 
 @router.get("/{asset_id}/documents", response_model=None)
@@ -137,7 +176,14 @@ def asset_documents(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(service.documents(asset_id), search_fields=["name", "document_type", "file_name"], date_fields=["created_at", "uploaded_at"])
+    service.assets.get(asset_id)
+    return service.lifecycle.list_for_asset_query(
+        "asset_documents",
+        asset_id,
+        query,
+        search_fields=["title", "document_type", "file_name", "description"],
+        date_fields=["created_at"],
+    )
 
 
 @router.get("/{asset_id}/photos", response_model=None)
@@ -146,7 +192,14 @@ def asset_photos(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(service.photos(asset_id), search_fields=["caption", "photo_type", "file_name"], date_fields=["created_at", "uploaded_at"])
+    service.assets.get(asset_id)
+    return service.lifecycle.list_for_asset_query(
+        "asset_photos",
+        asset_id,
+        query,
+        search_fields=["title", "description", "photo_type", "file_name"],
+        date_fields=["created_at"],
+    )
 
 
 @router.post("/{asset_id}/documents", response_model=AssetDocument, status_code=201)

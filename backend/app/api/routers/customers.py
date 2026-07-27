@@ -14,7 +14,7 @@ def list_customers(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("customers:read")),
 ):
-    return query.apply(service.list(), search_fields=["name", "contact_person", "email", "location"])
+    return service.repo.list_query(query, search_fields=["name", "contact_person", "email", "location"])
 
 
 @router.get("/{customer_id}", response_model=Customer)

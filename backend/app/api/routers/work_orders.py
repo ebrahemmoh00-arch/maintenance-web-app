@@ -14,8 +14,8 @@ def list_work_orders(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("work_orders:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.repo.list_query(
+        query,
         search_fields=["title", "description", "work_order_number", "wo_number", "asset_name", "technician_name"],
         filter_aliases={
             "asset": ["equipment_id", "asset_id", "asset_name", "equipment_name"],

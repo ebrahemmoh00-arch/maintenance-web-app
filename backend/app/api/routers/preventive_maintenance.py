@@ -19,8 +19,8 @@ def list_preventive_maintenance(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("preventive_maintenance:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.repo.list_query(
+        query,
         search_fields=["name", "description", "maintenance_type", "equipment_name"],
         filter_aliases={
             "asset": ["equipment_id", "asset_id", "equipment_name"],

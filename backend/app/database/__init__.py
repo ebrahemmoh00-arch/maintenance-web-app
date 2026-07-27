@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS equipment (
     last_maintenance_date TEXT DEFAULT '',
     status TEXT DEFAULT 'operational',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS asset_history (
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS asset_history (
     actor_id INTEGER,
     metadata TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(user_id) REFERENCES engineers(id) ON DELETE SET NULL,
     FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS asset_events (
     source_record_id TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     resolved_at TEXT DEFAULT '',
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS asset_measurements (
@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS asset_measurements (
     created_by_id INTEGER,
     user_name TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS asset_documents (
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS asset_documents (
     description TEXT DEFAULT '',
     uploaded_by_id INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS asset_photos (
     description TEXT DEFAULT '',
     uploaded_by_id INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -277,7 +277,7 @@ CREATE TABLE IF NOT EXISTS failure_events (
     rca_status TEXT DEFAULT 'not_required',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(problem_code_id) REFERENCES problem_codes(id) ON DELETE SET NULL,
     FOREIGN KEY(failure_code_id) REFERENCES failure_codes(id) ON DELETE SET NULL,
     FOREIGN KEY(cause_code_id) REFERENCES cause_codes(id) ON DELETE SET NULL,
@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS downtime_events (
     linked_work_order_id INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(linked_failure_id) REFERENCES failure_events(id) ON DELETE SET NULL,
     FOREIGN KEY(linked_work_order_id) REFERENCES work_orders(id) ON DELETE SET NULL
 );
@@ -322,7 +322,7 @@ CREATE TABLE IF NOT EXISTS root_cause_analysis (
     approved_at TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE CASCADE,
+    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE RESTRICT,
     FOREIGN KEY(approved_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -340,7 +340,7 @@ CREATE TABLE IF NOT EXISTS corrective_actions (
     status TEXT DEFAULT 'open',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE CASCADE,
+    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE RESTRICT,
     FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE SET NULL
 );
 
@@ -416,7 +416,7 @@ CREATE TABLE IF NOT EXISTS work_order_timeline (
     description TEXT DEFAULT '',
     metadata TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -428,7 +428,7 @@ CREATE TABLE IF NOT EXISTS work_order_status_history (
     changed_by_id INTEGER,
     reason TEXT DEFAULT '',
     changed_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(changed_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -439,7 +439,7 @@ CREATE TABLE IF NOT EXISTS work_order_assignment_history (
     assigned_by_id INTEGER,
     assigned_at TEXT DEFAULT CURRENT_TIMESTAMP,
     notes TEXT DEFAULT '',
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT,
     FOREIGN KEY(assigned_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
@@ -451,7 +451,7 @@ CREATE TABLE IF NOT EXISTS work_order_approvals (
     action TEXT NOT NULL,
     notes TEXT DEFAULT '',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(supervisor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -480,7 +480,7 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance (
     next_due_date TEXT DEFAULT '',
     status TEXT DEFAULT 'active',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
@@ -491,8 +491,8 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
     service_hours INTEGER DEFAULT 0,
     service_date TEXT DEFAULT CURRENT_TIMESTAMP,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE CASCADE,
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE RESTRICT,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS pm_plans (
@@ -515,7 +515,7 @@ CREATE TABLE IF NOT EXISTS pm_plans (
     status TEXT DEFAULT 'active',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS pm_plan_tasks (
@@ -537,8 +537,8 @@ CREATE TABLE IF NOT EXISTS pm_plan_history (
     service_hours INTEGER DEFAULT 0,
     service_date TEXT DEFAULT CURRENT_TIMESTAMP,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE RESTRICT,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
@@ -548,8 +548,8 @@ CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
     cycle_key TEXT NOT NULL,
     generated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     status TEXT DEFAULT 'generated',
-    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE RESTRICT,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     UNIQUE(pm_plan_id, cycle_key)
 );
 
@@ -757,7 +757,7 @@ CREATE TABLE IF NOT EXISTS equipment (
     last_maintenance_date TEXT DEFAULT '',
     status TEXT DEFAULT 'operational',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+    FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS asset_history (
@@ -786,7 +786,7 @@ CREATE TABLE IF NOT EXISTS asset_history (
     actor_id INTEGER,
     metadata TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(user_id) REFERENCES engineers(id) ON DELETE SET NULL,
     FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
@@ -803,7 +803,7 @@ CREATE TABLE IF NOT EXISTS asset_events (
     source_record_id TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     resolved_at TEXT DEFAULT '',
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS asset_measurements (
@@ -819,7 +819,7 @@ CREATE TABLE IF NOT EXISTS asset_measurements (
     created_by_id INTEGER,
     user_name TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS asset_documents (
@@ -832,7 +832,7 @@ CREATE TABLE IF NOT EXISTS asset_documents (
     description TEXT DEFAULT '',
     uploaded_by_id INTEGER,
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -846,7 +846,7 @@ CREATE TABLE IF NOT EXISTS asset_photos (
     description TEXT DEFAULT '',
     uploaded_by_id INTEGER,
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(uploaded_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -960,7 +960,7 @@ CREATE TABLE IF NOT EXISTS work_order_timeline (
     description TEXT DEFAULT '',
     metadata TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(actor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -972,7 +972,7 @@ CREATE TABLE IF NOT EXISTS work_order_status_history (
     changed_by_id INTEGER,
     reason TEXT DEFAULT '',
     changed_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(changed_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -983,7 +983,7 @@ CREATE TABLE IF NOT EXISTS work_order_assignment_history (
     assigned_by_id INTEGER,
     assigned_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     notes TEXT DEFAULT '',
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(engineer_id) REFERENCES engineers(id) ON DELETE RESTRICT,
     FOREIGN KEY(assigned_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
@@ -995,7 +995,7 @@ CREATE TABLE IF NOT EXISTS work_order_approvals (
     action TEXT NOT NULL,
     notes TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     FOREIGN KEY(supervisor_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -1024,7 +1024,7 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance (
     next_due_date TEXT DEFAULT '',
     status TEXT DEFAULT 'active',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS failure_events (
@@ -1054,7 +1054,7 @@ CREATE TABLE IF NOT EXISTS failure_events (
     rca_status TEXT DEFAULT 'not_required',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(problem_code_id) REFERENCES problem_codes(id) ON DELETE SET NULL,
     FOREIGN KEY(failure_code_id) REFERENCES failure_codes(id) ON DELETE SET NULL,
     FOREIGN KEY(cause_code_id) REFERENCES cause_codes(id) ON DELETE SET NULL,
@@ -1079,7 +1079,7 @@ CREATE TABLE IF NOT EXISTS downtime_events (
     linked_work_order_id INTEGER,
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+    FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
     FOREIGN KEY(linked_failure_id) REFERENCES failure_events(id) ON DELETE SET NULL,
     FOREIGN KEY(linked_work_order_id) REFERENCES work_orders(id) ON DELETE SET NULL
 );
@@ -1099,7 +1099,7 @@ CREATE TABLE IF NOT EXISTS root_cause_analysis (
     approved_at TEXT DEFAULT '',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE CASCADE,
+    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE RESTRICT,
     FOREIGN KEY(approved_by_id) REFERENCES engineers(id) ON DELETE SET NULL
 );
 
@@ -1117,7 +1117,7 @@ CREATE TABLE IF NOT EXISTS corrective_actions (
     status TEXT DEFAULT 'open',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE CASCADE,
+    FOREIGN KEY(failure_event_id) REFERENCES failure_events(id) ON DELETE RESTRICT,
     FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE SET NULL
 );
 
@@ -1147,8 +1147,8 @@ CREATE TABLE IF NOT EXISTS preventive_maintenance_history (
     service_hours INTEGER DEFAULT 0,
     service_date TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE CASCADE,
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(pm_task_id) REFERENCES preventive_maintenance(id) ON DELETE RESTRICT,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS pm_plans (
@@ -1171,7 +1171,7 @@ CREATE TABLE IF NOT EXISTS pm_plans (
     status TEXT DEFAULT 'active',
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     updated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS pm_plan_tasks (
@@ -1193,8 +1193,8 @@ CREATE TABLE IF NOT EXISTS pm_plan_history (
     service_hours INTEGER DEFAULT 0,
     service_date TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     created_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
-    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
-    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE RESTRICT,
+    FOREIGN KEY(equipment_id) REFERENCES equipment(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
@@ -1204,8 +1204,8 @@ CREATE TABLE IF NOT EXISTS pm_plan_work_orders (
     cycle_key TEXT NOT NULL,
     generated_at TEXT DEFAULT (CURRENT_TIMESTAMP::text),
     status TEXT DEFAULT 'generated',
-    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE CASCADE,
-    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY(pm_plan_id) REFERENCES pm_plans(id) ON DELETE RESTRICT,
+    FOREIGN KEY(work_order_id) REFERENCES work_orders(id) ON DELETE RESTRICT,
     UNIQUE(pm_plan_id, cycle_key)
 );
 
@@ -1601,7 +1601,7 @@ def ensure_measurement_schema(db: DatabaseConnection) -> None:
             """
             CREATE TABLE IF NOT EXISTS measurement_templates (
                 id SERIAL PRIMARY KEY,
-                asset_id INTEGER REFERENCES equipment(id) ON DELETE CASCADE,
+                asset_id INTEGER REFERENCES equipment(id) ON DELETE RESTRICT,
                 name TEXT NOT NULL,
                 description TEXT DEFAULT '',
                 category TEXT DEFAULT '',
@@ -1639,7 +1639,7 @@ def ensure_measurement_schema(db: DatabaseConnection) -> None:
                 status TEXT DEFAULT 'active',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+                FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
                 FOREIGN KEY(created_by_id) REFERENCES engineers(id) ON DELETE SET NULL
             )
             """
@@ -1692,7 +1692,7 @@ def ensure_measurement_template_name_scope(db: DatabaseConnection) -> None:
             status TEXT DEFAULT 'active',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE CASCADE,
+            FOREIGN KEY(asset_id) REFERENCES equipment(id) ON DELETE RESTRICT,
             FOREIGN KEY(created_by_id) REFERENCES engineers(id) ON DELETE SET NULL
         )
         """

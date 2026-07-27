@@ -14,8 +14,8 @@ def list_engineers(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("users:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.repo.list_query(
+        query,
         search_fields=["name", "email", "phone", "job_title", "department", "work_location", "role"],
         filter_aliases={
             "status": ["status"],

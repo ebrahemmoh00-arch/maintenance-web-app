@@ -14,8 +14,8 @@ def list_downtime_events(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.downtime.list_query(
+        query,
         search_fields=["asset_name", "reason", "description", "failure_code"],
         filter_aliases={"asset": ["asset_id", "equipment_id", "asset_name"], "status": ["status"], "site": ["site", "location"]},
         date_fields=["start_time", "end_time", "created_at"],

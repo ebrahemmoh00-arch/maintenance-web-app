@@ -190,7 +190,62 @@ class AuditService:
         )
 
     @staticmethod
-    def list_logs(filters: dict[str, Any], current_user: Any) -> list[dict[str, Any]]:
+    def list_logs(
+        filters: dict[str, Any],
+        current_user: Any,
+        *,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+    ) -> list[dict[str, Any]]:
+        where, params = AuditService._log_filters(filters, current_user)
+        limit = min(max(int(filters.get("limit") or 500), 1), 2000)
+        clause = f"WHERE {' AND '.join(where)}" if where else ""
+        order = AuditService._log_order(sort_by, sort_order)
+        with get_connection() as db:
+            rows = db.execute(
+                f"SELECT * FROM audit_logs {clause}{order} LIMIT ?",
+                (*params, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    @staticmethod
+    def list_logs_page(
+        filters: dict[str, Any],
+        current_user: Any,
+        *,
+        page: int,
+        page_size: int,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+    ) -> dict[str, Any]:
+        import math
+
+        where, params = AuditService._log_filters(filters, current_user)
+        safe_page = max(int(page or 1), 1)
+        safe_page_size = min(max(int(page_size or 25), 1), 500)
+        offset = (safe_page - 1) * safe_page_size
+        clause = f"WHERE {' AND '.join(where)}" if where else ""
+        order = AuditService._log_order(sort_by, sort_order)
+        with get_connection() as db:
+            count_row = db.execute(
+                f"SELECT COUNT(*) AS total FROM audit_logs {clause}",
+                tuple(params),
+            ).fetchone()
+            total = int(count_row["total"] if isinstance(count_row, dict) else count_row[0])
+            rows = db.execute(
+                f"SELECT * FROM audit_logs {clause}{order} LIMIT ? OFFSET ?",
+                (*params, safe_page_size, offset),
+            ).fetchall()
+        return {
+            "items": [dict(row) for row in rows],
+            "page": safe_page,
+            "page_size": safe_page_size,
+            "total": total,
+            "pages": max(math.ceil(total / safe_page_size), 1) if total else 0,
+        }
+
+    @staticmethod
+    def _log_filters(filters: dict[str, Any], current_user: Any) -> tuple[list[str], list[Any]]:
         where: list[str] = []
         params: list[Any] = []
 
@@ -225,14 +280,27 @@ class AuditService:
                 where.append("user_id = ?")
                 params.append(str(getattr(current_user, "id", "")))
 
-        limit = min(max(int(filters.get("limit") or 500), 1), 2000)
-        clause = f"WHERE {' AND '.join(where)}" if where else ""
-        with get_connection() as db:
-            rows = db.execute(
-                f"SELECT * FROM audit_logs {clause} ORDER BY timestamp DESC, id DESC LIMIT ?",
-                (*params, limit),
-            ).fetchall()
-            return [dict(row) for row in rows]
+        return where, params
+
+    @staticmethod
+    def _log_order(sort_by: str | None, sort_order: str = "desc") -> str:
+        allowed = {
+            "id",
+            "timestamp",
+            "user_id",
+            "user_name",
+            "role",
+            "action",
+            "module",
+            "record_id",
+            "description",
+            "ip_address",
+            "status",
+        }
+        direction = "ASC" if str(sort_order).lower() == "asc" else "DESC"
+        if sort_by in allowed:
+            return f" ORDER BY {sort_by} {direction}, id DESC"
+        return " ORDER BY timestamp DESC, id DESC"
 
     @staticmethod
     def get_log(log_id: int, current_user: Any) -> dict[str, Any]:

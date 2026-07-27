@@ -14,8 +14,8 @@ def list_inventory(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("inventory:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.repo.list_query(
+        query,
         search_fields=["name", "part_number", "category", "warehouse", "supplier"],
         filter_aliases={"status": ["status"], "site": ["site", "warehouse"], "asset": ["asset_id", "asset_name"]},
         date_fields=["created_at", "updated_at"],

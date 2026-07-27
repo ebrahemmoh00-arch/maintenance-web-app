@@ -14,8 +14,8 @@ def list_pm_plans(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("pm_plans:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.repo.list_query(
+        query,
         search_fields=["name", "description", "recurrence_type", "asset_name"],
         filter_aliases={
             "asset": ["asset_id", "equipment_id", "asset_name"],

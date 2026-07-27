@@ -14,8 +14,8 @@ def list_failure_events(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("assets:read")),
 ):
-    return query.apply(
-        service.list(),
+    return service.failures.list_query(
+        query,
         search_fields=["asset_name", "failure_code", "description", "root_cause"],
         filter_aliases={
             "asset": ["asset_id", "equipment_id", "asset_name"],

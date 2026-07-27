@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ...core.audit import AuditService
 from ...core.auth import CurrentUser, get_current_user, require_permission
 from ...schemas import AuditDeleteRequest, AuditExportRequest, AuditLog
-from ...utils.pagination import paginate_items, sort_items
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
@@ -25,24 +24,27 @@ def list_audit_logs(
     sort_order: str = Query(default="asc", pattern="^(asc|desc)$"),
     current_user: CurrentUser = Depends(require_permission("audit_logs:read")),
 ):
-    rows = AuditService.list_logs(
-        {
-            "from_date": from_date,
-            "to_date": to_date,
-            "user_id": user_id,
-            "role": role,
-            "module": module,
-            "action": action,
-            "status": status,
-            "search": search,
-            "limit": limit,
-        },
-        current_user,
-    )
-    rows = sort_items(rows, sort_by, sort_order)
+    filters = {
+        "from_date": from_date,
+        "to_date": to_date,
+        "user_id": user_id,
+        "role": role,
+        "module": module,
+        "action": action,
+        "status": status,
+        "search": search,
+        "limit": limit,
+    }
     if page is not None:
-        return paginate_items(rows, page, page_size)
-    return rows
+        return AuditService.list_logs_page(
+            filters,
+            current_user,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+    return AuditService.list_logs(filters, current_user, sort_by=sort_by, sort_order=sort_order)
 
 
 @router.post("/export")

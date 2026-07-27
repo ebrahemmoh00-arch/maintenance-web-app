@@ -14,8 +14,8 @@ def schedule(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("schedule:read")),
 ):
-    return query.apply(
-        service.schedule(),
+    return service.repo.list_query(
+        query,
         search_fields=["title", "description", "work_order_number", "asset_name", "technician_name"],
         filter_aliases={
             "asset": ["equipment_id", "asset_id", "asset_name", "equipment_name"],

@@ -7,7 +7,8 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..core.audit import AuditService
-from ..database import get_connection, insert_row
+from ..database import DB_BACKEND, get_connection, insert_row
+from ..utils.pagination import ListQuery, query_database_items
 
 MAINTENANCE_ALERT_WINDOW_DAYS = 7
 MAINTENANCE_ALERT_WINDOW_HOURS = 100
@@ -63,6 +64,25 @@ class Repository:
         with get_connection() as db:
             rows = db.execute(f"SELECT * FROM {self.table} ORDER BY id DESC").fetchall()
             return [dict(row) for row in rows]
+
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        field_map = {field: field for field in ("id", "created_at", *self.fields)}
+        return query_database_items(
+            base_sql=f"SELECT * FROM {self.table}",
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("id", "DESC")],
+        )
 
     def get(self, item_id: int) -> dict[str, Any]:
         with get_connection() as db:
@@ -141,6 +161,24 @@ class JobTitleRepository(Repository):
             rows = db.execute("SELECT * FROM job_titles ORDER BY name COLLATE NOCASE ASC").fetchall()
             return [dict(row) for row in rows]
 
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        return query_database_items(
+            base_sql="SELECT * FROM job_titles",
+            query=query,
+            field_map={"id": "id", "name": "name", "created_at": "created_at"},
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("name", "ASC"), ("id", "ASC")],
+        )
+
     def create(self, payload: dict[str, Any]) -> dict[str, Any]:
         name = str(payload.get("name", "")).strip()
         if not name:
@@ -186,6 +224,25 @@ class OperationalPerformanceReportRepository(Repository):
                 """
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        field_map = {field: field for field in ("id", "created_at", *self.fields)}
+        return query_database_items(
+            base_sql="SELECT * FROM operational_performance_reports",
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("created_at", "DESC"), ("id", "DESC")],
+        )
 
 
 DEFAULT_OPERATIONAL_REPORT_ITEMS = [
@@ -384,6 +441,26 @@ class EquipmentRepository(Repository):
             rows = db.execute(f"SELECT * FROM {self.table} ORDER BY id DESC").fetchall()
             return [add_maintenance_calculations(dict(row)) for row in rows]
 
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        field_map = {field: field for field in ("id", "created_at", *self.fields)}
+        return query_database_items(
+            base_sql="SELECT * FROM equipment",
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("id", "DESC")],
+            row_mapper=add_maintenance_calculations,
+        )
+
     def get(self, item_id: int) -> dict[str, Any]:
         with get_connection() as db:
             row = db.execute(f"SELECT * FROM {self.table} WHERE id = ?", (item_id,)).fetchone()
@@ -401,32 +478,222 @@ class EquipmentRepository(Repository):
         for item in self.list():
             if item["maintenance_alert"] == "OK":
                 continue
-            reasons = []
-            if item["hours_until_maintenance"] is not None and item["hours_until_maintenance"] <= 0:
-                reasons.append("service hours reached the maintenance interval")
-            elif item["hours_until_maintenance"] is not None and item["hours_until_maintenance"] <= MAINTENANCE_ALERT_WINDOW_HOURS:
-                reasons.append(f"{item['hours_until_maintenance']} service hours remaining")
-            if item["days_until_maintenance"] is not None and item["days_until_maintenance"] <= 0:
-                reasons.append("scheduled maintenance date is due")
-            elif item["days_until_maintenance"] is not None and item["days_until_maintenance"] <= MAINTENANCE_ALERT_WINDOW_DAYS:
-                reasons.append(f"{item['days_until_maintenance']} days remaining")
-            alerts.append(
-                {
-                    "equipment_id": item["id"],
-                    "equipment_name": item["name"],
-                    "serial_number": item["serial_number"],
-                    "location": item["location"],
-                    "alert_level": item["maintenance_alert"],
-                    "reason": "; ".join(reasons) or "maintenance threshold is approaching",
-                    "next_maintenance_date": item["next_maintenance_date"],
-                    "days_until_maintenance": item["days_until_maintenance"],
-                    "hours_until_maintenance": item["hours_until_maintenance"],
-                }
-            )
+            alerts.append(self._format_maintenance_alert(item))
         return alerts
+
+    def maintenance_alerts_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        if DB_BACKEND == "postgres":
+            next_date_expr = """
+                CASE
+                    WHEN maintenance_interval_days > 0 AND NULLIF(last_maintenance_date, '') IS NOT NULL
+                    THEN (NULLIF(last_maintenance_date, '')::date + (maintenance_interval_days::int * INTERVAL '1 day'))::date
+                    ELSE NULL
+                END
+            """
+            days_until_expr = f"""
+                CASE
+                    WHEN maintenance_interval_days > 0 AND NULLIF(last_maintenance_date, '') IS NOT NULL
+                    THEN ({next_date_expr}) - CURRENT_DATE
+                    ELSE NULL
+                END
+            """
+        else:
+            next_date_expr = """
+                CASE
+                    WHEN maintenance_interval_days > 0 AND NULLIF(last_maintenance_date, '') IS NOT NULL
+                    THEN date(NULLIF(last_maintenance_date, ''), '+' || CAST(maintenance_interval_days AS TEXT) || ' days')
+                    ELSE NULL
+                END
+            """
+            days_until_expr = f"""
+                CASE
+                    WHEN maintenance_interval_days > 0 AND NULLIF(last_maintenance_date, '') IS NOT NULL
+                    THEN CAST(julianday({next_date_expr}) - julianday(date('now')) AS INTEGER)
+                    ELSE NULL
+                END
+            """
+        hours_until_expr = """
+            CASE
+                WHEN maintenance_interval_hours > 0 THEN maintenance_interval_hours - current_hours
+                ELSE NULL
+            END
+        """
+        base_sql = f"""
+            SELECT
+                alert_source.*,
+                CASE
+                    WHEN COALESCE(alert_source.hours_until_maintenance, 999999999) <= 0
+                      OR COALESCE(alert_source.days_until_maintenance, 999999999) <= 0
+                    THEN 'DUE NOW'
+                    ELSE 'UPCOMING'
+                END AS alert_level
+            FROM (
+                SELECT
+                    id AS equipment_id,
+                    name AS equipment_name,
+                    serial_number,
+                    location,
+                    {next_date_expr} AS next_maintenance_date,
+                    {days_until_expr} AS days_until_maintenance,
+                    {hours_until_expr} AS hours_until_maintenance
+                FROM equipment
+            ) AS alert_source
+            WHERE
+                (alert_source.hours_until_maintenance IS NOT NULL AND alert_source.hours_until_maintenance <= {MAINTENANCE_ALERT_WINDOW_HOURS})
+                OR (alert_source.days_until_maintenance IS NOT NULL AND alert_source.days_until_maintenance <= {MAINTENANCE_ALERT_WINDOW_DAYS})
+        """
+        field_map = {
+            "id": "equipment_id",
+            "equipment_id": "equipment_id",
+            "asset_id": "equipment_id",
+            "equipment_name": "equipment_name",
+            "asset_name": "equipment_name",
+            "serial_number": "serial_number",
+            "location": "location",
+            "alert_level": "alert_level",
+            "status": "alert_level",
+            "priority": "alert_level",
+            "severity": "alert_level",
+            "next_maintenance_date": "next_maintenance_date",
+            "due_date": "next_maintenance_date",
+            "timestamp": "next_maintenance_date",
+            "created_at": "next_maintenance_date",
+            "days_until_maintenance": "days_until_maintenance",
+            "hours_until_maintenance": "hours_until_maintenance",
+        }
+        return query_database_items(
+            base_sql=base_sql,
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[
+                ("alert_level", "ASC"),
+                ("days_until_maintenance", "ASC"),
+                ("hours_until_maintenance", "ASC"),
+                ("equipment_name", "ASC"),
+            ],
+            row_mapper=self._format_maintenance_alert,
+        )
+
+    def _format_maintenance_alert(self, item: dict[str, Any]) -> dict[str, Any]:
+        next_date = item.get("next_maintenance_date")
+        if isinstance(next_date, (date, datetime)):
+            next_date = next_date.isoformat()
+        days_until = item.get("days_until_maintenance")
+        hours_until = item.get("hours_until_maintenance")
+        days_until = int(days_until) if days_until is not None else None
+        hours_until = int(hours_until) if hours_until is not None else None
+        reasons = []
+        if hours_until is not None and hours_until <= 0:
+            reasons.append("service hours reached the maintenance interval")
+        elif hours_until is not None and hours_until <= MAINTENANCE_ALERT_WINDOW_HOURS:
+            reasons.append(f"{hours_until} service hours remaining")
+        if days_until is not None and days_until <= 0:
+            reasons.append("scheduled maintenance date is due")
+        elif days_until is not None and days_until <= MAINTENANCE_ALERT_WINDOW_DAYS:
+            reasons.append(f"{days_until} days remaining")
+        return {
+            "equipment_id": item.get("equipment_id") or item.get("id"),
+            "equipment_name": item.get("equipment_name") or item.get("name"),
+            "serial_number": item.get("serial_number", ""),
+            "location": item.get("location", ""),
+            "alert_level": item.get("alert_level") or item.get("maintenance_alert"),
+            "reason": "; ".join(reasons) or "maintenance threshold is approaching",
+            "next_maintenance_date": next_date,
+            "days_until_maintenance": days_until,
+            "hours_until_maintenance": hours_until,
+        }
 
 
 class AssetLifecycleRepository:
+    ASSET_RECORD_FIELDS = {
+        "asset_history": {
+            "id",
+            "asset_id",
+            "event_type",
+            "event_time",
+            "reference_type",
+            "reference_id",
+            "user_id",
+            "summary",
+            "details",
+            "status",
+            "work_order_id",
+            "pm_plan_id",
+            "failure_code",
+            "downtime_duration_minutes",
+            "parts_used",
+            "technician_name",
+            "category",
+            "event_icon",
+            "title",
+            "description",
+            "source_module",
+            "source_record_id",
+            "actor_id",
+            "metadata",
+            "created_at",
+        },
+        "asset_events": {
+            "id",
+            "asset_id",
+            "event_type",
+            "severity",
+            "status",
+            "due_date",
+            "description",
+            "source_module",
+            "source_record_id",
+            "created_at",
+            "resolved_at",
+        },
+        "asset_measurements": {
+            "id",
+            "asset_id",
+            "measurement_type",
+            "value",
+            "unit",
+            "reading_date",
+            "source_module",
+            "source_record_id",
+            "notes",
+            "created_by_id",
+            "user_name",
+            "created_at",
+        },
+        "asset_documents": {
+            "id",
+            "asset_id",
+            "document_type",
+            "title",
+            "file_name",
+            "file_url",
+            "description",
+            "uploaded_by_id",
+            "created_at",
+        },
+        "asset_photos": {
+            "id",
+            "asset_id",
+            "photo_type",
+            "title",
+            "file_name",
+            "file_url",
+            "description",
+            "uploaded_by_id",
+            "created_at",
+        },
+    }
+
     def history(self, asset_id: int) -> list[dict[str, Any]]:
         return self._list_for_asset(
             "asset_history",
@@ -487,6 +754,31 @@ class AssetLifecycleRepository:
             "asset_photos",
             asset_id,
             "created_at DESC, id DESC",
+        )
+
+    def list_for_asset_query(
+        self,
+        table: str,
+        asset_id: int,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+        default_sort: list[tuple[str, str]] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        fields = self.ASSET_RECORD_FIELDS.get(table)
+        if fields is None:
+            raise HTTPException(status_code=400, detail="Unsupported asset record table")
+        return query_database_items(
+            base_sql=f"SELECT * FROM {table} WHERE asset_id = ?",
+            params=(asset_id,),
+            query=query,
+            field_map={field: field for field in fields},
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=default_sort or [("created_at", "DESC"), ("id", "DESC")],
         )
 
     def health(self, asset_id: int) -> dict[str, Any] | None:
@@ -767,6 +1059,44 @@ class FailureEventRepository(Repository):
         with get_connection() as db:
             return [dict(row) for row in db.execute(query).fetchall()]
 
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        base_sql = """
+            SELECT
+                fe.*,
+                e.name AS asset_name,
+                wo.title AS work_order_title
+            FROM failure_events fe
+            JOIN equipment e ON e.id = fe.asset_id
+            LEFT JOIN work_orders wo ON wo.id = fe.linked_work_order_id
+        """
+        field_map = {
+            **{field: field for field in ("id", "created_at", "updated_at", *self.fields)},
+            "asset_name": "asset_name",
+            "work_order_title": "work_order_title",
+            "failure_code": "failure_id",
+            "description": "failure_description",
+            "priority": "severity",
+            "asset": "asset_id",
+            "equipment_id": "asset_id",
+            "failure_date": "failure_datetime",
+        }
+        return query_database_items(
+            base_sql=base_sql,
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("failure_datetime", "DESC"), ("id", "DESC")],
+        )
+
     def get(self, item_id: int) -> dict[str, Any]:
         query = """
             SELECT
@@ -817,6 +1147,37 @@ class DowntimeEventRepository(Repository):
         """
         with get_connection() as db:
             return [dict(row) for row in db.execute(query).fetchall()]
+
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        base_sql = """
+            SELECT de.*, e.name AS asset_name
+            FROM downtime_events de
+            JOIN equipment e ON e.id = de.asset_id
+        """
+        field_map = {
+            **{field: field for field in ("id", "created_at", "updated_at", *self.fields)},
+            "asset_name": "asset_name",
+            "asset": "asset_id",
+            "equipment_id": "asset_id",
+            "reason": "downtime_reason",
+            "description": "downtime_reason",
+        }
+        return query_database_items(
+            base_sql=base_sql,
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("start_time", "DESC"), ("id", "DESC")],
+        )
 
     def get(self, item_id: int) -> dict[str, Any]:
         query = """
@@ -982,6 +1343,52 @@ class WorkOrderRepository(Repository):
         """
         with get_connection() as db:
             return [self._with_lifecycle(dict(row)) for row in db.execute(query).fetchall()]
+
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        base_sql = """
+            SELECT
+                wo.*,
+                c.name AS customer_name,
+                e.name AS equipment_name,
+                eng.name AS engineer_name,
+                assigned_by.name AS assigned_by_name,
+                approved_by.name AS approved_by_name
+            FROM work_orders wo
+            JOIN customers c ON c.id = wo.customer_id
+            JOIN equipment e ON e.id = wo.equipment_id
+            JOIN engineers eng ON eng.id = wo.engineer_id
+            LEFT JOIN engineers assigned_by ON assigned_by.id = wo.assigned_by_id
+            LEFT JOIN engineers approved_by ON approved_by.id = wo.approved_by_id
+        """
+        field_map = {
+            **{field: field for field in ("id", "created_at", "updated_at", *self.fields)},
+            "customer_name": "customer_name",
+            "equipment_name": "equipment_name",
+            "engineer_name": "engineer_name",
+            "assigned_by_name": "assigned_by_name",
+            "approved_by_name": "approved_by_name",
+            "asset_id": "equipment_id",
+            "asset_name": "equipment_name",
+            "assigned_to": "engineer_name",
+            "technician_name": "engineer_name",
+        }
+        return query_database_items(
+            base_sql=base_sql,
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("scheduled_date", "DESC"), ("id", "DESC")],
+            row_mapper=self._with_lifecycle,
+        )
 
     def get(self, item_id: int) -> dict[str, Any]:
         query = """
@@ -1176,6 +1583,45 @@ class InventoryRepository(Repository):
         with get_connection() as db:
             return [inventory_status(dict(row)) for row in db.execute(query).fetchall()]
 
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        base_sql = """
+            SELECT
+                ii.*,
+                wo.title AS linked_work_order_title,
+                CASE
+                    WHEN ii.stock_quantity <= 0 THEN 'OUT OF STOCK'
+                    WHEN ii.stock_quantity <= ii.minimum_quantity THEN 'LOW STOCK'
+                    ELSE 'OK'
+                END AS stock_alert
+            FROM inventory_items ii
+            LEFT JOIN work_orders wo ON wo.id = ii.linked_work_order_id
+        """
+        field_map = {
+            **{field: field for field in ("id", "created_at", *self.fields)},
+            "linked_work_order_title": "linked_work_order_title",
+            "stock_alert": "stock_alert",
+            "status": "stock_alert",
+            "warehouse": "location",
+            "site": "location",
+        }
+        return query_database_items(
+            base_sql=base_sql,
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("stock_quantity", "ASC"), ("name", "ASC")],
+            row_mapper=inventory_status,
+        )
+
     def get(self, item_id: int) -> dict[str, Any]:
         query = """
             SELECT ii.*, wo.title AS linked_work_order_title
@@ -1255,6 +1701,38 @@ class PreventiveMaintenanceRepository(Repository):
         """
         with get_connection() as db:
             return [self._with_history(add_pm_calculations(dict(row))) for row in db.execute(query).fetchall()]
+
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        base_sql = """
+            SELECT pm.*, e.name AS equipment_name, e.current_hours
+            FROM preventive_maintenance pm
+            JOIN equipment e ON e.id = pm.equipment_id
+        """
+        field_map = {
+            **{field: field for field in ("id", "created_at", *self.fields)},
+            "equipment_name": "equipment_name",
+            "current_hours": "current_hours",
+            "name": "task_name",
+            "asset_id": "equipment_id",
+            "asset_name": "equipment_name",
+        }
+        return query_database_items(
+            base_sql=base_sql,
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("status", "ASC"), ("next_due_date", "ASC"), ("id", "DESC")],
+            row_mapper=lambda row: self._with_history(add_pm_calculations(row)),
+        )
 
     def get(self, item_id: int) -> dict[str, Any]:
         query = """
@@ -1387,6 +1865,48 @@ class PMPlanRepository(Repository):
         with get_connection() as db:
             rows = [dict(row) for row in db.execute(query).fetchall()]
         return [self._with_tasks(row) for row in rows]
+
+    def list_query(
+        self,
+        query: ListQuery,
+        *,
+        search_fields: list[str] | None = None,
+        filter_aliases: dict[str, list[str]] | None = None,
+        date_fields: list[str] | None = None,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        base_sql = """
+            SELECT
+                pp.*,
+                e.name AS equipment_name,
+                e.customer_id,
+                e.current_hours,
+                c.name AS customer_name
+            FROM pm_plans pp
+            JOIN equipment e ON e.id = pp.equipment_id
+            JOIN customers c ON c.id = e.customer_id
+        """
+        field_map = {
+            **{field: field for field in ("id", "created_at", "updated_at", *self.fields)},
+            "equipment_name": "equipment_name",
+            "customer_id": "customer_id",
+            "current_hours": "current_hours",
+            "customer_name": "customer_name",
+            "asset_id": "equipment_id",
+            "asset_name": "equipment_name",
+            "state": "status",
+            "location": "customer_name",
+            "site": "customer_name",
+        }
+        return query_database_items(
+            base_sql=base_sql,
+            query=query,
+            field_map=field_map,
+            search_fields=search_fields,
+            filter_aliases=filter_aliases,
+            date_fields=date_fields,
+            default_sort=[("status", "ASC"), ("next_due_date", "ASC"), ("next_due_runtime", "ASC"), ("id", "DESC")],
+            row_mapper=self._with_tasks,
+        )
 
     def get(self, item_id: int) -> dict[str, Any]:
         query = """

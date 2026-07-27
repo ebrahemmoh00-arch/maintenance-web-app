@@ -14,9 +14,9 @@ def maintenance_alerts(
     query: ListQuery = Depends(get_list_query),
     _=Depends(require_permission("alerts:read")),
 ):
-    return query.apply(
-        service.alerts(),
-        search_fields=["title", "message", "asset_name", "type"],
+    return service.repo.maintenance_alerts_query(
+        query,
+        search_fields=["equipment_name", "serial_number", "location", "alert_level"],
         filter_aliases={"asset": ["asset_id", "equipment_id", "asset_name"], "status": ["status"], "priority": ["priority", "severity"]},
         date_fields=["created_at", "due_date", "timestamp"],
     )
