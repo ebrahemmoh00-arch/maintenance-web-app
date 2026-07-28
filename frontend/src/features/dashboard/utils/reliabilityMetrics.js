@@ -5,8 +5,9 @@ import { calculateDuration, formatShortDate, getWorkOrderSavedDate, parseWorkOrd
 import { clampPercent, createMonthBuckets, monthLabel, toMonthKey } from "./dashboardDateUtils.js";
 import { assetLocationValues, buildCustomerNameById, matchesAnyFilterValue, matchesFilterValue, normalizeChoice } from "./dashboardFilters.js";
 
-export function buildAssetReliabilityRows(workOrders, equipment, pmTasks) {
+export function buildAssetReliabilityRows(workOrders, equipment, pmTasks, customers = []) {
   const assetStats = buildAssetFaultStats(workOrders, equipment);
+  const customerNameById = buildCustomerNameById(customers);
   return equipment.map(asset => {
     const stats = assetStats.get(Number(asset.id)) || {
       faults: 0,
@@ -17,9 +18,10 @@ export function buildAssetReliabilityRows(workOrders, equipment, pmTasks) {
     const overduePmCount = pmTasks.filter(task => Number(task.equipment_id) === Number(asset.id) && isPmOverdue(task)).length;
     const availability = assetAvailabilityPercent(asset, stats.downtimeHours);
     const health = calculateAssetHealthScore(asset, stats, overduePmCount, availability);
+    const site = assetLocationValues(asset, customerNameById)[0] || "-";
     return {
       ...asset,
-      site: asset.customer_name || asset.location || "-",
+      site,
       statusLabel: equipmentIndustrialStatus(asset),
       health,
       availability,

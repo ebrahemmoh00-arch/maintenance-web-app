@@ -66,7 +66,7 @@ export function buildMaintenanceDashboardMetrics(data, alerts, reliability, lang
   const breakdownCount = Number(reliability?.failureCount ?? faultOrders.length + breakdownEquipment + alerts.filter(alert => alert.alert_level === "DUE NOW").length);
   const overduePmTasks = buildOverduePmRows(unifiedPmTasks, equipmentById);
   const cost = buildMaintenanceCostMetrics(workOrders, equipmentById, language);
-  const assetReliabilityRows = buildAssetReliabilityRows(workOrders, equipment, unifiedPmTasks);
+  const assetReliabilityRows = buildAssetReliabilityRows(workOrders, equipment, unifiedPmTasks, customers);
   const assetHealthRanking = assetReliabilityRows.map(row => ({
     ...row,
     category: assetHealthCategory(row.health)
