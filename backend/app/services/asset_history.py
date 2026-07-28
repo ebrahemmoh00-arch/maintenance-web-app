@@ -81,11 +81,619 @@ class AssetHistoryService:
         search: str | None = None,
     ) -> dict[str, Any]:
         self.assets.get(asset_id)
-        events = self._collect_events(asset_id)
-        events = self._dedupe(events)
-        events = [event for event in events if self._matches(event, event_type, date_from, date_to, technician, status, work_order, pm_cm, failure, downtime, search)]
-        events.sort(key=lambda item: (self._parse_datetime(item.get("event_time")), int(item.get("source_id") or 0)), reverse=True)
-        return self._paginate(events, page, page_size)
+        return self._query_history_page(
+            asset_id,
+            page=page,
+            page_size=page_size,
+            event_type=event_type,
+            date_from=date_from,
+            date_to=date_to,
+            technician=technician,
+            status=status,
+            work_order=work_order,
+            pm_cm=pm_cm,
+            failure=failure,
+            downtime=downtime,
+            search=search,
+        )
+
+    def _query_history_page(
+        self,
+        asset_id: int,
+        *,
+        page: int,
+        page_size: int,
+        event_type: str | None,
+        date_from: date | None,
+        date_to: date | None,
+        technician: str | None,
+        status: str | None,
+        work_order: str | None,
+        pm_cm: str | None,
+        failure: str | None,
+        downtime: str | None,
+        search: str | None,
+    ) -> dict[str, Any]:
+        safe_page = max(int(page or 1), 1)
+        safe_page_size = min(max(int(page_size or 25), 1), 500)
+        offset = (safe_page - 1) * safe_page_size
+        where_sql, where_params = self._history_filters(
+            event_type=event_type,
+            date_from=date_from,
+            date_to=date_to,
+            technician=technician,
+            status=status,
+            work_order=work_order,
+            pm_cm=pm_cm,
+            failure=failure,
+            downtime=downtime,
+            search=search,
+        )
+        where_clause = f" WHERE {' AND '.join(where_sql)}" if where_sql else ""
+        base_params = self._history_union_params(asset_id)
+        cte_sql = f"""
+        WITH all_events AS (
+            {self._history_union_sql()}
+        ),
+        filtered AS (
+            SELECT
+                all_events.*,
+                CASE
+                    WHEN all_events.work_order_id IS NOT NULL AND COALESCE(CAST(all_events.work_order_id AS TEXT), '') <> ''
+                        THEN LOWER(COALESCE(all_events.event_type, '')) || '|work_order|' || CAST(all_events.work_order_id AS TEXT) || '|' || SUBSTR(COALESCE(CAST(all_events.event_time AS TEXT), ''), 1, 19)
+                    ELSE LOWER(COALESCE(all_events.event_type, '')) || '|' || LOWER(COALESCE(all_events.reference_type, '')) || '|' || COALESCE(CAST(all_events.reference_id AS TEXT), '')
+                END AS dedupe_key
+            FROM all_events
+            {where_clause}
+        ),
+        deduped AS (
+            SELECT *
+            FROM (
+                SELECT
+                    filtered.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY filtered.dedupe_key
+                        ORDER BY COALESCE(CAST(filtered.event_time AS TEXT), '') DESC, filtered.source_order_id DESC
+                    ) AS dedupe_rank
+                FROM filtered
+            ) ranked_events
+            WHERE dedupe_rank = 1
+        )
+        """
+        count_sql = f"{cte_sql} SELECT COUNT(*) AS total FROM deduped"
+        page_sql = f"""
+        {cte_sql}
+        SELECT *
+        FROM deduped
+        ORDER BY COALESCE(CAST(event_time AS TEXT), '') DESC, source_order_id DESC
+        LIMIT ? OFFSET ?
+        """
+
+        with get_connection() as db:
+            try:
+                count_row = db.execute(count_sql, (*base_params, *where_params)).fetchone()
+                total = int(count_row["total"] if isinstance(count_row, dict) else count_row[0])
+                rows = db.execute(
+                    page_sql,
+                    (*base_params, *where_params, safe_page_size, offset),
+                ).fetchall()
+            except Exception as exc:  # pragma: no cover - converted to API-safe error.
+                raise HTTPException(status_code=500, detail="Asset history query failed") from exc
+
+        return {
+            "items": [self._normalize(dict(row)) for row in rows],
+            "page": safe_page,
+            "page_size": safe_page_size,
+            "total": total,
+            "pages": max(math.ceil(total / safe_page_size), 1) if total else 0,
+        }
+
+    def _history_union_params(self, asset_id: int) -> tuple[Any, ...]:
+        return (asset_id,) * 14
+
+    def _history_filters(
+        self,
+        *,
+        event_type: str | None,
+        date_from: date | None,
+        date_to: date | None,
+        technician: str | None,
+        status: str | None,
+        work_order: str | None,
+        pm_cm: str | None,
+        failure: str | None,
+        downtime: str | None,
+        search: str | None,
+    ) -> tuple[list[str], list[Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if event_type:
+            clauses.append("LOWER(COALESCE(all_events.event_type, '')) = LOWER(?)")
+            params.append(event_type)
+        if date_from or date_to:
+            event_date = "SUBSTR(COALESCE(CAST(all_events.event_time AS TEXT), ''), 1, 10)"
+            date_clauses = []
+            if date_from:
+                date_clauses.append(f"{event_date} <> ''")
+                date_clauses.append(f"{event_date} >= ?")
+                params.append(date_from.isoformat())
+            if date_to:
+                date_clauses.append(f"{event_date} <= ?")
+                params.append(date_to.isoformat())
+            clauses.append("(" + " AND ".join(date_clauses) + ")")
+        if technician:
+            clauses.append("(LOWER(COALESCE(all_events.technician, '')) LIKE LOWER(?) OR LOWER(COALESCE(all_events.user_name, '')) LIKE LOWER(?))")
+            params.extend([f"%{technician}%", f"%{technician}%"])
+        if status:
+            clauses.append("LOWER(COALESCE(all_events.status, '')) LIKE LOWER(?)")
+            params.append(f"%{status}%")
+        if work_order:
+            clauses.append("(LOWER(COALESCE(CAST(all_events.work_order_id AS TEXT), '')) LIKE LOWER(?) OR LOWER(COALESCE(all_events.work_order_number, '')) LIKE LOWER(?))")
+            params.extend([f"%{work_order}%", f"%{work_order}%"])
+        if pm_cm:
+            requested = self._lower(pm_cm)
+            if requested in {"pm", "preventive", "preventive maintenance"}:
+                clauses.append("(LOWER(COALESCE(all_events.event_type, '')) LIKE LOWER(?) OR LOWER(COALESCE(all_events.event_type, '')) LIKE LOWER(?))")
+                params.extend(["%pm%", "%preventive%"])
+            elif requested in {"cm", "corrective", "corrective maintenance"}:
+                clauses.append("(LOWER(COALESCE(all_events.event_type, '')) LIKE LOWER(?) OR LOWER(COALESCE(all_events.event_type, '')) LIKE LOWER(?))")
+                params.extend(["%cm%", "%corrective%"])
+        if self._truthy_filter(failure):
+            clauses.append("(LOWER(COALESCE(all_events.event_type, '')) LIKE LOWER(?) OR LOWER(COALESCE(all_events.failure_code, '')) LIKE LOWER(?))")
+            params.extend(["%failure%", "%failure%"])
+        if self._truthy_filter(downtime):
+            clauses.append("LOWER(COALESCE(all_events.event_type, '')) LIKE LOWER(?)")
+            params.append("%downtime%")
+        if search:
+            search_fields = [
+                "event_type",
+                "summary",
+                "description",
+                "details",
+                "user_name",
+                "technician",
+                "work_order_number",
+                "pm_plan",
+                "failure_code",
+                "status",
+            ]
+            clauses.append("(" + " OR ".join([f"LOWER(COALESCE(CAST(all_events.{field} AS TEXT), '')) LIKE LOWER(?)" for field in search_fields]) + ")")
+            params.extend([f"%{search}%"] * len(search_fields))
+        return clauses, params
+
+    def _history_union_sql(self) -> str:
+        return """
+            SELECT
+                CAST(ah.id AS TEXT) AS source_id,
+                ah.id AS source_order_id,
+                'asset_history' AS source_table,
+                ah.asset_id,
+                COALESCE(NULLIF(ah.event_type, ''), 'Status Changed') AS event_type,
+                COALESCE(NULLIF(ah.event_time, ''), ah.created_at) AS event_time,
+                COALESCE(ah.user_id, ah.actor_id) AS user_id,
+                COALESCE(actor.name, '') AS user_name,
+                COALESCE(NULLIF(ah.technician_name, ''), actor.name, '') AS technician,
+                ah.work_order_id,
+                COALESCE('WO-' || CAST(ah.work_order_id AS TEXT), '') AS work_order_number,
+                ah.pm_plan_id,
+                COALESCE(pp.name, '') AS pm_plan,
+                COALESCE(ah.failure_code, '') AS failure_code,
+                COALESCE(ah.downtime_duration_minutes, 0) AS downtime_duration_minutes,
+                COALESCE(ah.parts_used, '') AS parts_used,
+                COALESCE(NULLIF(ah.summary, ''), ah.title) AS summary,
+                ah.description,
+                COALESCE(NULLIF(ah.details, ''), ah.description) AS details,
+                COALESCE(ah.status, '') AS status,
+                COALESCE(NULLIF(ah.reference_type, ''), ah.source_module) AS reference_type,
+                COALESCE(NULLIF(ah.reference_id, ''), ah.source_record_id) AS reference_id,
+                ah.metadata
+            FROM asset_history ah
+            LEFT JOIN engineers actor ON actor.id = COALESCE(ah.user_id, ah.actor_id)
+            LEFT JOIN pm_plans pp ON pp.id = ah.pm_plan_id
+            WHERE ah.asset_id = ?
+            UNION ALL
+            SELECT
+                CAST(wo.id AS TEXT) AS source_id,
+                wo.id AS source_order_id,
+                'work_orders' AS source_table,
+                wo.equipment_id AS asset_id,
+                CASE
+                    WHEN UPPER(wo.title) LIKE 'PM:%%' THEN 'Preventive Maintenance'
+                    WHEN LOWER(wo.title || ' ' || wo.description || ' ' || wo.priority) LIKE '%%breakdown%%'
+                      OR LOWER(wo.title || ' ' || wo.description || ' ' || wo.priority) LIKE '%%failure%%'
+                      OR LOWER(wo.title || ' ' || wo.description || ' ' || wo.priority) LIKE '%%fault%%'
+                      OR LOWER(wo.priority) = 'critical' THEN 'Corrective Maintenance'
+                    ELSE 'Work Order Created'
+                END AS event_type,
+                wo.created_at AS event_time,
+                wo.engineer_id AS user_id,
+                COALESCE(eng.name, '') AS user_name,
+                COALESCE(eng.name, '') AS technician,
+                wo.id AS work_order_id,
+                'WO-' || CAST(wo.id AS TEXT) AS work_order_number,
+                pwo.pm_plan_id AS pm_plan_id,
+                COALESCE(pp.name, '') AS pm_plan,
+                '' AS failure_code,
+                COALESCE(wo.work_duration_minutes, 0) AS downtime_duration_minutes,
+                '' AS parts_used,
+                wo.title AS summary,
+                wo.description AS description,
+                wo.notes AS details,
+                wo.status AS status,
+                'Work Orders' AS reference_type,
+                CAST(wo.id AS TEXT) AS reference_id,
+                '' AS metadata
+            FROM work_orders wo
+            LEFT JOIN engineers eng ON eng.id = wo.engineer_id
+            LEFT JOIN pm_plan_work_orders pwo ON pwo.work_order_id = wo.id
+            LEFT JOIN pm_plans pp ON pp.id = pwo.pm_plan_id
+            WHERE wo.equipment_id = ?
+            UNION ALL
+            SELECT
+                CAST(wot.id AS TEXT) AS source_id,
+                wot.id AS source_order_id,
+                'work_order_timeline' AS source_table,
+                wo.equipment_id AS asset_id,
+                CASE
+                    WHEN UPPER(wot.event_type) = 'CREATED' THEN 'Work Order Created'
+                    WHEN UPPER(wot.event_type) = 'STATUS_CHANGE' THEN
+                        CASE LOWER(COALESCE(NULLIF(wot.to_status, ''), wo.status))
+                            WHEN 'assigned' THEN 'Work Order Assigned'
+                            WHEN 'accepted' THEN 'Status Changed'
+                            WHEN 'in_progress' THEN 'Work Started'
+                            WHEN 'on_hold' THEN 'Status Changed'
+                            WHEN 'waiting_for_parts' THEN 'Status Changed'
+                            WHEN 'completed' THEN 'Work Completed'
+                            WHEN 'pending_supervisor_review' THEN 'Work Completed'
+                            WHEN 'approved' THEN 'Work Approved'
+                            WHEN 'closed' THEN 'Work Order Closed'
+                            WHEN 'cancelled' THEN 'Status Changed'
+                            WHEN 'rejected' THEN 'Status Changed'
+                            ELSE 'Status Changed'
+                        END
+                    WHEN UPPER(wot.event_type) = 'NOTIFICATION' THEN 'Status Changed'
+                    ELSE wot.event_type
+                END AS event_type,
+                wot.created_at AS event_time,
+                wot.actor_id AS user_id,
+                COALESCE(NULLIF(wot.actor_name, ''), actor.name, '') AS user_name,
+                COALESCE(NULLIF(wot.actor_name, ''), actor.name, eng.name, '') AS technician,
+                wo.id AS work_order_id,
+                'WO-' || CAST(wo.id AS TEXT) AS work_order_number,
+                pwo.pm_plan_id AS pm_plan_id,
+                COALESCE(pp.name, '') AS pm_plan,
+                '' AS failure_code,
+                COALESCE(wo.work_duration_minutes, 0) AS downtime_duration_minutes,
+                '' AS parts_used,
+                COALESCE(NULLIF(wot.description, ''), wo.title) AS summary,
+                wot.description AS description,
+                wot.metadata AS details,
+                COALESCE(NULLIF(wot.to_status, ''), wo.status) AS status,
+                'Work Order Timeline' AS reference_type,
+                CAST(wot.id AS TEXT) AS reference_id,
+                wot.metadata AS metadata
+            FROM work_order_timeline wot
+            JOIN work_orders wo ON wo.id = wot.work_order_id
+            LEFT JOIN engineers actor ON actor.id = wot.actor_id
+            LEFT JOIN engineers eng ON eng.id = wo.engineer_id
+            LEFT JOIN pm_plan_work_orders pwo ON pwo.work_order_id = wo.id
+            LEFT JOIN pm_plans pp ON pp.id = pwo.pm_plan_id
+            WHERE wo.equipment_id = ?
+            UNION ALL
+            SELECT
+                CAST(pm.id AS TEXT) AS source_id,
+                pm.id AS source_order_id,
+                'preventive_maintenance' AS source_table,
+                pm.equipment_id AS asset_id,
+                'Preventive Maintenance' AS event_type,
+                COALESCE(NULLIF(pm.last_service_date, ''), pm.created_at) AS event_time,
+                NULL AS user_id,
+                '' AS user_name,
+                '' AS technician,
+                NULL AS work_order_id,
+                '' AS work_order_number,
+                NULL AS pm_plan_id,
+                pm.task_name AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                '' AS parts_used,
+                pm.task_name AS summary,
+                'Preventive maintenance task configured' AS description,
+                'Interval hours: ' || CAST(pm.interval_hours AS TEXT) AS details,
+                pm.status AS status,
+                'Preventive Maintenance' AS reference_type,
+                CAST(pm.id AS TEXT) AS reference_id,
+                '' AS metadata
+            FROM preventive_maintenance pm
+            WHERE pm.equipment_id = ?
+            UNION ALL
+            SELECT
+                CAST(pmh.id AS TEXT) AS source_id,
+                pmh.id AS source_order_id,
+                'preventive_maintenance_history' AS source_table,
+                pmh.equipment_id AS asset_id,
+                'Preventive Maintenance' AS event_type,
+                pmh.service_date AS event_time,
+                NULL AS user_id,
+                '' AS user_name,
+                '' AS technician,
+                NULL AS work_order_id,
+                '' AS work_order_number,
+                NULL AS pm_plan_id,
+                pmh.task_name AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                '' AS parts_used,
+                pmh.task_name AS summary,
+                'Maintenance completed at ' || CAST(pmh.service_hours AS TEXT) || ' operating hours' AS description,
+                '' AS details,
+                'completed' AS status,
+                'Preventive Maintenance History' AS reference_type,
+                CAST(pmh.id AS TEXT) AS reference_id,
+                '' AS metadata
+            FROM preventive_maintenance_history pmh
+            WHERE pmh.equipment_id = ?
+            UNION ALL
+            SELECT
+                CAST(pp.id AS TEXT) AS source_id,
+                pp.id AS source_order_id,
+                'pm_plans' AS source_table,
+                pp.equipment_id AS asset_id,
+                'Preventive Maintenance' AS event_type,
+                COALESCE(NULLIF(pp.last_service_date, ''), pp.created_at) AS event_time,
+                NULL AS user_id,
+                '' AS user_name,
+                '' AS technician,
+                NULL AS work_order_id,
+                '' AS work_order_number,
+                pp.id AS pm_plan_id,
+                pp.name AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                pp.planned_spare_parts AS parts_used,
+                pp.name AS summary,
+                pp.description AS description,
+                pp.checklist_template AS details,
+                pp.status AS status,
+                'PM Plans' AS reference_type,
+                CAST(pp.id AS TEXT) AS reference_id,
+                pp.required_skills AS metadata
+            FROM pm_plans pp
+            WHERE pp.equipment_id = ?
+            UNION ALL
+            SELECT
+                CAST(fe.id AS TEXT) AS source_id,
+                fe.id AS source_order_id,
+                'failure_events' AS source_table,
+                fe.asset_id,
+                'Failure Recorded' AS event_type,
+                fe.failure_datetime AS event_time,
+                fe.reported_by_id AS user_id,
+                COALESCE(reporter.name, '') AS user_name,
+                COALESCE(tech.name, reporter.name, '') AS technician,
+                fe.linked_work_order_id AS work_order_id,
+                CASE WHEN fe.linked_work_order_id IS NULL THEN '' ELSE 'WO-' || CAST(fe.linked_work_order_id AS TEXT) END AS work_order_number,
+                fe.linked_pm_id AS pm_plan_id,
+                '' AS pm_plan,
+                fe.failure_id AS failure_code,
+                0 AS downtime_duration_minutes,
+                '' AS parts_used,
+                fe.failure_id AS summary,
+                fe.failure_description AS description,
+                fe.operational_impact AS details,
+                fe.status AS status,
+                'Failure Events' AS reference_type,
+                CAST(fe.id AS TEXT) AS reference_id,
+                fe.severity AS metadata
+            FROM failure_events fe
+            LEFT JOIN engineers reporter ON reporter.id = fe.reported_by_id
+            LEFT JOIN engineers tech ON tech.id = fe.assigned_technician_id
+            WHERE fe.asset_id = ?
+            UNION ALL
+            SELECT
+                CAST(de.id AS TEXT) AS source_id,
+                de.id AS source_order_id,
+                'downtime_events' AS source_table,
+                de.asset_id,
+                'Downtime Started' AS event_type,
+                de.start_time AS event_time,
+                NULL AS user_id,
+                '' AS user_name,
+                COALESCE(eng.name, '') AS technician,
+                de.linked_work_order_id AS work_order_id,
+                CASE WHEN de.linked_work_order_id IS NULL THEN '' ELSE 'WO-' || CAST(de.linked_work_order_id AS TEXT) END AS work_order_number,
+                NULL AS pm_plan_id,
+                '' AS pm_plan,
+                COALESCE(fe.failure_id, '') AS failure_code,
+                de.total_downtime_minutes AS downtime_duration_minutes,
+                '' AS parts_used,
+                de.downtime_category AS summary,
+                de.downtime_reason AS description,
+                '' AS details,
+                CASE WHEN de.end_time = '' THEN 'open' ELSE 'closed' END AS status,
+                'Downtime Events' AS reference_type,
+                CAST(de.id AS TEXT) AS reference_id,
+                '' AS metadata
+            FROM downtime_events de
+            LEFT JOIN failure_events fe ON fe.id = de.linked_failure_id
+            LEFT JOIN work_orders wo ON wo.id = de.linked_work_order_id
+            LEFT JOIN engineers eng ON eng.id = wo.engineer_id
+            WHERE de.asset_id = ?
+            UNION ALL
+            SELECT
+                CAST(de.id AS TEXT) || '-end' AS source_id,
+                de.id AS source_order_id,
+                'downtime_events' AS source_table,
+                de.asset_id,
+                'Downtime Ended' AS event_type,
+                de.end_time AS event_time,
+                NULL AS user_id,
+                '' AS user_name,
+                COALESCE(eng.name, '') AS technician,
+                de.linked_work_order_id AS work_order_id,
+                CASE WHEN de.linked_work_order_id IS NULL THEN '' ELSE 'WO-' || CAST(de.linked_work_order_id AS TEXT) END AS work_order_number,
+                NULL AS pm_plan_id,
+                '' AS pm_plan,
+                COALESCE(fe.failure_id, '') AS failure_code,
+                de.total_downtime_minutes AS downtime_duration_minutes,
+                '' AS parts_used,
+                de.downtime_category AS summary,
+                de.downtime_reason AS description,
+                '' AS details,
+                'closed' AS status,
+                'Downtime Events' AS reference_type,
+                CAST(de.id AS TEXT) AS reference_id,
+                '' AS metadata
+            FROM downtime_events de
+            LEFT JOIN failure_events fe ON fe.id = de.linked_failure_id
+            LEFT JOIN work_orders wo ON wo.id = de.linked_work_order_id
+            LEFT JOIN engineers eng ON eng.id = wo.engineer_id
+            WHERE de.asset_id = ? AND COALESCE(de.end_time, '') <> ''
+            UNION ALL
+            SELECT
+                CAST(ii.id AS TEXT) AS source_id,
+                ii.id AS source_order_id,
+                'inventory_items' AS source_table,
+                wo.equipment_id AS asset_id,
+                'Spare Parts Issued' AS event_type,
+                ii.created_at AS event_time,
+                wo.engineer_id AS user_id,
+                COALESCE(eng.name, '') AS user_name,
+                COALESCE(eng.name, '') AS technician,
+                wo.id AS work_order_id,
+                'WO-' || CAST(wo.id AS TEXT) AS work_order_number,
+                NULL AS pm_plan_id,
+                '' AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                ii.name AS parts_used,
+                ii.name AS summary,
+                'Inventory item linked to work order' AS description,
+                'Stock: ' || CAST(ii.stock_quantity AS TEXT) || ' ' || COALESCE(ii.unit, '') AS details,
+                CASE
+                    WHEN ii.stock_quantity <= 0 THEN 'OUT OF STOCK'
+                    WHEN ii.stock_quantity <= ii.minimum_quantity THEN 'LOW STOCK'
+                    ELSE 'OK'
+                END AS status,
+                'Inventory' AS reference_type,
+                CAST(ii.id AS TEXT) AS reference_id,
+                '' AS metadata
+            FROM inventory_items ii
+            JOIN work_orders wo ON wo.id = ii.linked_work_order_id
+            LEFT JOIN engineers eng ON eng.id = wo.engineer_id
+            WHERE wo.equipment_id = ?
+            UNION ALL
+            SELECT
+                CAST(am.id AS TEXT) AS source_id,
+                am.id AS source_order_id,
+                'asset_measurements' AS source_table,
+                am.asset_id,
+                'Meter Reading' AS event_type,
+                am.reading_date AS event_time,
+                am.created_by_id AS user_id,
+                COALESCE(NULLIF(am.user_name, ''), eng.name, '') AS user_name,
+                COALESCE(NULLIF(am.user_name, ''), eng.name, '') AS technician,
+                NULL AS work_order_id,
+                '' AS work_order_number,
+                NULL AS pm_plan_id,
+                '' AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                '' AS parts_used,
+                am.measurement_type AS summary,
+                CAST(am.value AS TEXT) || ' ' || COALESCE(am.unit, '') AS description,
+                am.notes AS details,
+                '' AS status,
+                COALESCE(NULLIF(am.source_module, ''), 'Asset Measurements') AS reference_type,
+                COALESCE(NULLIF(am.source_record_id, ''), CAST(am.id AS TEXT)) AS reference_id,
+                '' AS metadata
+            FROM asset_measurements am
+            LEFT JOIN engineers eng ON eng.id = am.created_by_id
+            WHERE am.asset_id = ?
+            UNION ALL
+            SELECT
+                CAST(ad.id AS TEXT) AS source_id,
+                ad.id AS source_order_id,
+                'asset_documents' AS source_table,
+                ad.asset_id,
+                'Document Uploaded' AS event_type,
+                ad.created_at AS event_time,
+                ad.uploaded_by_id AS user_id,
+                COALESCE(eng.name, '') AS user_name,
+                COALESCE(eng.name, '') AS technician,
+                NULL AS work_order_id,
+                '' AS work_order_number,
+                NULL AS pm_plan_id,
+                '' AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                '' AS parts_used,
+                ad.title AS summary,
+                ad.description AS description,
+                ad.file_url AS details,
+                ad.document_type AS status,
+                'Asset Documents' AS reference_type,
+                CAST(ad.id AS TEXT) AS reference_id,
+                ad.file_name AS metadata
+            FROM asset_documents ad
+            LEFT JOIN engineers eng ON eng.id = ad.uploaded_by_id
+            WHERE ad.asset_id = ?
+            UNION ALL
+            SELECT
+                CAST(ap.id AS TEXT) AS source_id,
+                ap.id AS source_order_id,
+                'asset_photos' AS source_table,
+                ap.asset_id,
+                'Photo Added' AS event_type,
+                ap.created_at AS event_time,
+                ap.uploaded_by_id AS user_id,
+                COALESCE(eng.name, '') AS user_name,
+                COALESCE(eng.name, '') AS technician,
+                NULL AS work_order_id,
+                '' AS work_order_number,
+                NULL AS pm_plan_id,
+                '' AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                '' AS parts_used,
+                ap.title AS summary,
+                ap.description AS description,
+                ap.file_url AS details,
+                ap.photo_type AS status,
+                'Asset Photos' AS reference_type,
+                CAST(ap.id AS TEXT) AS reference_id,
+                ap.file_name AS metadata
+            FROM asset_photos ap
+            LEFT JOIN engineers eng ON eng.id = ap.uploaded_by_id
+            WHERE ap.asset_id = ?
+            UNION ALL
+            SELECT
+                CAST(ae.id AS TEXT) AS source_id,
+                ae.id AS source_order_id,
+                'asset_events' AS source_table,
+                ae.asset_id,
+                ae.event_type AS event_type,
+                COALESCE(NULLIF(ae.due_date, ''), ae.created_at) AS event_time,
+                NULL AS user_id,
+                '' AS user_name,
+                '' AS technician,
+                NULL AS work_order_id,
+                '' AS work_order_number,
+                NULL AS pm_plan_id,
+                '' AS pm_plan,
+                '' AS failure_code,
+                0 AS downtime_duration_minutes,
+                '' AS parts_used,
+                ae.event_type AS summary,
+                ae.description AS description,
+                ae.resolved_at AS details,
+                ae.status AS status,
+                COALESCE(NULLIF(ae.source_module, ''), 'Asset Events') AS reference_type,
+                COALESCE(NULLIF(ae.source_record_id, ''), CAST(ae.id AS TEXT)) AS reference_id,
+                ae.severity AS metadata
+            FROM asset_events ae
+            WHERE ae.asset_id = ?
+        """
 
     def _collect_events(self, asset_id: int) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
@@ -733,20 +1341,6 @@ class AssetHistoryService:
             if self._lower(search) not in self._lower(haystack):
                 return False
         return True
-
-    def _paginate(self, items: list[dict[str, Any]], page: int, page_size: int) -> dict[str, Any]:
-        safe_page = max(int(page or 1), 1)
-        safe_page_size = min(max(int(page_size or 25), 1), 500)
-        total = len(items)
-        start = (safe_page - 1) * safe_page_size
-        end = start + safe_page_size
-        return {
-            "items": items[start:end],
-            "page": safe_page,
-            "page_size": safe_page_size,
-            "total": total,
-            "pages": max(math.ceil(total / safe_page_size), 1) if total else 0,
-        }
 
     def _parse_datetime(self, value: Any) -> datetime:
         if isinstance(value, datetime):
