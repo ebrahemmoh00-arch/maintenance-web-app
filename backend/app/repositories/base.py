@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException
 
 from ..core.audit import AuditService
-from ..database import DB_BACKEND, get_connection, insert_row
+from ..database import get_connection, insert_row
 from ..utils.pagination import ListQuery, query_database_items
 
 MAINTENANCE_ALERT_WINDOW_DAYS = 7

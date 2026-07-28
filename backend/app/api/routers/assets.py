@@ -4,7 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 
 from ...core.auth import CurrentUser, require_permission
-from ...schemas import AssetDocument, AssetDocumentCreate, AssetEvent, AssetHealth, AssetHistory, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, DowntimeEvent, FailureEvent, MeasurementTemplate, MeasurementTemplateCreate, MeasurementTemplateUpdate
+from ...schemas import AssetDocument, AssetDocumentCreate, AssetHealth, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, MeasurementTemplate, MeasurementTemplateCreate, MeasurementTemplateUpdate
 from ...services import AssetHistoryService, AssetLifecycleService, DowntimeService, FailureManagementService, MeasurementTemplateService
 from ...utils.pagination import ListQuery, get_list_query
 

@@ -4,14 +4,12 @@ import { ProgressBar } from "../../../shared/components/StatusPrimitives.jsx";
 import { tr } from "../../../shared/config/appConfig.jsx";
 import { formatNumber } from "../../../shared/i18n/index.js";
 import { formatShortDate } from "../../work-orders/utils/workOrderForms.js";
-import { hasChartValue } from "../utils/executiveDashboardMetrics.js";
 import {
   Activity,
   AlertTriangle,
   Bell,
   CalendarClock,
   CheckCircle2,
-  ClipboardList,
   Cpu,
   Eye,
   EyeOff,
@@ -21,7 +19,6 @@ import {
   PlusCircle,
   ShieldAlert,
   Sparkles,
-  TimerReset,
   TrendingDown,
   TrendingUp,
   Wrench

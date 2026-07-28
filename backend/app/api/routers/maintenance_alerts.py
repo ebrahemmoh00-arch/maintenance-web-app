@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 
 from ...core.auth import require_permission
-from ...schemas import MaintenanceAlert
 from ...services import EquipmentService
 from ...utils.pagination import ListQuery, get_list_query
 

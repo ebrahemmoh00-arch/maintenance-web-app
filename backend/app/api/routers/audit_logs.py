@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.audit import AuditService
-from ...core.auth import CurrentUser, get_current_user, require_permission
+from ...core.auth import CurrentUser, require_permission
 from ...schemas import AuditDeleteRequest, AuditExportRequest, AuditLog
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])

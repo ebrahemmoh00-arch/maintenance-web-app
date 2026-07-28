@@ -17,6 +17,22 @@ export default defineConfig(({ mode }) => {
     preview: {
       ...(host ? { host } : {}),
       port
+    },
+    test: {
+      environment: "jsdom",
+      setupFiles: "./src/test/setup.js",
+      css: true,
+      coverage: {
+        provider: "v8",
+        reporter: ["text", "json-summary"],
+        reportsDirectory: "coverage",
+        include: ["src/**/*.{js,jsx}"],
+        exclude: [
+          "src/main.jsx",
+          "src/test/**",
+          "src/**/*.test.{js,jsx}"
+        ]
+      }
     }
   };
 });

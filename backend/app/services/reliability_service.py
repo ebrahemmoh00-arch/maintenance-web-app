@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..core.audit import AuditService
-from ..repositories import AssetLifecycleRepository, CauseCodeRepository, CorrectiveActionRepository, DowntimeEventRepository, EngineerRepository, EquipmentRepository, FailureCodeRepository, FailureEventRepository, FailureStatisticsRepository, PMPlanRepository, PreventiveMaintenanceRepository, ProblemCodeRepository, RemedyCodeRepository, RootCauseAnalysisRepository, WorkOrderRepository
+from ..repositories import AssetLifecycleRepository, CauseCodeRepository, CorrectiveActionRepository, DowntimeEventRepository, EngineerRepository, EquipmentRepository, FailureCodeRepository, FailureEventRepository, FailureStatisticsRepository, PreventiveMaintenanceRepository, ProblemCodeRepository, RemedyCodeRepository, RootCauseAnalysisRepository, WorkOrderRepository
 from .asset_service import AssetLifecycleService
 from .common import downtime_minutes, format_hours, parse_datetime_value, payload, status_value, utc_timestamp
 
