@@ -2,17 +2,23 @@ import asyncio
 import logging
 from datetime import datetime
 import os
+import time
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.auth import require_permission
 from .core.config import frontend_origins, validate_startup_configuration
+from .core.structured_logging import configure_logging, log_background_job, monotonic_ms
 from .database import init_db
 from .middleware.authentication import protect_api_routes
+from .middleware.rate_limiting import rate_limit_api_routes
+from .middleware.request_logging import log_http_requests
+from .middleware.security_headers import secure_http_responses
 from .api.routers import assets, audit_logs, auth, customers, dashboard, downtime_events, engineers, equipment, failure_events, inventory, job_titles, maintenance_alerts, pm_plans, preventive_maintenance, reports, schedule, work_orders
 from .services import PMPlanEngineService
 
+configure_logging()
 logger = logging.getLogger("cmms.pm_scheduler")
 pm_scheduler_task: asyncio.Task | None = None
 
@@ -32,6 +38,9 @@ app.add_middleware(
 
 
 app.middleware("http")(protect_api_routes)
+app.middleware("http")(rate_limit_api_routes)
+app.middleware("http")(secure_http_responses)
+app.middleware("http")(log_http_requests)
 
 
 @app.on_event("startup")
@@ -69,10 +78,25 @@ async def pm_scheduler_loop() -> None:
     interval = max(int(os.getenv("PM_SCHEDULER_INTERVAL_SECONDS", "3600") or 3600), 60)
     await asyncio.sleep(startup_delay)
     while True:
+        started = time.perf_counter()
         try:
-            PMPlanEngineService().run_due_plans()
+            result = PMPlanEngineService().run_due_plans()
+            log_background_job(
+                "background_job_completed",
+                job_name="pm_scheduler",
+                duration_ms=monotonic_ms(started),
+                generated=result.get("generated", ""),
+                skipped=result.get("skipped", ""),
+            )
         except Exception as exc:  # pragma: no cover - defensive production loop.
-            logger.warning("PM scheduler run failed: %s", exc.__class__.__name__)
+            logger.warning("pm_scheduler_failed", extra={"event": "pm_scheduler_failed", "error_type": exc.__class__.__name__}, exc_info=True)
+            log_background_job(
+                "background_job_failed",
+                job_name="pm_scheduler",
+                status="FAILED",
+                duration_ms=monotonic_ms(started),
+                error=exc,
+            )
         await asyncio.sleep(interval)
 
 

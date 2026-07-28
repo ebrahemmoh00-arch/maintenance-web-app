@@ -7,6 +7,7 @@ from typing import Any
 
 from ..core.config import admin_credentials_configured, admin_email, admin_password, admin_username, database_url
 from ..core.security import hash_password, is_password_hash
+from ..core.structured_logging import log_database_failure
 
 try:
     import psycopg
@@ -1346,30 +1347,50 @@ class DatabaseConnection:
         self.raw.__exit__(exc_type, exc, tb)
 
     def execute(self, query: str, params: tuple[Any, ...] | list[Any] | None = None):
-        return self.raw.execute(adapt_query(query, self.backend), params or ())
+        try:
+            return self.raw.execute(adapt_query(query, self.backend), params or ())
+        except Exception as exc:
+            log_database_failure(operation="execute", backend=self.backend, error=exc)
+            raise
 
     def executescript(self, script: str) -> None:
-        if self.backend == "sqlite":
-            self.raw.executescript(script)
-            return
-        for statement in split_sql_script(script):
-            self.execute(statement)
+        try:
+            if self.backend == "sqlite":
+                self.raw.executescript(script)
+                return
+            for statement in split_sql_script(script):
+                self.execute(statement)
+        except Exception as exc:
+            log_database_failure(operation="executescript", backend=self.backend, error=exc)
+            raise
 
     def commit(self) -> None:
-        self.raw.commit()
+        try:
+            self.raw.commit()
+        except Exception as exc:
+            log_database_failure(operation="commit", backend=self.backend, error=exc)
+            raise
 
 
 def get_connection() -> DatabaseConnection:
     if DB_BACKEND == "postgres":
         if psycopg is None:
             raise RuntimeError("DATABASE_URL is set, but psycopg is not installed.")
-        connection = psycopg.connect(DATABASE_URL, row_factory=dict_row)
-        return DatabaseConnection(connection, "postgres")
+        try:
+            connection = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+            return DatabaseConnection(connection, "postgres")
+        except Exception as exc:
+            log_database_failure(operation="connect", backend="postgres", error=exc)
+            raise
 
-    connection = sqlite3.connect(DB_PATH)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    return DatabaseConnection(connection, "sqlite")
+    try:
+        connection = sqlite3.connect(DB_PATH)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        return DatabaseConnection(connection, "sqlite")
+    except Exception as exc:
+        log_database_failure(operation="connect", backend="sqlite", error=exc)
+        raise
 
 
 def adapt_query(query: str, backend: str) -> str:

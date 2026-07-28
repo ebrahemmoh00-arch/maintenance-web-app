@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from ..core.audit import client_ip, device_info, reset_audit_context, set_audit_context
 from ..core.auth import authenticate_access_header
+from ..core.structured_logging import log_authorization_failure, update_log_context
 
 PUBLIC_API_PATHS = {
     "/api/login",
@@ -19,7 +20,9 @@ async def protect_api_routes(request: Request, call_next):
     try:
         current_user = authenticate_access_header(request.headers.get("Authorization"))
         request.state.current_user = current_user
+        update_log_context(user_id=current_user.id)
     except HTTPException as exc:
+        log_authorization_failure(permission="authenticated_api", request_path=path)
         return JSONResponse(status_code=exc.status_code, content={"detail": "Access Denied"})
     token = set_audit_context(current_user, ip_address=client_ip(request), device_info=device_info(request))
     try:

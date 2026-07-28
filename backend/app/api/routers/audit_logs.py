@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.audit import AuditService
 from ...core.auth import CurrentUser, require_permission
+from ...core.structured_logging import log_export_operation
 from ...schemas import AuditDeleteRequest, AuditExportRequest, AuditLog
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
@@ -51,6 +52,12 @@ def list_audit_logs(
 def export_audit_logs(payload: AuditExportRequest, current_user: CurrentUser = Depends(require_permission("audit_logs:read"))):
     if not current_user:
         return {"ok": False}
+    log_export_operation(
+        "audit_logs_exported",
+        export_type=payload.format,
+        module="Audit Logs",
+        user_id=current_user.id,
+    )
     AuditService.log_event(
         action="EXPORT",
         module="Reports",

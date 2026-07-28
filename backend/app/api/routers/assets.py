@@ -4,6 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 
 from ...core.auth import CurrentUser, require_permission
+from ...core.structured_logging import log_file_upload
 from ...schemas import AssetDocument, AssetDocumentCreate, AssetHealth, AssetMeasurement, AssetMeasurementCreate, AssetPhoto, AssetPhotoCreate, MeasurementTemplate, MeasurementTemplateCreate, MeasurementTemplateUpdate
 from ...services import AssetHistoryService, AssetLifecycleService, DowntimeService, FailureManagementService, MeasurementTemplateService
 from ...utils.pagination import ListQuery, get_list_query
@@ -26,12 +27,30 @@ def measurement_templates(
 
 @router.post("/measurement-templates", response_model=MeasurementTemplate, status_code=201)
 def create_measurement_template(template: MeasurementTemplateCreate, user=Depends(require_permission("measurement_templates:create"))):
-    return template_service.create(template, user.id)
+    created = template_service.create(template, user.id)
+    if created.get("guidance_file_name") or created.get("guidance_file_url"):
+        log_file_upload(
+            "guidance_file_linked",
+            asset_id=created.get("asset_id", ""),
+            file_name=created.get("guidance_file_name", ""),
+            file_type="measurement_guidance",
+            user_id=user.id,
+        )
+    return created
 
 
 @router.put("/measurement-templates/{template_id}", response_model=MeasurementTemplate)
-def update_measurement_template(template_id: int, template: MeasurementTemplateUpdate, _=Depends(require_permission("measurement_templates:update"))):
-    return template_service.update(template_id, template)
+def update_measurement_template(template_id: int, template: MeasurementTemplateUpdate, current_user=Depends(require_permission("measurement_templates:update"))):
+    updated = template_service.update(template_id, template)
+    if updated.get("guidance_file_name") or updated.get("guidance_file_url"):
+        log_file_upload(
+            "guidance_file_linked",
+            asset_id=updated.get("asset_id", ""),
+            file_name=updated.get("guidance_file_name", ""),
+            file_type="measurement_guidance",
+            user_id=current_user.id,
+        )
+    return updated
 
 
 @router.delete("/measurement-templates/{template_id}")
@@ -203,13 +222,29 @@ def asset_photos(
 
 
 @router.post("/{asset_id}/documents", response_model=AssetDocument, status_code=201)
-def add_asset_document(asset_id: int, document: AssetDocumentCreate, _=Depends(require_permission("assets:update"))):
-    return service.add_document(asset_id, document)
+def add_asset_document(asset_id: int, document: AssetDocumentCreate, current_user=Depends(require_permission("assets:update"))):
+    created = service.add_document(asset_id, document)
+    log_file_upload(
+        "asset_document_uploaded",
+        asset_id=asset_id,
+        file_name=created.get("file_name", "") or created.get("title", ""),
+        file_type=created.get("document_type", ""),
+        user_id=current_user.id,
+    )
+    return created
 
 
 @router.post("/{asset_id}/photos", response_model=AssetPhoto, status_code=201)
-def add_asset_photo(asset_id: int, photo: AssetPhotoCreate, _=Depends(require_permission("assets:update"))):
-    return service.add_photo(asset_id, photo)
+def add_asset_photo(asset_id: int, photo: AssetPhotoCreate, current_user=Depends(require_permission("assets:update"))):
+    created = service.add_photo(asset_id, photo)
+    log_file_upload(
+        "asset_photo_uploaded",
+        asset_id=asset_id,
+        file_name=created.get("file_name", "") or created.get("title", ""),
+        file_type=created.get("photo_type", ""),
+        user_id=current_user.id,
+    )
+    return created
 
 
 @router.post("/{asset_id}/measurements", response_model=AssetMeasurement, status_code=201)

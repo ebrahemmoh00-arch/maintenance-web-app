@@ -15,6 +15,7 @@ from jwt import InvalidTokenError
 from ..database import get_connection
 from .config import jwt_secret_key
 from .security import hash_password, is_password_hash, verify_password
+from .structured_logging import log_authorization_failure, update_log_context
 
 JWT_SECRET_KEY = jwt_secret_key()
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
@@ -339,11 +340,14 @@ def get_current_user(
 ) -> CurrentUser:
     existing = getattr(request.state, "current_user", None)
     if existing:
+        update_log_context(user_id=existing.id)
         return existing
     token = credentials.credentials if credentials else None
     if not token:
         raise access_denied(status.HTTP_401_UNAUTHORIZED)
-    return authenticate_access_header(f"Bearer {token}")
+    user = authenticate_access_header(f"Bearer {token}")
+    update_log_context(user_id=user.id)
+    return user
 
 
 def refresh_token_pair(refresh_token: str) -> dict[str, Any]:
@@ -459,6 +463,7 @@ def has_permission(user: CurrentUser, permission: str) -> bool:
 def require_permission(permission: str) -> Callable[[CurrentUser], CurrentUser]:
     def dependency(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
         if not has_permission(current_user, permission):
+            log_authorization_failure(permission=permission, user_id=current_user.id, role=current_user.role)
             raise access_denied()
         return current_user
 
